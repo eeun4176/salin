@@ -1,9 +1,20 @@
-import { useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useRef, type ChangeEvent } from "react";
 import { NavLink, useLocation } from "react-router";
-import { Search, X } from "lucide-react";
+import { ArchiveRestore, DatabaseBackup, Download, Search, X } from "lucide-react";
 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { downloadBackup, readBackup } from "@/features/workspace/backup";
 import { SECTION_LINKS } from "@/features/workspace/section-links";
 import { useUiStore } from "@/stores/ui-store";
+import { useWorkspaceStore } from "@/stores/workspace-store";
+import { toast } from "@/stores/toast-store";
 import { cn } from "@/lib/utils";
 
 /** Segmented switcher with a sliding white pill behind the active tab. */
@@ -68,7 +79,7 @@ function SearchField() {
   const setQuery = useUiStore((s) => s.setQuery);
 
   return (
-    <div role="search" className="relative w-full md:max-w-[17rem] lg:max-w-xs">
+    <div role="search" className="relative min-w-0 flex-1">
       <label htmlFor="workspace-search" className="sr-only">
         Search files and folders
       </label>
@@ -97,11 +108,68 @@ function SearchField() {
   );
 }
 
+/** Quick backup / restore menu that sits beside the search field. */
+function BackupMenu() {
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  function backUp() {
+    const { items } = useWorkspaceStore.getState();
+    downloadBackup(items);
+    toast(`Backed up ${items.length} item${items.length === 1 ? "" : "s"}.`);
+  }
+
+  async function restore(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    try {
+      const restored = await readBackup(file);
+      const { items: previous, replaceAll } = useWorkspaceStore.getState();
+      replaceAll(restored);
+      toast(`Restored ${restored.length} item${restored.length === 1 ? "" : "s"} from backup.`, {
+        label: "Undo",
+        onClick: () => replaceAll(previous),
+      });
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Couldn't restore that backup.");
+    }
+  }
+
+  return (
+    <>
+      <input ref={fileRef} type="file" accept=".json,application/json" className="sr-only" tabIndex={-1} aria-hidden="true" onChange={restore} />
+      <DropdownMenu modal={false}>
+        <DropdownMenuTrigger
+          aria-label="Backup and restore"
+          title="Backup and restore"
+          className="press grid size-12 shrink-0 place-items-center rounded-2xl border border-salin-border bg-white text-salin-text outline-none hover:bg-salin-tile focus-visible:ring-3 focus-visible:ring-salin-primary/15 data-[state=open]:border-salin-primary data-[state=open]:text-salin-primary"
+        >
+          <DatabaseBackup className="size-5" strokeWidth={1.9} />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-64 rounded-xl p-1.5">
+          <DropdownMenuLabel>Backup & restore</DropdownMenuLabel>
+          <DropdownMenuItem className="gap-2.5 py-2" onSelect={backUp}>
+            <Download /> Back up workspace
+          </DropdownMenuItem>
+          <DropdownMenuItem className="gap-2.5 py-2" onSelect={() => fileRef.current?.click()}>
+            <ArchiveRestore /> Restore from backup…
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <p className="px-1.5 py-1 text-xs text-salin-muted">Saves folders and file details as a .json file on this device.</p>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </>
+  );
+}
+
 export function WorkspaceToolbar() {
   return (
-    <div className="flex items-center justify-between gap-4">
+    <div className="flex items-center gap-3 md:gap-4">
       <SectionTabs />
-      <SearchField />
+      <div className="flex min-w-0 flex-1 items-center gap-2">
+        <SearchField />
+        <BackupMenu />
+      </div>
     </div>
   );
 }

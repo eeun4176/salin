@@ -13,6 +13,8 @@ interface WorkspaceState {
   restore: (id: string) => void;
   deleteForever: (id: string) => void;
   emptyTrash: () => void;
+  /** Replaces the whole workspace (restore from backup). */
+  replaceAll: (items: WorkspaceItem[]) => void;
 }
 
 const patchItem = (items: WorkspaceItem[], id: string, patch: (item: WorkspaceItem) => Partial<WorkspaceItem>) =>
@@ -48,4 +50,5 @@ export const useWorkspaceStore = create<WorkspaceState>()((set) => ({
   restore: (id) => set((s) => ({ items: patchItem(s.items, id, () => ({ deletedAt: null })) })),
   deleteForever: (id) => set((s) => ({ items: s.items.filter((item) => item.id !== id) })),
   emptyTrash: () => set((s) => ({ items: s.items.filter((item) => item.deletedAt === null) })),
+  replaceAll: (items) => set({ items }),
 }));

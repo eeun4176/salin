@@ -8,7 +8,8 @@ const LERP = 0.14;
 const RADIUS = 120;
 
 const baseLayer: CSSProperties = {
-  backgroundImage: "radial-gradient(circle at center, #E6EBE8 1.4px, transparent 1.9px)",
+  // A step darker than the #E6EBE8 border token, which nearly vanished on the canvas.
+  backgroundImage: "radial-gradient(circle at center, #D6DDD9 1.5px, transparent 2px)",
   backgroundSize: "16px 16px",
 };
 
@@ -20,6 +21,16 @@ const topLayer: CSSProperties = {
   WebkitMaskImage: spotMask,
   maskImage: spotMask,
 };
+
+// Fades the whole grid (dots + glow) out toward the bottom edge.
+const bottomFade = "linear-gradient(to bottom, #000 0%, #000 45%, rgb(0 0 0 / 0.35) 75%, transparent 100%)";
+
+const rootStyle = {
+  "--x": "50%",
+  "--y": "50%",
+  WebkitMaskImage: bottomFade,
+  maskImage: bottomFade,
+} as CSSProperties;
 
 const glowLayer: CSSProperties = {
   background: `radial-gradient(${RADIUS * 2.2}px circle at var(--x) var(--y), rgb(1 168 90 / 0.13), rgb(1 168 90 / 0.04) 45%, transparent 72%)`,
@@ -125,7 +136,7 @@ export function SpotlightGrid({ className }: { className?: string }) {
       ref={ref}
       aria-hidden="true"
       className={cn("pointer-events-none absolute inset-0 overflow-hidden", className)}
-      style={{ "--x": "50%", "--y": "50%" } as CSSProperties}
+      style={rootStyle}
     >
       <div className="absolute inset-0" style={baseLayer} />
       <div className="absolute inset-0" style={glowLayer} />
