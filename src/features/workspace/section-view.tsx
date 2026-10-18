@@ -121,8 +121,13 @@ export function SectionView({ section }: { section: WorkspaceSection }) {
   const setTrashSort = useUiStore((s) => s.setTrashSort);
 
   const sort = section === "trash" ? trashSort : workspaceSort;
-  const visible = useMemo(() => selectItems(items, { section, query, type, modified, sort }), [items, section, query, type, modified, sort]);
   const grouped = section === "recents" || (section === "trash" && sort.key === "modified");
+  // Day groups need a purely chronological list (folders-first would split a day into
+  // two groups); ItemsBlock still puts folders on top inside each group.
+  const visible = useMemo(
+    () => selectItems(items, { section, query, type, modified, sort: grouped ? { ...sort, foldersFirst: false } : sort }),
+    [items, section, query, type, modified, sort, grouped],
+  );
   const filtered = query.trim() !== "" || type !== "any" || modified !== "any";
 
   const clearFilters = () => {

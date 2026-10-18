@@ -9,36 +9,44 @@ import { useFilePicker, useQueueFiles } from "@/features/import/use-file-picker"
 import { formatBytes } from "@/features/workspace/query";
 import type { FileKind } from "@/features/workspace/types";
 import { useIntakeStore } from "@/stores/intake-store";
+import { toast } from "@/stores/toast-store";
 import { cn } from "@/lib/utils";
 
 const FORMATS: FileKind[] = ["pdf", "xlsx", "csv", "png", "jpg", "webp"];
 
 const hasFiles = (event: DragEvent) => event.dataTransfer?.types.includes("Files") ?? false;
 
-/** Collects files from a drop, walking into dropped folders. */
-async function filesFromDrop(dataTransfer: DataTransfer): Promise<File[]> {
+/**
+ * Collects files from a drop, walking into dropped folders. Entries the
+ * browser can't read are counted and skipped instead of failing the drop.
+ */
+async function filesFromDrop(dataTransfer: DataTransfer): Promise<{ files: File[]; unreadable: number }> {
   // Entries must be read synchronously, while the drop event is still live.
   const entries = Array.from(dataTransfer.items ?? [])
     .map((item) => item.webkitGetAsEntry?.())
     .filter((entry): entry is FileSystemEntry => !!entry);
-  if (entries.length === 0) return Array.from(dataTransfer.files);
+  if (entries.length === 0) return { files: Array.from(dataTransfer.files), unreadable: 0 };
 
   const files: File[] = [];
+  let unreadable = 0;
   const walk = async (entry: FileSystemEntry): Promise<void> => {
     if (entry.isFile) {
-      files.push(await new Promise<File>((resolve, reject) => (entry as FileSystemFileEntry).file(resolve, reject)));
+      const file = await new Promise<File | null>((resolve) => (entry as FileSystemFileEntry).file(resolve, () => resolve(null)));
+      if (file) files.push(file);
+      else unreadable += 1;
       return;
     }
     if (!entry.isDirectory) return;
     const reader = (entry as FileSystemDirectoryEntry).createReader();
     for (;;) {
-      const batch = await new Promise<FileSystemEntry[]>((resolve, reject) => reader.readEntries(resolve, reject));
-      if (batch.length === 0) break;
+      const batch = await new Promise<FileSystemEntry[] | null>((resolve) => reader.readEntries(resolve, () => resolve(null)));
+      if (batch === null) unreadable += 1;
+      if (!batch?.length) break;
       for (const child of batch) await walk(child);
     }
   };
   for (const entry of entries) await walk(entry);
-  return files;
+  return { files, unreadable };
 }
 
 export function ImportPage() {
@@ -75,7 +83,10 @@ export function ImportPage() {
       e.preventDefault();
       depth = 0;
       setDragging(false);
-      void filesFromDrop(e.dataTransfer).then(queueFiles);
+      void filesFromDrop(e.dataTransfer).then(({ files, unreadable }) => {
+        if (files.length) queueFiles(files);
+        if (unreadable) toast(`Couldn't read ${unreadable} dropped item${unreadable === 1 ? "" : "s"}. Try Browse files instead.`);
+      });
     };
     window.addEventListener("dragenter", onEnter);
     window.addEventListener("dragover", onOver);

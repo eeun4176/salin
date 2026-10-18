@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { NavLink, useNavigate } from "react-router";
+import { NavLink, useLocation, useNavigate } from "react-router";
 import { Camera, Plus, Upload, type LucideIcon } from "lucide-react";
 
 import { SECTION_LINKS } from "@/features/workspace/section-links";
@@ -46,7 +46,12 @@ function TabLink({ to, label, icon: Icon }: (typeof SECTION_LINKS)[number]) {
  * The centre toggle turns into an X and fans Scan / Import out on an arc.
  */
 export function MobileNav() {
-  const [open, setOpen] = useState(false);
+  const { pathname } = useLocation();
+  // Remember which page the menu was opened on, so leaving that page any other way
+  // (e.g. the Android back button) closes it and releases the scroll lock.
+  const [openOn, setOpenOn] = useState<string | null>(null);
+  const open = openOn === pathname;
+  const setOpen = (next: boolean) => setOpenOn(next ? pathname : null);
   const toggleRef = useRef<HTMLButtonElement>(null);
   const navigate = useNavigate();
   const reduced = useReducedMotion();
@@ -56,7 +61,7 @@ export function MobileNav() {
     lockScroll(true);
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
-      setOpen(false);
+      setOpenOn(null);
       toggleRef.current?.focus();
     };
     document.addEventListener("keydown", onKeyDown);
@@ -146,7 +151,7 @@ export function MobileNav() {
           aria-expanded={open}
           aria-controls="quick-actions"
           aria-label={open ? "Close quick actions" : "Open quick actions"}
-          onClick={() => setOpen((v) => !v)}
+          onClick={() => setOpen(!open)}
           style={{ width: FAB, height: FAB, top: -24, left: -FAB / 2 }}
           className={cn(
             "absolute grid place-items-center rounded-full text-white",

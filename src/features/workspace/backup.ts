@@ -18,7 +18,8 @@ const backupSchema = z.object({
   app: z.literal("salin"),
   version: z.literal(1),
   exportedAt: z.string(),
-  items: z.array(itemSchema),
+  // Duplicate ids would make every action hit several items at once.
+  items: z.array(itemSchema).refine((items) => new Set(items.map((item) => item.id)).size === items.length),
 });
 
 /**
