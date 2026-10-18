@@ -1,3 +1,10 @@
+/**
+ * App Router
+ * Maps every URL to a screen. The four workspace tabs (and open folders at
+ * /folders/:folderId) share HomeLayout so the hero stays mounted while
+ * switching between them; other screens render inside AppShell directly.
+ */
+
 import { createBrowserRouter, Navigate } from "react-router";
 
 import { AppShell } from "@/components/layout/app-shell";
@@ -18,6 +25,7 @@ export const router = createBrowserRouter([
         Component: HomeLayout,
         children: [
           { index: true, element: <SectionView section="workspace" /> },
+          { path: "folders/:folderId", element: <SectionView section="workspace" /> },
           { path: "recents", element: <SectionView section="recents" /> },
           { path: "favorites", element: <SectionView section="favorites" /> },
           { path: "trash", element: <SectionView section="trash" /> },

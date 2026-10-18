@@ -1,7 +1,14 @@
-import { useCallback, useEffect, useRef, type ChangeEvent } from "react";
-import { useNavigate } from "react-router";
+/**
+ * File Picker Hooks
+ * Hidden <input type="file"> elements (files or a whole folder) with functions
+ * to open them, plus hooks that validate picked files and either queue them
+ * on the Import screen or save them straight into a workspace folder.
+ */
 
-import { ACCEPT_ATTR, toIntakeFiles, useIntakeStore } from "@/stores/intake-store";
+import { useCallback, useEffect, useRef, type ChangeEvent } from "react";
+
+import { saveIntakeFiles } from "@/features/workspace/workspace-actions";
+import { ACCEPT_ATTR, toIntakeFiles, useIntakeStore, type IntakeResult, type PickedFile } from "@/stores/intake-store";
 import { toast } from "@/stores/toast-store";
 
 /**
@@ -25,8 +32,8 @@ export function useFilePicker(onFiles: (files: File[]) => void) {
 
   const inputs = (
     <>
-      <input ref={fileRef} type="file" multiple accept={ACCEPT_ATTR} className="sr-only" tabIndex={-1} aria-hidden="true" onChange={handleChange} />
-      <input ref={folderRef} type="file" multiple className="sr-only" tabIndex={-1} aria-hidden="true" onChange={handleChange} />
+      <input ref={fileRef} type="file" multiple accept={ACCEPT_ATTR} className="sr-only" tabIndex={-1} aria-hidden="true" data-testid="file-input" onChange={handleChange} />
+      <input ref={folderRef} type="file" multiple className="sr-only" tabIndex={-1} aria-hidden="true" data-testid="folder-input" onChange={handleChange} />
     </>
   );
 
@@ -37,30 +44,43 @@ export function useFilePicker(onFiles: (files: File[]) => void) {
   };
 }
 
-/** Validates files, queues the supported ones and reports the rest. */
+/** Toast for files that failed validation. */
+export function reportRejected(rejected: IntakeResult["rejected"]) {
+  if (rejected.length === 0) return;
+  const first = rejected[0];
+  toast(
+    rejected.length === 1
+      ? `Skipped “${first.name}”: ${first.reason.toLowerCase()}.`
+      : `Skipped ${rejected.length} files that aren't PDF, XLSX, CSV, PNG, JPG or WebP (or are over 50 MB).`,
+  );
+}
+
+/** Validates files, queues the supported ones on the Import screen and reports the rest. */
 export function useQueueFiles() {
   const enqueue = useIntakeStore((s) => s.enqueue);
   // Stable so window-level drag listeners don't re-subscribe on every render.
-  return useCallback((files: File[]) => {
-    const { ok, rejected } = toIntakeFiles(files, "import");
-    if (ok.length) enqueue(ok);
-    if (rejected.length) {
-      const first = rejected[0];
-      toast(
-        rejected.length === 1
-          ? `Skipped “${first.name}”: ${first.reason.toLowerCase()}.`
-          : `Skipped ${rejected.length} files that aren't PDF, XLSX, CSV, PNG, JPG or WebP (or are over 50 MB).`,
-      );
-    }
-    return ok.length;
-  }, [enqueue]);
+  return useCallback(
+    (files: (File | PickedFile)[]) => {
+      const { ok, rejected } = toIntakeFiles(files, "import");
+      if (ok.length) enqueue(ok);
+      reportRejected(rejected);
+      return ok.length;
+    },
+    [enqueue],
+  );
 }
 
-/** Queue files and jump to the Import screen — used by the workspace "Upload" actions. */
-export function useUploadToImport() {
-  const queueFiles = useQueueFiles();
-  const navigate = useNavigate();
-  return (files: File[]) => {
-    if (queueFiles(files) > 0) navigate("/import");
-  };
+/** Validates files and saves them straight into a workspace folder (the workspace "Upload" actions). */
+export function useUploadToFolder(folderId: string | null) {
+  return useCallback(
+    async (files: (File | PickedFile)[]) => {
+      const { ok, rejected } = toIntakeFiles(files, "import");
+      reportRejected(rejected);
+      if (ok.length === 0) return;
+      toast(`Saving ${ok.length} file${ok.length === 1 ? "" : "s"}…`);
+      await saveIntakeFiles(ok, folderId);
+      ok.forEach((f) => f.previewUrl && URL.revokeObjectURL(f.previewUrl));
+    },
+    [folderId],
+  );
 }

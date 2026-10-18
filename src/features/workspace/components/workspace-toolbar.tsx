@@ -1,5 +1,12 @@
-import { useLayoutEffect, useRef, type ChangeEvent } from "react";
-import { NavLink, useLocation } from "react-router";
+/**
+ * Workspace Toolbar
+ * Top row of the workspace card: the Workspace / Recents / Favorites / Trash
+ * tab switcher (desktop), the search field, and the quick backup & restore
+ * button.
+ */
+
+import { useLayoutEffect, useRef } from "react";
+import { Link, useLocation } from "react-router";
 import { ArchiveRestore, DatabaseBackup, Download, Search, X } from "lucide-react";
 
 import {
@@ -10,11 +17,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { downloadBackup, readBackup } from "@/features/workspace/backup";
-import { SECTION_LINKS } from "@/features/workspace/section-links";
+import { exportWorkspaceBackup } from "@/features/backup/backup-actions";
+import { useRestoreBackup } from "@/features/backup/use-restore-backup";
+import { SECTION_LINKS, isSectionActive } from "@/features/workspace/section-links";
 import { useUiStore } from "@/stores/ui-store";
-import { useWorkspaceStore } from "@/stores/workspace-store";
-import { toast } from "@/stores/toast-store";
 import { cn } from "@/lib/utils";
 
 /** Segmented switcher with a sliding white pill behind the active tab. */
@@ -53,22 +59,23 @@ function SectionTabs() {
           aria-hidden="true"
           className="absolute top-1.5 bottom-1.5 left-0 rounded-xl bg-white shadow-[0_1px_2px_rgb(0_0_0/0.06)] transition-[transform,width] duration-500 ease-spring motion-reduce:transition-none"
         />
-        {SECTION_LINKS.map(({ to, label, icon: Icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end
-            className={({ isActive }) =>
-              cn(
+        {SECTION_LINKS.map(({ to, label, icon: Icon }) => {
+          const isActive = isSectionActive(to, pathname);
+          return (
+            <Link
+              key={to}
+              to={to}
+              aria-current={isActive ? "page" : undefined}
+              className={cn(
                 "relative z-10 flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-medium transition-colors lg:px-5",
                 isActive ? "text-salin-primary" : "text-salin-muted hover:text-salin-text",
-              )
-            }
-          >
-            <Icon className="size-[18px]" strokeWidth={1.9} />
-            {label}
-          </NavLink>
-        ))}
+              )}
+            >
+              <Icon className="size-[18px]" strokeWidth={1.9} />
+              {label}
+            </Link>
+          );
+        })}
       </div>
     </nav>
   );
@@ -110,34 +117,11 @@ function SearchField() {
 
 /** Quick backup / restore menu that sits beside the search field. */
 function BackupMenu() {
-  const fileRef = useRef<HTMLInputElement>(null);
-
-  function backUp() {
-    const { items } = useWorkspaceStore.getState();
-    downloadBackup(items);
-    toast(`Backed up ${items.length} item${items.length === 1 ? "" : "s"}.`);
-  }
-
-  async function restore(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-    try {
-      const restored = await readBackup(file);
-      const { items: previous, replaceAll } = useWorkspaceStore.getState();
-      replaceAll(restored);
-      toast(`Restored ${restored.length} item${restored.length === 1 ? "" : "s"} from backup.`, {
-        label: "Undo",
-        onClick: () => replaceAll(previous),
-      });
-    } catch (error) {
-      toast(error instanceof Error ? error.message : "Couldn't restore that backup.");
-    }
-  }
+  const restore = useRestoreBackup();
 
   return (
     <>
-      <input ref={fileRef} type="file" accept=".json,application/json" className="sr-only" tabIndex={-1} aria-hidden="true" onChange={restore} />
+      {restore.elements}
       <DropdownMenu modal={false}>
         <DropdownMenuTrigger
           aria-label="Backup and restore"
@@ -148,14 +132,14 @@ function BackupMenu() {
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-64 rounded-xl p-1.5">
           <DropdownMenuLabel>Backup & restore</DropdownMenuLabel>
-          <DropdownMenuItem className="gap-2.5 py-2" onSelect={backUp}>
+          <DropdownMenuItem className="gap-2.5 py-2" onSelect={() => void exportWorkspaceBackup()}>
             <Download /> Back up workspace
           </DropdownMenuItem>
-          <DropdownMenuItem className="gap-2.5 py-2" onSelect={() => fileRef.current?.click()}>
+          <DropdownMenuItem className="gap-2.5 py-2" onSelect={restore.pick}>
             <ArchiveRestore /> Restore from backup…
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <p className="px-1.5 py-1 text-xs text-salin-muted">Saves folders and file details as a .json file on this device.</p>
+          <p className="px-1.5 py-1 text-xs text-salin-muted">Saves every folder and original file into one .zip on this device.</p>
         </DropdownMenuContent>
       </DropdownMenu>
     </>

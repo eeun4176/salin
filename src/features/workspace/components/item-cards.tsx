@@ -1,3 +1,10 @@
+/**
+ * Item Cards & Rows
+ * How a folder or file looks in the workspace: compact folder pills, file
+ * thumbnail cards for grid view, and rows for list view. Clicking anywhere
+ * on one opens it; the ⋮ button opens its actions menu.
+ */
+
 import { Folder, Heart } from "lucide-react";
 
 import { DocThumbnail } from "@/components/brand/doc-thumbnail";
@@ -6,7 +13,7 @@ import { FileTypeIcon } from "@/components/brand/file-type-icon";
 import { ItemActions } from "@/features/workspace/components/item-actions";
 import { formatBytes, formatDate, sectionTime } from "@/features/workspace/query";
 import type { WorkspaceItem, WorkspaceSection } from "@/features/workspace/types";
-import { toast } from "@/stores/toast-store";
+import { useOpenItem } from "@/features/workspace/use-open-item";
 import { cn } from "@/lib/utils";
 
 // Names wrap to two lines on phones instead of truncating after a few letters.
@@ -15,23 +22,17 @@ const nameClass = "line-clamp-2 text-[13px] leading-snug font-medium break-words
 const tileBase =
   "group relative rounded-2xl bg-salin-tile transition-[background-color,box-shadow] duration-200 hover:bg-salin-tile-hover has-[[data-open-target]:focus-visible]:ring-2 has-[[data-open-target]:focus-visible]:ring-salin-primary";
 
-function openItem(item: WorkspaceItem) {
-  if (item.deletedAt !== null) {
-    toast("Restore this item to open it.");
-    return;
-  }
-  toast(item.kind === "folder" ? "Opening folders arrives with nested folders in Phase 2." : "File previews arrive with local storage in Phase 2.");
-}
-
 /**
  * Stretched invisible button that opens the item; sits under the overflow
  * menu so both stay independently focusable.
  */
 function OpenTarget({ item }: { item: WorkspaceItem }) {
+  const openItem = useOpenItem();
   return (
     <button
       type="button"
       data-open-target=""
+      data-item-name={item.name}
       onClick={() => openItem(item)}
       className="absolute inset-0 rounded-[inherit] outline-none"
       aria-label={`Open ${item.kind === "folder" ? "folder" : FILE_KIND_META[item.fileType ?? "pdf"].name} ${item.name}`}

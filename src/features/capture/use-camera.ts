@@ -1,3 +1,9 @@
+/**
+ * Camera Hook
+ * Streams the device camera into the Scan screen's video element, handles
+ * switching cameras and retrying, and explains camera errors.
+ */
+
 import { useEffect, useState, type RefObject } from "react";
 
 export type Facing = "environment" | "user";

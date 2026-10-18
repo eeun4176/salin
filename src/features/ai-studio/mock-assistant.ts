@@ -1,4 +1,12 @@
+/**
+ * Sample Assistant (Phase 1 placeholder)
+ * Canned Ask Salin AI replies that show the shape of real results with
+ * sample data (until on-device extraction in Phase 4), plus CSV export with
+ * spreadsheet formula-injection protection.
+ */
+
 import { FILE_KIND_META } from "@/components/brand/file-kinds";
+import { downloadBlob } from "@/lib/download";
 import type { IntakeFile } from "@/stores/intake-store";
 
 export interface ExtractedTable {
@@ -98,13 +106,7 @@ function safeCell(value: string) {
 /** Downloads the table as a UTF-8 CSV that Excel opens directly. */
 export function downloadTableCsv(table: ExtractedTable, filename = "salin-extracted-data.csv") {
   const lines = [table.columns, ...table.rows, ...(table.total ? [table.total] : [])].map((row) => row.map(safeCell).join(","));
-  const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
+  downloadBlob(new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" }), filename);
 }
 
 export function tableAsText(table: ExtractedTable) {

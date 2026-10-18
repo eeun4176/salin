@@ -1,3 +1,9 @@
+/**
+ * App Header
+ * The logo, "Install Salin" button (PWA install prompt) and Settings button
+ * shown at the top of every screen.
+ */
+
 import { useState } from "react";
 import { Link } from "react-router";
 import { Check, Download, Settings } from "lucide-react";

@@ -1,6 +1,14 @@
+/**
+ * Home Layout
+ * The home screen frame: the hero banner on top and the rounded white
+ * workspace card below it. The active tab or folder renders inside the card,
+ * and the file preview opens on top of it.
+ */
+
 import { Outlet } from "react-router";
 
 import { Hero } from "@/features/home/hero";
+import { FilePreview } from "@/features/workspace/components/file-preview";
 import { WorkspaceToolbar } from "@/features/workspace/components/workspace-toolbar";
 
 /**
@@ -21,6 +29,7 @@ export function HomeLayout() {
           <Outlet />
         </main>
       </div>
+      <FilePreview />
     </>
   );
 }

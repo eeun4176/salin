@@ -1,3 +1,9 @@
+/**
+ * Lenis Handle
+ * Access to the app's single Lenis smooth-scroll instance: programmatic
+ * scrolling and pausing scroll while overlays are open.
+ */
+
 import type Lenis from "lenis";
 
 /**

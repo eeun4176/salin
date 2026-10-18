@@ -1,3 +1,9 @@
+/**
+ * Dropdown Menu (shadcn/ui)
+ * Radix-based dropdown menus (items, radio items, labels, separators) used for
+ * every ⋮ and filter menu.
+ */
+
 import * as React from "react"
 import { cn } from "cn"
 import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui"

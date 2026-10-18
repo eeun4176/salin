@@ -1,3 +1,9 @@
+/**
+ * UI Store
+ * Workspace view preferences shared across tabs: search text, Type/Modified
+ * filters, sort order and grid/list layout.
+ */
+
 import { create } from "zustand";
 
 export type ViewMode = "grid" | "list";

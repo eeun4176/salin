@@ -1,3 +1,9 @@
+/**
+ * Smooth Scroll Hook
+ * Starts Lenis smooth scrolling for the whole app (skipped under reduced
+ * motion) while letting menus and dialogs scroll natively.
+ */
+
 import { useEffect } from "react";
 import Lenis from "lenis";
 

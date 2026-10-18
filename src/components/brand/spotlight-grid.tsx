@@ -1,3 +1,10 @@
+/**
+ * Spotlight Dot Grid
+ * The hero/page-band backdrop: a gray dot grid with a green spotlight that
+ * follows the pointer (and drifts on its own when idle), fading out toward the
+ * bottom.
+ */
+
 import { useEffect, useRef, type CSSProperties } from "react";
 
 import { cn } from "@/lib/utils";

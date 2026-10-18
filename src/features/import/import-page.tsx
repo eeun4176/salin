@@ -1,3 +1,10 @@
+/**
+ * Import Page (/import)
+ * Drag-and-drop or browse for files and whole folders, review the queue,
+ * then save everything into a chosen workspace folder (folder structure is
+ * kept) or hand the files to Ask Salin AI.
+ */
+
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { CheckCircle2, CloudUpload, FileUp, FolderInput, FolderUp, ShieldCheck, Sparkles, X } from "lucide-react";
@@ -6,9 +13,12 @@ import { PageFrame } from "@/components/layout/page-frame";
 import { FILE_KIND_META } from "@/components/brand/file-kinds";
 import { FileTypeIcon } from "@/components/brand/file-type-icon";
 import { useFilePicker, useQueueFiles } from "@/features/import/use-file-picker";
+import { FolderPickerDialog } from "@/features/workspace/components/folder-picker-dialog";
 import { formatBytes } from "@/features/workspace/query";
 import type { FileKind } from "@/features/workspace/types";
-import { useIntakeStore } from "@/stores/intake-store";
+import { folderUrl } from "@/features/workspace/use-open-item";
+import { saveIntakeFiles } from "@/features/workspace/workspace-actions";
+import { useIntakeStore, type PickedFile } from "@/stores/intake-store";
 import { toast } from "@/stores/toast-store";
 import { cn } from "@/lib/utils";
 
@@ -17,22 +27,27 @@ const FORMATS: FileKind[] = ["pdf", "xlsx", "csv", "png", "jpg", "webp"];
 const hasFiles = (event: DragEvent) => event.dataTransfer?.types.includes("Files") ?? false;
 
 /**
- * Collects files from a drop, walking into dropped folders. Entries the
- * browser can't read are counted and skipped instead of failing the drop.
+ * Collects files from a drop, walking into dropped folders and remembering
+ * each file's folder path. Entries the browser can't read are counted and
+ * skipped instead of failing the drop.
  */
-async function filesFromDrop(dataTransfer: DataTransfer): Promise<{ files: File[]; unreadable: number }> {
+async function filesFromDrop(dataTransfer: DataTransfer): Promise<{ files: PickedFile[]; unreadable: number }> {
   // Entries must be read synchronously, while the drop event is still live.
   const entries = Array.from(dataTransfer.items ?? [])
     .map((item) => item.webkitGetAsEntry?.())
     .filter((entry): entry is FileSystemEntry => !!entry);
-  if (entries.length === 0) return { files: Array.from(dataTransfer.files), unreadable: 0 };
+  if (entries.length === 0) {
+    return { files: Array.from(dataTransfer.files, (file) => ({ file, folderPath: "" })), unreadable: 0 };
+  }
 
-  const files: File[] = [];
+  const files: PickedFile[] = [];
   let unreadable = 0;
   const walk = async (entry: FileSystemEntry): Promise<void> => {
     if (entry.isFile) {
       const file = await new Promise<File | null>((resolve) => (entry as FileSystemFileEntry).file(resolve, () => resolve(null)));
-      if (file) files.push(file);
+      // fullPath is "/Folder/sub/name.pdf"; keep "Folder/sub".
+      const folderPath = entry.fullPath.split("/").filter(Boolean).slice(0, -1).join("/");
+      if (file) files.push({ file, folderPath });
       else unreadable += 1;
       return;
     }
@@ -58,6 +73,15 @@ export function ImportPage() {
   const { inputs, pickFiles, pickFolder } = useFilePicker(queueFiles);
   const navigate = useNavigate();
   const [dragging, setDragging] = useState(false);
+  const [choosingFolder, setChoosingFolder] = useState(false);
+
+  async function saveTo(folderId: string | null) {
+    const files = useIntakeStore.getState().queue;
+    const saved = await saveIntakeFiles(files, folderId, { onOpen: () => navigate(folderUrl(folderId)) });
+    if (saved === null) return;
+    setChoosingFolder(false);
+    clearQueue();
+  }
 
   // The whole page is a drop target; the zone just shows it.
   useEffect(() => {
@@ -171,6 +195,7 @@ export function ImportPage() {
                   </p>
                   <p className="text-xs text-salin-muted">
                     {FILE_KIND_META[file.kind].name} · {formatBytes(file.size)}
+                    {file.folderPath && <span className="hidden sm:inline"> · in {file.folderPath}</span>}
                   </p>
                 </div>
                 <span className="hidden items-center gap-1 rounded-full bg-salin-primary-soft px-2 py-0.5 text-xs font-medium text-[#016A39] sm:inline-flex">
@@ -191,12 +216,10 @@ export function ImportPage() {
           <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
             <button
               type="button"
-              disabled
-              title="Saving to folders arrives in Phase 2"
-              className="inline-flex h-12 items-center justify-center gap-2 rounded-xl px-5 text-sm font-semibold text-salin-muted ring-1 ring-salin-border disabled:opacity-60"
+              onClick={() => setChoosingFolder(true)}
+              className="press inline-flex h-12 items-center justify-center gap-2 rounded-xl px-5 text-sm font-semibold text-salin-text ring-1 ring-salin-border hover:bg-salin-tile"
             >
               <FolderInput className="size-[18px]" /> Save to Workspace
-              <span className="rounded-md bg-salin-tile px-1.5 py-0.5 text-[10px] font-semibold tracking-wide uppercase">Soon</span>
             </button>
             <button
               type="button"
@@ -215,6 +238,13 @@ export function ImportPage() {
       <p className="mt-6 flex items-center justify-center gap-1.5 text-xs text-salin-muted">
         <ShieldCheck className="size-4 text-salin-primary" /> Imported files are checked for type and size and never leave your device.
       </p>
+      <FolderPickerDialog
+        open={choosingFolder}
+        onOpenChange={setChoosingFolder}
+        title={`Save ${queue.length} file${queue.length === 1 ? "" : "s"} to…`}
+        confirmLabel="Save here"
+        onConfirm={saveTo}
+      />
     </PageFrame>
   );
 }

@@ -1,8 +1,15 @@
+/**
+ * Mobile Navigation
+ * The phone-only bottom tab bar (Workspace · Recents · + · Favorites ·
+ * Trash) with the raised + button that fans out the Scan and Import quick
+ * actions over a white scrim.
+ */
+
 import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { NavLink, useLocation, useNavigate } from "react-router";
+import { Link, useLocation, useNavigate } from "react-router";
 import { Camera, Plus, Upload, type LucideIcon } from "lucide-react";
 
-import { SECTION_LINKS } from "@/features/workspace/section-links";
+import { SECTION_LINKS, isSectionActive } from "@/features/workspace/section-links";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import { lockScroll } from "@/lib/lenis";
 import { cn } from "@/lib/utils";
@@ -19,25 +26,20 @@ const ACTIONS: { label: string; to: string; icon: LucideIcon; x: number; y: numb
   { label: "Import", to: "/import", icon: Upload, x: 60, y: -76 },
 ];
 
-function TabLink({ to, label, icon: Icon }: (typeof SECTION_LINKS)[number]) {
+function TabLink({ to, label, icon: Icon, pathname }: (typeof SECTION_LINKS)[number] & { pathname: string }) {
+  const isActive = isSectionActive(to, pathname);
   return (
-    <NavLink
+    <Link
       to={to}
-      end
-      className={({ isActive }) =>
-        cn(
-          "flex flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors",
-          isActive ? "text-salin-primary" : "text-salin-muted active:text-salin-text",
-        )
-      }
-    >
-      {({ isActive }) => (
-        <>
-          <Icon className="size-[22px]" strokeWidth={isActive ? 2.2 : 1.8} />
-          <span>{label}</span>
-        </>
+      aria-current={isActive ? "page" : undefined}
+      className={cn(
+        "flex flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors",
+        isActive ? "text-salin-primary" : "text-salin-muted active:text-salin-text",
       )}
-    </NavLink>
+    >
+      <Icon className="size-[22px]" strokeWidth={isActive ? 2.2 : 1.8} />
+      <span>{label}</span>
+    </Link>
   );
 }
 
@@ -96,11 +98,11 @@ export function MobileNav() {
       >
         <div className="grid h-(--mobile-nav-h) grid-cols-5">
           {left.map((link) => (
-            <TabLink key={link.to} {...link} />
+            <TabLink key={link.to} {...link} pathname={pathname} />
           ))}
           <div aria-hidden="true" />
           {right.map((link) => (
-            <TabLink key={link.to} {...link} />
+            <TabLink key={link.to} {...link} pathname={pathname} />
           ))}
         </div>
       </nav>

@@ -1,3 +1,9 @@
+/**
+ * Install Prompt Hook
+ * Captures the browser's PWA install prompt so the "Install Salin" button can
+ * show it, and tracks whether the app is already installed.
+ */
+
 import { useEffect, useState } from "react";
 
 interface BeforeInstallPromptEvent extends Event {

@@ -1,13 +1,24 @@
+/**
+ * Section View
+ * The body of the workspace card for one tab — Workspace (including any
+ * open folder at /folders/:folderId), Recents, Favorites or Trash. Renders
+ * breadcrumbs, filters, the sorter and the items, plus loading, error,
+ * empty and "folder not found" states.
+ */
+
 import { useMemo } from "react";
-import { FolderSearch, Heart, RotateCcwClock, Trash } from "lucide-react";
+import { Link, useParams } from "react-router";
+import { ChevronRight, FolderOpen, FolderSearch, Heart, House, RotateCcw, RotateCcwClock, Trash, TriangleAlert } from "lucide-react";
 
 import { FilterBar } from "@/features/workspace/components/filter-bar";
 import { FileCard, FolderCard, ItemRow } from "@/features/workspace/components/item-cards";
 import { SortControl } from "@/features/workspace/components/sort-control";
+import { folderPath } from "@/features/workspace/mappers";
 import { groupByDay, selectItems } from "@/features/workspace/query";
 import type { WorkspaceItem, WorkspaceSection } from "@/features/workspace/types";
+import { folderUrl } from "@/features/workspace/use-open-item";
 import { useUiStore, type ViewMode } from "@/stores/ui-store";
-import { useWorkspaceStore } from "@/stores/workspace-store";
+import { startWorkspaceSync, useWorkspaceStore } from "@/stores/workspace-store";
 
 const gridCols = "grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4";
 
@@ -81,15 +92,17 @@ function ItemsBlock({
   );
 }
 
-function EmptyState({ section, filtered, onClear }: { section: WorkspaceSection; filtered: boolean; onClear: () => void }) {
+function EmptyState({ section, filtered, inFolder, onClear }: { section: WorkspaceSection; filtered: boolean; inFolder: boolean; onClear: () => void }) {
   const copy = filtered
     ? { icon: FolderSearch, title: "No matches", body: "Nothing here matches your search or filters." }
-    : {
-        workspace: { icon: FolderSearch, title: "Your workspace is empty", body: "Scan a document or import files to get started." },
-        recents: { icon: RotateCcwClock, title: "No recent files", body: "Files you open or edit will show up here." },
-        favorites: { icon: Heart, title: "No favorites yet", body: "Use ⋮ → Add to Favorites on any file or folder." },
-        trash: { icon: Trash, title: "Trash is empty", body: "Deleted items stay here until you remove them for good." },
-      }[section];
+    : inFolder
+      ? { icon: FolderOpen, title: "This folder is empty", body: "Use the folder menu above to add a subfolder or upload files." }
+      : {
+          workspace: { icon: FolderSearch, title: "Your workspace is empty", body: "Scan a document or import files to get started." },
+          recents: { icon: RotateCcwClock, title: "No recent files", body: "Files you open will show up here." },
+          favorites: { icon: Heart, title: "No favorites yet", body: "Use ⋮ → Add to Favorites on any file or folder." },
+          trash: { icon: Trash, title: "Trash is empty", body: "Deleted items stay here until you remove them for good." },
+        }[section];
   const Icon = copy.icon;
 
   return (
@@ -108,9 +121,89 @@ function EmptyState({ section, filtered, onClear }: { section: WorkspaceSection;
   );
 }
 
+function LoadingState() {
+  return (
+    <div role="status" aria-label="Loading workspace" className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 md:mt-6">
+      {Array.from({ length: 4 }, (_, i) => (
+        <div key={i} className="aspect-[5/4.6] animate-pulse rounded-2xl bg-salin-tile motion-reduce:animate-none" />
+      ))}
+    </div>
+  );
+}
+
+function ErrorState({ message }: { message: string }) {
+  return (
+    <div role="alert" className="flex flex-col items-center px-6 py-14 text-center">
+      <span className="grid size-14 place-items-center rounded-2xl bg-destructive/10 text-destructive">
+        <TriangleAlert className="size-6" />
+      </span>
+      <p className="mt-4 font-semibold text-salin-text">Workspace unavailable</p>
+      <p className="mt-1 max-w-sm text-sm text-salin-muted">{message}</p>
+      <button type="button" onClick={startWorkspaceSync} className="press mt-4 inline-flex h-9 items-center gap-2 rounded-xl px-4 text-sm font-semibold text-salin-primary ring-1 ring-salin-border hover:bg-salin-primary-soft">
+        <RotateCcw className="size-4" /> Try again
+      </button>
+    </div>
+  );
+}
+
+function Breadcrumbs({ folderId }: { folderId: string }) {
+  const folderById = useWorkspaceStore((s) => s.folderById);
+  const path = folderPath(folderId, folderById);
+  return (
+    <nav aria-label="Breadcrumb" className="no-scrollbar mt-5 -mb-2 overflow-x-auto md:mt-6" data-lenis-prevent-horizontal="">
+      <ol className="flex items-center gap-1 text-[13px] whitespace-nowrap">
+        <li>
+          <Link to="/" className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 font-medium text-salin-muted hover:bg-salin-tile hover:text-salin-text">
+            <House className="size-3.5" /> Workspace
+          </Link>
+        </li>
+        {path.map((folder, i) => {
+          const current = i === path.length - 1;
+          return (
+            <li key={folder.id} className="flex items-center gap-1">
+              <ChevronRight aria-hidden="true" className="size-3.5 text-salin-subtle" />
+              {current ? (
+                <span aria-current="page" className="max-w-48 truncate px-1.5 py-1 font-semibold text-salin-text">
+                  {folder.name}
+                </span>
+              ) : (
+                <Link to={folderUrl(folder.id)} className="max-w-40 truncate rounded-md px-1.5 py-1 font-medium text-salin-muted hover:bg-salin-tile hover:text-salin-text">
+                  {folder.name}
+                </Link>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
+  );
+}
+
+function FolderMissing() {
+  return (
+    <div className="flex flex-col items-center px-6 py-16 text-center">
+      <span className="grid size-14 place-items-center rounded-2xl bg-salin-tile text-salin-muted">
+        <FolderSearch className="size-6" />
+      </span>
+      <p className="mt-4 font-semibold text-salin-text">Folder not found</p>
+      <p className="mt-1 max-w-xs text-sm text-salin-muted">It may have been deleted or moved to Trash.</p>
+      <Link to="/" className="press mt-4 inline-flex h-9 items-center rounded-xl px-4 text-sm font-semibold text-salin-primary ring-1 ring-salin-border hover:bg-salin-primary-soft">
+        Back to Workspace
+      </Link>
+    </div>
+  );
+}
+
 /** Contents of the workspace card for one tab: filters, sorter and items. */
 export function SectionView({ section }: { section: WorkspaceSection }) {
+  const { folderId: routeFolderId } = useParams();
+  const folderId = section === "workspace" ? (routeFolderId ?? null) : null;
+
+  const status = useWorkspaceStore((s) => s.status);
+  const error = useWorkspaceStore((s) => s.error);
   const items = useWorkspaceStore((s) => s.items);
+  const hiddenFolderIds = useWorkspaceStore((s) => s.hiddenFolderIds);
+  const folderExists = useWorkspaceStore((s) => folderId === null || (s.folderById.has(folderId) && !s.hiddenFolderIds.has(folderId)));
   const query = useUiStore((s) => s.query);
   const type = useUiStore((s) => s.type);
   const modified = useUiStore((s) => s.modified);
@@ -125,10 +218,20 @@ export function SectionView({ section }: { section: WorkspaceSection }) {
   // Day groups need a purely chronological list (folders-first would split a day into
   // two groups); ItemsBlock still puts folders on top inside each group.
   const visible = useMemo(
-    () => selectItems(items, { section, query, type, modified, sort: grouped ? { ...sort, foldersFirst: false } : sort }),
-    [items, section, query, type, modified, sort, grouped],
+    () =>
+      selectItems(items, {
+        section,
+        query,
+        type,
+        modified,
+        sort: grouped ? { ...sort, foldersFirst: false } : sort,
+        folderId,
+        hiddenFolderIds,
+      }),
+    [items, section, query, type, modified, sort, grouped, folderId, hiddenFolderIds],
   );
   const filtered = query.trim() !== "" || type !== "any" || modified !== "any";
+  const searchingEverywhere = section === "workspace" && query.trim() !== "";
 
   const clearFilters = () => {
     const ui = useUiStore.getState();
@@ -137,35 +240,43 @@ export function SectionView({ section }: { section: WorkspaceSection }) {
     ui.setModified("any");
   };
 
+  if (status === "loading") return <LoadingState />;
+  if (status === "error") return <ErrorState message={error ?? "Something went wrong."} />;
+  if (!folderExists) return <FolderMissing />;
+
   return (
-    <div className="mt-5 md:mt-6">
-      <FilterBar section={section} />
+    <div>
+      {folderId !== null && <Breadcrumbs folderId={folderId} />}
+      <div className="mt-5 md:mt-6">
+        <FilterBar section={section} folderId={folderId} />
 
-      {section !== "recents" && (
-        <div className="mt-4">
-          <SortControl sort={sort} onChange={section === "trash" ? setTrashSort : setSort} dateLabel={section === "trash" ? "Date trashed" : "Date modified"} />
-        </div>
-      )}
-
-      {section === "trash" && visible.length > 0 && (
-        <p className="mt-2 text-xs text-salin-muted">Items in Trash stay on this device until you restore or delete them forever.</p>
-      )}
-
-      <div className="mt-4">
-        {visible.length === 0 ? (
-          <EmptyState section={section} filtered={filtered} onClear={clearFilters} />
-        ) : grouped ? (
-          <div className="space-y-6">
-            {groupByDay(visible, section).map((group) => (
-              <section key={group.label} aria-label={group.label}>
-                <h3 className="mb-3 text-[13px] font-semibold text-salin-text">{group.label}</h3>
-                <ItemsBlock items={group.items} section={section} viewMode={viewMode} foldersFirst={sort.foldersFirst} />
-              </section>
-            ))}
+        {section !== "recents" && (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+            <SortControl sort={sort} onChange={section === "trash" ? setTrashSort : setSort} dateLabel={section === "trash" ? "Date trashed" : "Date modified"} />
+            {searchingEverywhere && <p className="text-xs text-salin-muted">Searching all folders</p>}
           </div>
-        ) : (
-          <ItemsBlock items={visible} section={section} viewMode={viewMode} foldersFirst={sort.foldersFirst} />
         )}
+
+        {section === "trash" && visible.length > 0 && (
+          <p className="mt-2 text-xs text-salin-muted">Items in Trash stay on this device until you restore or delete them forever.</p>
+        )}
+
+        <div className="mt-4">
+          {visible.length === 0 ? (
+            <EmptyState section={section} filtered={filtered} inFolder={folderId !== null} onClear={clearFilters} />
+          ) : grouped ? (
+            <div className="space-y-6">
+              {groupByDay(visible, section).map((group) => (
+                <section key={group.label} aria-label={group.label}>
+                  <h3 className="mb-3 text-[13px] font-semibold text-salin-text">{group.label}</h3>
+                  <ItemsBlock items={group.items} section={section} viewMode={viewMode} foldersFirst={sort.foldersFirst} />
+                </section>
+              ))}
+            </div>
+          ) : (
+            <ItemsBlock items={visible} section={section} viewMode={viewMode} foldersFirst={sort.foldersFirst} />
+          )}
+        </div>
       </div>
     </div>
   );

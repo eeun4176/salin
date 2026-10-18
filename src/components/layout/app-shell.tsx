@@ -1,14 +1,19 @@
+/**
+ * App Shell
+ * The frame around every screen: skip-to-content link, smooth scrolling,
+ * scroll reset between pages, the mobile bottom bar and the toast area.
+ */
+
 import { useEffect, useRef } from "react";
 import { Outlet, useLocation } from "react-router";
 
 import { Toaster } from "@/components/common/toaster";
 import { MobileNav } from "@/components/layout/mobile-nav";
+import { isWorkspaceRoute } from "@/features/workspace/section-links";
 import { useSmoothScroll } from "@/hooks/use-smooth-scroll";
 import { scrollToY } from "@/lib/lenis";
 
-const HOME_TABS = new Set(["/", "/recents", "/favorites", "/trash"]);
-
-/** Jump to the top between pages, but keep position when switching workspace tabs. */
+/** Jump to the top between pages, but keep position when switching workspace tabs or folders. */
 function useScrollReset() {
   const { pathname } = useLocation();
   const previous = useRef(pathname);
@@ -17,7 +22,7 @@ function useScrollReset() {
     const from = previous.current;
     previous.current = pathname;
     if (from === pathname) return;
-    if (HOME_TABS.has(from) && HOME_TABS.has(pathname)) return;
+    if (isWorkspaceRoute(from) && isWorkspaceRoute(pathname)) return;
     scrollToY(0, { immediate: true });
   }, [pathname]);
 }

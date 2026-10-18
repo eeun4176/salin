@@ -1,4 +1,12 @@
+/**
+ * Filter Bar
+ * The row above the items: the section/folder title menu (New Folder, Upload
+ * a File, Upload a Folder, or Empty trash), the Type and Modified filter
+ * chips, and the list/grid toggle.
+ */
+
 import { useState } from "react";
+import { useNavigate } from "react-router";
 import { ChevronDown, FileUp, FolderPlus, FolderUp, LayoutGrid, List, Trash } from "lucide-react";
 
 import {
@@ -11,9 +19,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { NameDialog } from "@/components/common/name-dialog";
-import { useFilePicker, useUploadToImport } from "@/features/import/use-file-picker";
+import { useFilePicker, useUploadToFolder } from "@/features/import/use-file-picker";
 import type { WorkspaceSection } from "@/features/workspace/types";
+import { folderUrl, siblingNameValidator } from "@/features/workspace/use-open-item";
+import { createFolder, emptyTrash } from "@/features/workspace/workspace-actions";
 import { useUiStore, type ModifiedFilter, type TypeFilter, type ViewMode } from "@/stores/ui-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { toast } from "@/stores/toast-store";
@@ -97,39 +108,33 @@ function FilterChip<T extends string>({
   );
 }
 
-/** "Workspace ˅" title menu: create folder / upload files / upload a folder (or empty trash). */
-function SectionMenu({ section }: { section: WorkspaceSection }) {
-  const [creating, setCreating] = useState(false);
-  const createFolder = useWorkspaceStore((s) => s.createFolder);
-  const emptyTrash = useWorkspaceStore((s) => s.emptyTrash);
+/** "Workspace ˅" (or folder name) title menu: new folder / upload files / upload a folder — or empty trash. */
+function SectionMenu({ section, folderId }: { section: WorkspaceSection; folderId: string | null }) {
+  const [dialog, setDialog] = useState<"create" | "empty" | null>(null);
+  const navigate = useNavigate();
   const trashCount = useWorkspaceStore((s) => s.items.filter((i) => i.deletedAt !== null).length);
-  const upload = useUploadToImport();
-  const { inputs, pickFiles, pickFolder } = useFilePicker(upload);
+  const folderName = useWorkspaceStore((s) => (folderId ? s.folderById.get(folderId)?.name : undefined));
+  // Uploads from other tabs go to the top level of the workspace.
+  const upload = useUploadToFolder(folderId);
+  const { inputs, pickFiles, pickFolder } = useFilePicker((files) => void upload(files));
+  const title = folderName ?? SECTION_TITLES[section];
 
   return (
     <>
       {inputs}
       <DropdownMenu modal={false}>
-        <DropdownMenuTrigger className="press -ml-1.5 inline-flex h-10 items-center gap-1.5 rounded-xl px-1.5 text-[22px] font-semibold tracking-[-0.02em] text-salin-text outline-none hover:bg-salin-tile md:text-2xl">
-          {SECTION_TITLES[section]}
-          <ChevronDown className="size-5" strokeWidth={2.2} />
+        <DropdownMenuTrigger data-testid="section-menu" className="press -ml-1.5 inline-flex h-10 max-w-full min-w-0 items-center gap-1.5 rounded-xl px-1.5 text-[22px] font-semibold tracking-[-0.02em] text-salin-text outline-none hover:bg-salin-tile md:text-2xl">
+          <span className="truncate">{title}</span>
+          <ChevronDown className="size-5 shrink-0" strokeWidth={2.2} />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-56 rounded-xl p-1.5">
           {section === "trash" ? (
-            <DropdownMenuItem
-              variant="destructive"
-              disabled={trashCount === 0}
-              className="gap-2.5 py-2"
-              onSelect={() => {
-                emptyTrash();
-                toast("Trash emptied.");
-              }}
-            >
+            <DropdownMenuItem variant="destructive" disabled={trashCount === 0} className="gap-2.5 py-2" onSelect={() => setDialog("empty")}>
               <Trash /> Empty trash
             </DropdownMenuItem>
           ) : (
             <>
-              <DropdownMenuItem className="gap-2.5 py-2" onSelect={() => setCreating(true)}>
+              <DropdownMenuItem className="gap-2.5 py-2" onSelect={() => setDialog("create")}>
                 <FolderPlus /> New Folder
               </DropdownMenuItem>
               <DropdownMenuSeparator />
@@ -145,16 +150,27 @@ function SectionMenu({ section }: { section: WorkspaceSection }) {
       </DropdownMenu>
 
       <NameDialog
-        open={creating}
-        onOpenChange={setCreating}
+        open={dialog === "create"}
+        onOpenChange={(open) => setDialog(open ? "create" : null)}
         title="New folder"
         initialValue="Untitled folder"
         confirmLabel="Create"
-        onSubmit={(name) => {
-          createFolder(name);
-          setCreating(false);
-          toast(`Folder “${name}” created.`);
+        validate={siblingNameValidator("folder", folderId)}
+        onSubmit={async (name) => {
+          const folder = await createFolder(name, folderId);
+          setDialog(null);
+          toast(`Folder “${folder.name}” created.`, { label: "Open", onClick: () => navigate(folderUrl(folder.id)) });
         }}
+      />
+
+      <ConfirmDialog
+        open={dialog === "empty"}
+        onOpenChange={(open) => setDialog(open ? "empty" : null)}
+        title="Empty Trash?"
+        description={`${trashCount} item${trashCount === 1 ? "" : "s"} in Trash, including everything inside trashed folders, will be permanently removed from this device. This can't be undone.`}
+        confirmLabel="Empty trash"
+        destructive
+        onConfirm={emptyTrash}
       />
     </>
   );
@@ -194,7 +210,7 @@ function ViewToggle() {
   );
 }
 
-export function FilterBar({ section }: { section: WorkspaceSection }) {
+export function FilterBar({ section, folderId }: { section: WorkspaceSection; folderId: string | null }) {
   const type = useUiStore((s) => s.type);
   const modified = useUiStore((s) => s.modified);
   const setType = useUiStore((s) => s.setType);
@@ -202,7 +218,7 @@ export function FilterBar({ section }: { section: WorkspaceSection }) {
 
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-3">
-      <SectionMenu section={section} />
+      <SectionMenu section={section} folderId={folderId} />
       <span aria-hidden="true" className="hidden h-5 w-px bg-[#C9D1CC] sm:block" />
       <div className="order-last flex w-full gap-2 sm:order-none sm:w-auto">
         <FilterChip

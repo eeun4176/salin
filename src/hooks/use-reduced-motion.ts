@@ -1,3 +1,9 @@
+/**
+ * Reduced Motion Hook
+ * Live `prefers-reduced-motion` flag so animations can be turned off for
+ * people who ask for less motion.
+ */
+
 import { useSyncExternalStore } from "react";
 
 const QUERY = "(prefers-reduced-motion: reduce)";

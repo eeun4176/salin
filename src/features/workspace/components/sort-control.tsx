@@ -1,3 +1,9 @@
+/**
+ * Sort Control
+ * The "Name ≡" sorter: sort by name or date, A–Z / Z–A (or oldest/newest), and
+ * folders on top or mixed with files.
+ */
+
 import { ArrowDownWideNarrow, ArrowUpNarrowWide } from "lucide-react";
 
 import {

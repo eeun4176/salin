@@ -1,3 +1,11 @@
+/**
+ * Workspace Queries
+ * Pure functions behind every workspace view: which items a tab or folder
+ * shows (folder scope, Trash, Favorites, Recents, search, Type/Modified
+ * filters), how they're sorted, how Recents/Trash are grouped by day, and
+ * size/date formatting for cards and rows.
+ */
+
 import type { FileKind, WorkspaceItem, WorkspaceSection } from "./types";
 import type { ModifiedFilter, SortState, TypeFilter } from "@/stores/ui-store";
 
@@ -53,6 +61,10 @@ export interface QueryOptions {
   type: TypeFilter;
   modified: ModifiedFilter;
   sort: SortState;
+  /** Workspace tab only: the open folder (`null` = top level). Ignored while searching. */
+  folderId?: string | null;
+  /** Folders in Trash or inside a trashed folder; their contents are hidden outside Trash. */
+  hiddenFolderIds?: Set<string>;
   now?: number;
 }
 
@@ -61,13 +73,22 @@ const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "bas
 export function selectItems(items: WorkspaceItem[], opts: QueryOptions) {
   const now = opts.now ?? Date.now();
   const q = opts.query.trim().toLowerCase();
+  const hidden = opts.hiddenFolderIds ?? new Set<string>();
+  const folderId = opts.folderId ?? null;
 
   const visible = items.filter((item) => {
-    const inTrash = item.deletedAt !== null;
-    if (opts.section === "trash" ? !inTrash : inTrash) return false;
+    if (opts.section === "trash") {
+      if (item.deletedAt === null) return false;
+    } else {
+      if (item.deletedAt !== null) return false;
+      // Things inside a trashed folder are only reachable by restoring the folder.
+      if (item.parentId !== null && hidden.has(item.parentId)) return false;
+    }
     if (opts.section === "favorites" && !item.isFavorite) return false;
     // Recents lists files the user touched, like Drive does.
     if (opts.section === "recents" && item.kind !== "file") return false;
+    // The workspace tab shows one folder's contents; a search looks through every folder.
+    if (opts.section === "workspace" && !q && item.parentId !== folderId) return false;
     if (q && !item.name.toLowerCase().includes(q)) return false;
     return matchesType(item, opts.type) && matchesModified(item, opts.modified, now);
   });
@@ -108,7 +129,8 @@ export function groupByDay(items: WorkspaceItem[], section: WorkspaceSection, no
 export function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
 
 export function formatDate(ts: number, now = Date.now()) {

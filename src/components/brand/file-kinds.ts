@@ -1,3 +1,9 @@
+/**
+ * File Kind Metadata
+ * Label, brand colour and readable name for each supported file type (PDF,
+ * XLSX, CSV, PNG, JPG, WebP), shared by icons, cards and previews.
+ */
+
 import type { FileKind } from "@/features/workspace/types";
 
 export const FILE_KIND_META: Record<FileKind, { label: string; color: string; name: string }> = {

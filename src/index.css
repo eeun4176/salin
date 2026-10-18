@@ -1,3 +1,10 @@
+/*
+ * Global Styles
+ * Tailwind setup, Salin design tokens (colours, easing, animations), shadcn
+ * theme variables, base element styles, and the custom utilities `press`
+ * (Apple-style tap feedback), `no-scrollbar` and `pb-mobile-nav`.
+ */
+
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";

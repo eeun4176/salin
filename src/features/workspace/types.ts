@@ -1,14 +1,23 @@
-export type FileKind = "pdf" | "xlsx" | "csv" | "png" | "jpg" | "webp";
-
 /**
- * View model for a workspace entry. Phase 2 will back this with the Dexie
- * `folders` / `files` tables; for the Phase 1 shell it lives in memory.
+ * Workspace View Types
+ * The `WorkspaceItem` view model that every card, row, menu and filter in the
+ * workspace UI renders — one shape for both folders and files — plus the
+ * names of the four workspace tabs.
  */
+
+import type { FileKind } from "@/types/domain";
+
+export type { FileKind };
+
+/** A folder or file as the workspace UI sees it (mapped from Dexie records in mappers.ts). */
 export interface WorkspaceItem {
   id: string;
   kind: "folder" | "file";
   name: string;
+  /** Containing folder, `null` at the top level. */
+  parentId: string | null;
   fileType?: FileKind;
+  mimeType?: string;
   /** Bytes, files only. */
   size?: number;
   modifiedAt: number;

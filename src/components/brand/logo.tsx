@@ -1,3 +1,8 @@
+/**
+ * Salin Logo
+ * The "≡Salin" wordmark that links back to the home screen.
+ */
+
 import { Link } from "react-router";
 
 import { cn } from "@/lib/utils";

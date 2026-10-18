@@ -1,3 +1,9 @@
+/**
+ * Page Frame
+ * Shared layout for Scan, Import, AI Studio and Settings: a compact hero band
+ * with back link and title, then the white content card.
+ */
+
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { ArrowLeft } from "lucide-react";

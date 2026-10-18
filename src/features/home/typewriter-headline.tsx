@@ -1,3 +1,9 @@
+/**
+ * Typewriter Headline
+ * "Turn Documents into Structured Data" typed out letter by letter with a
+ * blinking green caret (static under reduced motion).
+ */
+
 import { useEffect, useState, type ReactNode } from "react";
 
 import { cn } from "@/lib/utils";

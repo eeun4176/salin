@@ -1,3 +1,9 @@
+/**
+ * Toaster
+ * Renders the toast notifications from the toast store at the bottom of the
+ * screen, above the mobile tab bar.
+ */
+
 import { X } from "lucide-react";
 
 import { useToastStore } from "@/stores/toast-store";

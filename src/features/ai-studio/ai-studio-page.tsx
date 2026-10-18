@@ -1,3 +1,9 @@
+/**
+ * Ask Salin AI Page (/ai-studio)
+ * Chat-style screen: suggested prompts, attachments from Scan/Import or the
+ * paperclip, sample replies with result tables and CSV export.
+ */
+
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent, type KeyboardEvent } from "react";
 import {
   Bot,

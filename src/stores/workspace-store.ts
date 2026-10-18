@@ -1,54 +1,74 @@
+/**
+ * Workspace Store
+ * Read-side state for the workspace UI: the current folder/file metadata from
+ * IndexedDB (kept live with a Dexie `liveQuery`, so changes from any tab show
+ * up automatically), mapped view items, and the loading/error status. Writes
+ * go through `features/workspace/workspace-actions.ts`, never through here.
+ */
+
+import { liveQuery, type Subscription } from "dexie";
 import { create } from "zustand";
 
-import { createSampleItems } from "@/features/workspace/mock-data";
+import { loadWorkspace, type WorkspaceSnapshot } from "@/core/storage/repositories/workspace-repository";
+import { fileToItem, folderToItem, hiddenFolderIds } from "@/features/workspace/mappers";
 import type { WorkspaceItem } from "@/features/workspace/types";
+import type { Folder, WorkspaceFile } from "@/types/domain";
+
+export type WorkspaceStatus = "loading" | "ready" | "error";
 
 interface WorkspaceState {
+  status: WorkspaceStatus;
+  error: string | null;
+  folders: Folder[];
+  files: WorkspaceFile[];
+  folderById: Map<string, Folder>;
+  /** Folders in Trash or inside a trashed folder. */
+  hiddenFolderIds: Set<string>;
   items: WorkspaceItem[];
-  createFolder: (name: string) => void;
-  rename: (id: string, name: string) => void;
-  duplicate: (id: string) => void;
-  toggleFavorite: (id: string) => void;
-  moveToTrash: (id: string) => void;
-  restore: (id: string) => void;
-  deleteForever: (id: string) => void;
-  emptyTrash: () => void;
-  /** Replaces the whole workspace (restore from backup). */
-  replaceAll: (items: WorkspaceItem[]) => void;
 }
 
-const patchItem = (items: WorkspaceItem[], id: string, patch: (item: WorkspaceItem) => Partial<WorkspaceItem>) =>
-  items.map((item) => (item.id === id ? { ...item, ...patch(item) } : item));
-
-/** In-memory workspace for the Phase 1 shell; swapped for Dexie repositories in Phase 2. */
-export const useWorkspaceStore = create<WorkspaceState>()((set) => ({
-  items: createSampleItems(),
-  createFolder: (name) =>
-    set((s) => ({
-      items: [
-        { id: crypto.randomUUID(), kind: "folder", name, modifiedAt: Date.now(), openedAt: null, isFavorite: false, deletedAt: null },
-        ...s.items,
-      ],
-    })),
-  rename: (id, name) => set((s) => ({ items: patchItem(s.items, id, () => ({ name, modifiedAt: Date.now() })) })),
-  duplicate: (id) =>
-    set((s) => {
-      const index = s.items.findIndex((item) => item.id === id);
-      if (index === -1) return s;
-      const source = s.items[index];
-      const copy: WorkspaceItem = {
-        ...source,
-        id: crypto.randomUUID(),
-        name: `Copy of ${source.name}`,
-        modifiedAt: Date.now(),
-        isFavorite: false,
-      };
-      return { items: [...s.items.slice(0, index + 1), copy, ...s.items.slice(index + 1)] };
-    }),
-  toggleFavorite: (id) => set((s) => ({ items: patchItem(s.items, id, (item) => ({ isFavorite: !item.isFavorite })) })),
-  moveToTrash: (id) => set((s) => ({ items: patchItem(s.items, id, () => ({ deletedAt: Date.now() })) })),
-  restore: (id) => set((s) => ({ items: patchItem(s.items, id, () => ({ deletedAt: null })) })),
-  deleteForever: (id) => set((s) => ({ items: s.items.filter((item) => item.id !== id) })),
-  emptyTrash: () => set((s) => ({ items: s.items.filter((item) => item.deletedAt === null) })),
-  replaceAll: (items) => set({ items }),
+export const useWorkspaceStore = create<WorkspaceState>()(() => ({
+  status: "loading",
+  error: null,
+  folders: [],
+  files: [],
+  folderById: new Map(),
+  hiddenFolderIds: new Set(),
+  items: [],
 }));
+
+function toState({ folders, files }: WorkspaceSnapshot): Partial<WorkspaceState> {
+  return {
+    status: "ready",
+    error: null,
+    folders,
+    files,
+    folderById: new Map(folders.map((f) => [f.id, f])),
+    hiddenFolderIds: hiddenFolderIds(folders),
+    items: [...folders.map(folderToItem), ...files.map(fileToItem)],
+  };
+}
+
+let subscription: Subscription | null = null;
+
+/** Starts (or restarts, after an error) live syncing of the workspace from IndexedDB. */
+export function startWorkspaceSync() {
+  subscription?.unsubscribe();
+  if (useWorkspaceStore.getState().status === "error") useWorkspaceStore.setState({ status: "loading", error: null });
+  subscription = liveQuery(loadWorkspace).subscribe({
+    next: (snapshot) => useWorkspaceStore.setState(toState(snapshot)),
+    error: (error: unknown) => {
+      console.error("Workspace storage failed", error);
+      useWorkspaceStore.setState({
+        status: "error",
+        error:
+          "Salin couldn't open its storage on this device. Private browsing or blocked site data can cause this — allow site data and try again.",
+      });
+    },
+  });
+}
+
+export function stopWorkspaceSync() {
+  subscription?.unsubscribe();
+  subscription = null;
+}

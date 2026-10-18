@@ -1,3 +1,9 @@
+/**
+ * File Type Icon
+ * Document-shaped SVG icon with a coloured extension tag (".CSV", ".PDF"…)
+ * used in the hero badges, cards, lists and previews.
+ */
+
 import { cn } from "@/lib/utils";
 import { FILE_KIND_META } from "@/components/brand/file-kinds";
 import type { FileKind } from "@/features/workspace/types";

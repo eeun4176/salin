@@ -1,3 +1,9 @@
+/**
+ * Home Hero
+ * Top banner of the home screen: header, dot-grid spotlight, typewriter
+ * headline, floating file-type badges and the Scan/Import buttons.
+ */
+
 import type { CSSProperties } from "react";
 import { Link } from "react-router";
 import { FileDown, ScanLine } from "lucide-react";

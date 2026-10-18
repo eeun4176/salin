@@ -1,3 +1,9 @@
+/**
+ * Document Thumbnail
+ * The mini table-form drawing shown on file cards (an image placeholder for
+ * photos), matching the mockup's thumbnail style.
+ */
+
 import { ImageIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";

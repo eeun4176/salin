@@ -1,9 +1,19 @@
+/**
+ * Scan Page (/scan)
+ * Camera capture for paper documents: live viewfinder with a page frame,
+ * capture/upload of pages, then save the pages into a workspace folder or
+ * send them to Ask Salin AI.
+ */
+
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useNavigate } from "react-router";
 import { CameraOff, FolderInput, Images, LoaderCircle, RotateCcw, Sparkles, SwitchCamera, X } from "lucide-react";
 
 import { PageFrame } from "@/components/layout/page-frame";
 import { CAMERA_ERROR_COPY, useCamera } from "@/features/capture/use-camera";
+import { FolderPickerDialog } from "@/features/workspace/components/folder-picker-dialog";
+import { folderUrl } from "@/features/workspace/use-open-item";
+import { saveIntakeFiles } from "@/features/workspace/workspace-actions";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import { toIntakeFiles, useIntakeStore, type IntakeFile } from "@/stores/intake-store";
 import { toast } from "@/stores/toast-store";
@@ -49,6 +59,7 @@ export function ScanPage() {
 
   const [pages, setPages] = useState<IntakeFile[]>([]);
   const [flashes, setFlashes] = useState(0);
+  const [choosingFolder, setChoosingFolder] = useState(false);
   const pagesRef = useRef<IntakeFile[]>([]);
   const handedOff = useRef(false);
 
@@ -106,6 +117,14 @@ export function ScanPage() {
     handedOff.current = true;
     attach(pages);
     navigate("/ai-studio");
+  }
+
+  async function saveTo(folderId: string | null) {
+    const saved = await saveIntakeFiles(pages, folderId, { onOpen: () => navigate(folderUrl(folderId)) });
+    if (saved === null) return;
+    setChoosingFolder(false);
+    pages.forEach((p) => p.previewUrl && URL.revokeObjectURL(p.previewUrl));
+    setPages([]);
   }
 
   const errorCopy = status.state === "error" ? CAMERA_ERROR_COPY[status.error] : null;
@@ -234,12 +253,11 @@ export function ScanPage() {
             </button>
             <button
               type="button"
-              disabled
-              title="Saving to folders arrives in Phase 2"
-              className="inline-flex h-12 items-center justify-center gap-2 rounded-xl text-sm font-semibold text-salin-muted ring-1 ring-salin-border disabled:opacity-60"
+              disabled={pages.length === 0}
+              onClick={() => setChoosingFolder(true)}
+              className="press inline-flex h-12 items-center justify-center gap-2 rounded-xl text-sm font-semibold text-salin-text ring-1 ring-salin-border hover:bg-salin-tile disabled:opacity-45"
             >
               <FolderInput className="size-[18px]" /> Save to Workspace
-              <span className="rounded-md bg-salin-tile px-1.5 py-0.5 text-[10px] font-semibold tracking-wide uppercase">Soon</span>
             </button>
           </div>
 
@@ -256,6 +274,14 @@ export function ScanPage() {
           </section>
         </aside>
       </div>
+
+      <FolderPickerDialog
+        open={choosingFolder}
+        onOpenChange={setChoosingFolder}
+        title={`Save ${pages.length} page${pages.length === 1 ? "" : "s"} to…`}
+        confirmLabel="Save here"
+        onConfirm={saveTo}
+      />
     </PageFrame>
   );
 }
