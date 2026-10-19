@@ -3,13 +3,13 @@
  * Device storage (usage, quota, low-space warning, persistent storage
  * request), workspace backup & restore, privacy controls (delete all data
  * on this device), appearance (light / dark / match device theme,
- * comfortable / compact density), and placeholders for later-phase settings.
+ * comfortable / compact density), and text recognition (OCR files, profile,
+ * languages, device check and benchmark).
  */
 
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ArchiveRestore,
-  Cpu,
   Download,
   HardDrive,
   Monitor,
@@ -25,6 +25,8 @@ import {
 } from "lucide-react";
 
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
+import { OcrSettingsCard } from "@/features/settings/ocr-settings-card";
+import { SectionCard } from "@/features/settings/section-card";
 import { PageFrame } from "@/components/layout/page-frame";
 import { getStorageStatus, isStorageLow, requestPersistentStorage, type StorageStatus } from "@/core/storage/storage-health";
 import { deleteAllWorkspaceData, exportWorkspaceBackup } from "@/features/backup/backup-actions";
@@ -36,28 +38,8 @@ import { toast } from "@/stores/toast-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { cn } from "@/lib/utils";
 
-const LATER: { icon: LucideIcon; title: string; body: string; phase: string }[] = [
-  { icon: Cpu, title: "Offline models", body: "Download and manage on-device OCR models.", phase: "Phase 4" },
-];
-
 const button =
   "press inline-flex h-10 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold ring-1 ring-salin-border hover:bg-salin-tile disabled:opacity-50";
-
-function SectionCard({ icon: Icon, title, id, children }: { icon: LucideIcon; title: string; id: string; children: ReactNode }) {
-  return (
-    <section aria-labelledby={id} className="rounded-2xl p-5 ring-1 ring-salin-border">
-      <div className="flex items-center gap-3">
-        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-salin-tile text-salin-primary">
-          <Icon className="size-5" />
-        </span>
-        <h2 id={id} className="font-semibold">
-          {title}
-        </h2>
-      </div>
-      <div className="mt-4">{children}</div>
-    </section>
-  );
-}
 
 function StorageCard() {
   const [status, setStatus] = useState<StorageStatus | null>(null);
@@ -260,26 +242,13 @@ function PrivacyCard() {
 
 export function SettingsPage() {
   return (
-    <PageFrame title="Settings" description="Storage, backups, privacy and appearance for this device.">
+    <PageFrame title="Settings" description="Storage, text recognition, backups, privacy and appearance for this device.">
       <div className="space-y-5">
         <StorageCard />
+        <OcrSettingsCard />
         <BackupCard />
         <PrivacyCard />
         <AppearanceCard />
-        <ul className="divide-y divide-salin-border rounded-2xl ring-1 ring-salin-border">
-          {LATER.map(({ icon: Icon, title, body, phase }) => (
-            <li key={title} className="flex items-center gap-4 px-4 py-4">
-              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-salin-tile text-salin-text">
-                <Icon className="size-5" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="font-medium">{title}</p>
-                <p className="text-sm text-salin-muted">{body}</p>
-              </div>
-              <span className="shrink-0 rounded-md bg-salin-tile px-2 py-1 text-[11px] font-semibold text-salin-muted">{phase}</span>
-            </li>
-          ))}
-        </ul>
       </div>
     </PageFrame>
   );

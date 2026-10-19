@@ -3,7 +3,11 @@
  * Build setup: React, Tailwind CSS, the "@/…" import alias, and the PWA
  * plugin that writes the web app manifest and a Workbox service worker which
  * precaches the app shell (HTML, JS, CSS, fonts, icons — including the
- * document parsers and the pdf.js worker) for offline use.
+ * document parsers, the pdf.js worker, the image-preparation worker and the
+ * small OCR engine worker script) for offline use. The OCR engine builds
+ * (~4 MB each, one per kind of device) and language files are emitted as
+ * assets but NOT precached: Salin downloads only the ones a device needs,
+ * on demand, into its own Cache Storage (see model-manager.ts).
  * User documents are never put in these caches — they live in IndexedDB.
  */
 
@@ -41,6 +45,8 @@ export default defineConfig({
       workbox: {
         // mjs: the pdf.js worker, so PDFs can be read offline.
         globPatterns: ["**/*.{js,mjs,css,html,svg,png,woff2,webmanifest}"],
+        // OCR engine builds: downloaded on demand by the model manager, not by every visitor.
+        globIgnores: ["**/tesseract-core-*"],
         // Any in-app URL (e.g. /folders/…) opens from the cached app shell when offline.
         navigateFallback: "/index.html",
         cleanupOutdatedCaches: true,

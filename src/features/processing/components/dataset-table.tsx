@@ -3,8 +3,10 @@
  * The editable grid on the review screen, spreadsheet-style: click a cell to
  * edit it (saved when you leave the cell or press Enter), column menus in the
  * header, a row number that shows where the row came from, and per-row
- * "view source" and delete buttons. Cells that need attention are tinted
- * with the reason in their tooltip. Long tables render 100 rows at a time.
+ * "view source" and delete buttons (rows read from a scan open the page with
+ * their region highlighted). Cells that need attention are tinted with the
+ * reason in their tooltip; values corrected after OCR say what OCR read.
+ * Long tables render 100 rows at a time.
  */
 
 import { memo, useState, type KeyboardEvent } from "react";
@@ -26,6 +28,7 @@ function display(value: CellValue | undefined) {
 }
 
 function describeSource(source: SourceReference, fileName: string | undefined) {
+  if (source.ocr) return `${fileName ?? "Deleted document"} · scanned page ${source.ocr.page}`;
   // Excel rows carry their cells ("B5:F5"); other sources a row or line number.
   const at = source.range ? `cells ${source.range}` : source.row ? `row ${source.row}` : null;
   const where = [source.sheet, source.page ? `page ${source.page}` : null, at].filter(Boolean).join(", ");
@@ -37,12 +40,15 @@ interface CellProps {
   value: CellValue | undefined;
   label: string;
   issue: string | undefined;
+  /** Extra tooltip, e.g. what OCR read before the value was corrected. */
+  hint?: string;
   onCommit: (value: CellValue) => void;
 }
 
 /** Edits as plain text and converts to the column's type when the edit is committed. */
-function Cell({ column, value, label, issue, onCommit }: CellProps) {
+function Cell({ column, value, label, issue, hint, onCommit }: CellProps) {
   const shown = display(value);
+  const title = [issue, hint].filter(Boolean).join(" · ") || undefined;
   const className = cn(
     "h-10 w-full min-w-36 bg-transparent px-2.5 text-sm text-salin-text outline-none placeholder:text-salin-subtle focus:bg-salin-surface focus:ring-2 focus:ring-salin-primary focus:ring-inset",
     issue && "bg-amber-50 dark:bg-amber-400/15",
@@ -53,7 +59,7 @@ function Cell({ column, value, label, issue, onCommit }: CellProps) {
       <select
         aria-label={label}
         aria-invalid={issue ? true : undefined}
-        title={issue}
+        title={title}
         value={value === true ? "yes" : value === false ? "no" : ""}
         onChange={(e) => onCommit(e.target.value === "" ? null : e.target.value === "yes")}
         className={className}
@@ -83,7 +89,7 @@ function Cell({ column, value, label, issue, onCommit }: CellProps) {
       key={shown}
       aria-label={label}
       aria-invalid={issue ? true : undefined}
-      title={issue}
+      title={title}
       defaultValue={shown}
       inputMode={column.type === "number" ? "decimal" : undefined}
       placeholder={column.type === "date" ? "YYYY-MM-DD" : undefined}
@@ -102,7 +108,7 @@ interface RowProps {
   sourceLabel: string | null;
   onUpdateCell: DatasetReview["updateCell"];
   onRemoveRow: DatasetReview["removeRow"];
-  onViewSource: (fileId: string) => void;
+  onViewSource: (source: SourceReference) => void;
 }
 
 function sameIssues(a: Map<string, string> | undefined, b: Map<string, string> | undefined) {
@@ -126,6 +132,7 @@ const Row = memo(function Row({ row, index, columns, issues, sourceLabel, onUpda
             value={row.values[column.id]}
             label={`${column.name}, row ${index + 1}`}
             issue={issues?.get(column.id)}
+            hint={row.source?.ocr?.original[column.id] !== undefined ? `Corrected — OCR read “${row.source.ocr.original[column.id]}”` : undefined}
             onCommit={(value) => onUpdateCell(row.id, column.id, value)}
           />
         </td>
@@ -137,7 +144,7 @@ const Row = memo(function Row({ row, index, columns, issues, sourceLabel, onUpda
               type="button"
               aria-label={`View source of row ${index + 1}: ${sourceLabel}`}
               title={sourceLabel ?? undefined}
-              onClick={() => onViewSource(row.source!.fileId)}
+              onClick={() => onViewSource(row.source!)}
               className="grid size-8 place-items-center rounded-lg text-salin-subtle hover:bg-salin-tile hover:text-salin-text"
             >
               <FileSearch className="size-4" />
@@ -169,7 +176,7 @@ interface DatasetTableProps {
   /** Show only rows with at least one issue. */
   issuesOnly: boolean;
   sourceNames: Map<string, string>;
-  onViewSource: (fileId: string) => void;
+  onViewSource: (source: SourceReference) => void;
 }
 
 export function DatasetTable({ review, issuesOnly, sourceNames, onViewSource }: DatasetTableProps) {

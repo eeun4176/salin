@@ -4,9 +4,10 @@
  * descriptive name, how many records it holds, a review status with advice
  * ("Ready", "Check before creating", or why it was left out), and a small
  * preview of the rows it will produce. The technical settings — which cells,
- * which rows hold the column names, merged cells and formulas — stay inside
- * a collapsed "Adjust selection" panel, with the sheet itself for selecting
- * cells visually.
+ * which rows hold the column names (a dropdown that previews the names each
+ * choice gives), merged cells and formulas — stay inside a collapsed
+ * "Adjust selection" panel, with the sheet itself for selecting cells
+ * visually.
  */
 
 import { useId, useState } from "react";
@@ -15,6 +16,7 @@ import { ChevronDown, CircleCheck, CircleMinus, RotateCcw, Trash2, TriangleAlert
 import { columnLetter, formatRange, type CellRange } from "@/core/processing/excel/cell-range";
 import { checkRange, MAX_HEADER_ROWS, suggestHeaderRows, type TableStats } from "@/core/processing/excel/table-detection";
 import type { SheetModel } from "@/core/processing/excel/workbook-reader";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SheetGrid } from "@/features/processing/components/sheet-grid";
 import { recordCount, reviewStatus, type EvaluatedDraft, type ReviewKind, type TableDraft } from "@/features/processing/table-drafts";
 import { cn } from "@/lib/utils";
@@ -134,6 +136,7 @@ function AdjustSelection({ sheet, draft, evaluated, onChange }: Pick<SectionCard
   };
   const changed = draft.detected && (draft.detected.range !== draft.range || draft.detected.headerRows !== draft.headerRows);
   const firstRow = (range?.s.r ?? 0) + 1;
+  const labelId = useId();
 
   return (
     <div className="space-y-3 rounded-xl bg-salin-canvas p-3 ring-1 ring-salin-border">
@@ -153,21 +156,26 @@ function AdjustSelection({ sheet, draft, evaluated, onChange }: Pick<SectionCard
             className="h-9 w-32 rounded-lg border border-salin-border bg-salin-surface px-2.5 font-mono text-sm text-salin-text uppercase outline-none focus:border-salin-primary focus:ring-2 focus:ring-salin-primary/15 aria-invalid:border-destructive"
           />
         </label>
-        <label className="grid gap-1 text-xs font-medium text-salin-muted">
-          Column names
-          <select
-            value={draft.headerRows}
-            onChange={(e) => onChange({ headerRows: Number(e.target.value) })}
-            className="h-9 rounded-lg border border-salin-border bg-salin-surface px-2 text-sm text-salin-text outline-none focus:border-salin-primary"
-          >
-            <option value={0}>None — name columns by letter</option>
-            {Array.from({ length: MAX_HEADER_ROWS }, (_, i) => i + 1).map((n) => (
-              <option key={n} value={n}>
-                {n === 1 ? `From row ${firstRow}` : `From rows ${firstRow}–${firstRow + n - 1}`}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="grid w-full gap-1 sm:w-72">
+          <span id={labelId} className="text-xs font-medium text-salin-muted">
+            Column names
+          </span>
+          <Select value={String(draft.headerRows)} onValueChange={(value) => onChange({ headerRows: Number(value) })}>
+            <SelectTrigger aria-labelledby={labelId} className="h-9 rounded-lg">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="w-(--radix-select-trigger-width) max-w-[calc(100vw-2rem)] sm:w-80">
+              <SelectItem value="0" description={range ? `Columns are named ${letterNames(range)}` : "Columns are named by letter."}>
+                No header row
+              </SelectItem>
+              {Array.from({ length: MAX_HEADER_ROWS }, (_, i) => i + 1).map((n) => (
+                <SelectItem key={n} value={String(n)} description={range ? headerPreview(sheet, range, n) : undefined}>
+                  {n === 1 ? `Row ${firstRow}` : `Rows ${firstRow}–${firstRow + n - 1} combined`}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
         {changed && (
           <button type="button" onClick={reset} className="press inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold text-salin-text ring-1 ring-salin-border hover:bg-salin-tile">
             <RotateCcw className="size-4" /> Reset
@@ -178,6 +186,25 @@ function AdjustSelection({ sheet, draft, evaluated, onChange }: Pick<SectionCard
       {evaluated.ok && <TechnicalNotes stats={evaluated.description.stats} />}
     </div>
   );
+}
+
+/** "Column A, Column B, Column C…" for a range with no header row. */
+function letterNames(range: CellRange) {
+  const count = range.e.c - range.s.c + 1;
+  const names = Array.from({ length: Math.min(3, count) }, (_, i) => `${columnLetter(range.s.c + i)}`);
+  return `Column ${names.join(", ")}${count > 3 ? "…" : ""}`;
+}
+
+/** The column names `rows` header rows would give: "Owner, Pet, Doses Rabies…". */
+function headerPreview(sheet: SheetModel, range: CellRange, rows: number) {
+  const names: string[] = [];
+  for (let c = range.s.c; c <= range.e.c && names.length < 4; c++) {
+    const parts = Array.from({ length: rows }, (_, i) => sheet.cells[range.s.r + i]?.[c]?.trim() ?? "").filter(Boolean);
+    if (parts.length) names.push(parts.join(" "));
+  }
+  if (names.length === 0) return "These rows are empty.";
+  const more = range.e.c - range.s.c + 1 > names.length;
+  return `${names.slice(0, 3).join(", ")}${more || names.length > 3 ? "…" : ""}`;
 }
 
 function TechnicalNotes({ stats }: { stats: TableStats }) {

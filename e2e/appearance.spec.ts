@@ -1,8 +1,9 @@
 /**
  * Appearance & Thumbnails E2E Tests
  * Settings → Appearance switches theme and density, applies them at once,
- * and keeps them after a reload (and sits below Privacy); the Datasets tab
- * sits next to Workspace; file cards preview each file's real content
+ * and keeps them after a reload (and sits below Privacy); the tab bar has
+ * the same four tabs as the phone, with Datasets opened from a card inside
+ * Workspace; file cards preview each file's real content
  * (image, PDF page, table rows — an Excel workbook's main table — text).
  */
 
@@ -16,9 +17,9 @@ test("theme and density are applied immediately and remembered", async ({ page }
   const html = page.locator("html");
   await expect(html).not.toHaveClass(/dark/);
 
-  await page.getByRole("radio", { name: "Dark" }).click();
+  await page.getByRole("radio", { name: "Dark", exact: true }).click();
   await expect(html).toHaveClass(/dark/);
-  await page.getByRole("radio", { name: "Compact" }).click();
+  await page.getByRole("radio", { name: "Compact", exact: true }).click();
   await expect(html).toHaveAttribute("data-density", "compact");
   const background = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
   expect(background).not.toBe("rgb(248, 250, 249)");
@@ -26,10 +27,10 @@ test("theme and density are applied immediately and remembered", async ({ page }
   await page.reload();
   await expect(html).toHaveClass(/dark/);
   await expect(html).toHaveAttribute("data-density", "compact");
-  await expect(page.getByRole("radio", { name: "Dark" })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByRole("radio", { name: "Dark", exact: true })).toHaveAttribute("aria-checked", "true");
 
-  await page.getByRole("radio", { name: "Light" }).click();
-  await page.getByRole("radio", { name: "Comfortable" }).click();
+  await page.getByRole("radio", { name: "Light", exact: true }).click();
+  await page.getByRole("radio", { name: "Comfortable", exact: true }).click();
   await expect(html).not.toHaveClass(/dark/);
   await expect(html).not.toHaveAttribute("data-density", "compact");
 });
@@ -66,10 +67,15 @@ test("file cards show each file's real content", async ({ page }) => {
   await expect(thumb("Form.pdf")).toHaveAttribute("data-thumbnail", "image");
 });
 
-test("Datasets sits next to Workspace, and Appearance comes after Privacy in Settings", async ({ page }) => {
+test("Datasets lives inside Workspace, and Appearance comes after Privacy in Settings", async ({ page }) => {
   await openWorkspace(page);
   const tabs = page.getByRole("navigation", { name: "Workspace sections" }).getByRole("link");
-  await expect(tabs).toHaveText(["Workspace", "Datasets", "Recents", "Favorites", "Trash"]);
+  await expect(tabs).toHaveText(["Workspace", "Recents", "Favorites", "Trash"]);
+  await page.getByRole("link", { name: /^Datasets/ }).click();
+  await expect(page).toHaveURL(/\/datasets$/);
+  // Still inside Workspace: its tab stays selected, and the breadcrumb leads back.
+  await expect(tabs.first()).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("navigation", { name: "Breadcrumb" })).toContainText("Workspace");
 
   await page.goto("/settings");
   const headings = await page.getByRole("heading", { level: 2 }).allTextContents();

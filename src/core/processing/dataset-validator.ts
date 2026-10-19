@@ -30,6 +30,9 @@ export const columnSchema = z.object({
   sourceHeader: z.string().nullable(),
 });
 
+const unit = z.number().min(0).max(1);
+const normalizedBox = z.object({ x: unit, y: unit, width: unit, height: unit });
+
 export const sourceReferenceSchema = z.object({
   fileId: id,
   page: positiveInt.nullable(),
@@ -37,6 +40,16 @@ export const sourceReferenceSchema = z.object({
   row: positiveInt.nullable(),
   // Added with Excel table detection; older records and backups have no range.
   range: z.string().max(40).nullable().default(null),
+  // Added with OCR (Phase 4): where on the scanned page the row and each value came from.
+  ocr: z
+    .object({
+      documentId: id,
+      page: positiveInt,
+      region: normalizedBox.nullable(),
+      cells: z.record(z.string(), normalizedBox),
+      original: z.record(z.string(), z.string()),
+    })
+    .optional(),
 });
 
 export const datasetSchema = z.object({
@@ -51,6 +64,7 @@ export const datasetSchema = z.object({
   createdAt: timestamp,
   updatedAt: timestamp,
   lastExportedAt: timestamp.nullable(),
+  origin: z.object({ kind: z.literal("ocr"), documentId: id, templateId: z.string().min(1).max(100) }).optional(),
 });
 
 export const datasetRowSchema = z.object({

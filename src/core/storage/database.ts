@@ -3,12 +3,15 @@
  * Declares the "SalinAI" IndexedDB database, its tables, indexes and versioned
  * migrations. Every repository reads and writes through the `db` exported here.
  * Workspace tables: folders, files, fileBlobs. Processing tables (Phase 3):
- * processingJobs, extractedDocuments, datasets, datasetRows. Derived: thumbnails.
+ * processingJobs, extractedDocuments, datasets, datasetRows. OCR tables
+ * (Phase 4): ocrDocuments, ocrPages, templates (saved document templates),
+ * benchmarks. Derived: thumbnails. OCR model files live in Cache Storage.
  */
 
 import Dexie, { type EntityTable, type Transaction } from "dexie";
 
-import type { AppSetting, DocumentTemplate, FileBlob, Folder, ModelMetadata, Thumbnail, WorkspaceFile } from "@/types/domain";
+import type { AppSetting, FileBlob, Folder, Thumbnail, WorkspaceFile } from "@/types/domain";
+import type { BenchmarkRecord, OcrDocument, OcrPage, StoredTemplate } from "@/types/ocr";
 import type { Dataset, DatasetRow, ExtractedDocument, ProcessingJob } from "@/types/processing";
 
 export type SalinDatabase = Dexie & {
@@ -20,8 +23,10 @@ export type SalinDatabase = Dexie & {
   processingJobs: EntityTable<ProcessingJob, "id">;
   extractedDocuments: EntityTable<ExtractedDocument, "id">;
   thumbnails: EntityTable<Thumbnail, "blobId">;
-  templates: EntityTable<DocumentTemplate, "id">;
-  modelMetadata: EntityTable<ModelMetadata, "id">;
+  templates: EntityTable<StoredTemplate, "id">;
+  ocrDocuments: EntityTable<OcrDocument, "id">;
+  ocrPages: EntityTable<OcrPage, "id">;
+  benchmarks: EntityTable<BenchmarkRecord, "id">;
   settings: EntityTable<AppSetting, "key">;
 };
 
@@ -64,6 +69,19 @@ db.version(3)
 
 // v4 — file card thumbnails (derived from the stored bytes; never backed up).
 db.version(4).stores({ thumbnails: "blobId" });
+
+// v5 — Phase 4 OCR: scan documents and their pages, saved templates (the v1
+// placeholder table was never written to, so it is cleared), device benchmarks.
+// Model files moved to Cache Storage, so the unused modelMetadata table goes.
+db.version(5)
+  .stores({
+    ocrDocuments: "id, updatedAt, *fileIds, *datasetIds",
+    ocrPages: "id, documentId, [documentId+position], fileId",
+    templates: "id, updatedAt",
+    benchmarks: "id, createdAt",
+    modelMetadata: null,
+  })
+  .upgrade((tx) => tx.table("templates").clear());
 
 const TIMESTAMP_FIELDS = ["createdAt", "updatedAt", "lastOpenedAt", "deletedAt"] as const;
 

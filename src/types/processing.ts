@@ -2,11 +2,13 @@
  * Processing Types
  * Shapes of the Phase 3 records: processing jobs (status, stage, progress,
  * errors), the text and tables extracted from a document, and the structured
- * datasets (columns, rows, source-file references) built from them. Stored in
- * IndexedDB; shared by the processing services, repositories and UI.
+ * datasets (columns, rows, source-file references — for scanned documents also
+ * the OCR page region of each value) built from them. Stored in IndexedDB;
+ * shared by the processing services, repositories and UI.
  */
 
 import type { FileKind, ID, Timestamp } from "./domain";
+import type { Box } from "./ocr";
 
 /* ------------------------------------------------------------------
    Processing jobs
@@ -160,6 +162,27 @@ export interface SourceReference {
   row: number | null;
   /** Spreadsheet cells the row came from, e.g. "B5:F5" (Excel only). */
   range: string | null;
+  /** For rows read by OCR: the scan they came from and where on its page (page-relative 0–1 boxes). */
+  ocr?: OcrSourceReference;
+}
+
+export interface OcrSourceReference {
+  documentId: ID;
+  /** 1-based page within the OCR document. */
+  page: number;
+  /** The whole record's region. */
+  region: Box | null;
+  /** Each value's region, by column id. */
+  cells: Record<ID, Box>;
+  /** What OCR originally read, by column id, where the reviewer changed it. */
+  original: Record<ID, string>;
+}
+
+/** How a dataset was made, beyond its source files. */
+export interface DatasetOrigin {
+  kind: "ocr";
+  documentId: ID;
+  templateId: string;
 }
 
 export type DatasetStatus = "needs_review" | "reviewed";
@@ -180,6 +203,8 @@ export interface Dataset {
   createdAt: Timestamp;
   updatedAt: Timestamp;
   lastExportedAt: Timestamp | null;
+  /** Set for datasets made from scanned documents (OCR). */
+  origin?: DatasetOrigin;
 }
 
 export interface DatasetRow {

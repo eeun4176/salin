@@ -5,17 +5,19 @@
  * rows, Excel workbooks their main table (found by table detection on the
  * first visible sheet with data), and text files their first lines. Previews
  * are made in the background (two at a time), saved in IndexedDB per set of
- * bytes, and kept in memory for the session, so each file is rendered once;
- * a preview that fails isn't saved, so it's tried again next visit.
+ * bytes, and kept in memory for the session, so each file is rendered once.
+ * Files that can't be previewed get an accurate reason (damaged,
+ * password-protected, empty, unsupported format) from their bytes; an
+ * unexplained failure isn't saved, so it's tried again next visit.
  */
 
 import { getFileWithBlob } from "@/core/storage/repositories/file-repository";
 import { getThumbnail, saveThumbnail } from "@/core/storage/repositories/thumbnail.repository";
 import { parseCsvPreview } from "@/lib/csv";
-import type { Thumbnail, WorkspaceFile } from "@/types/domain";
+import type { Thumbnail, ThumbnailProblem, WorkspaceFile } from "@/types/domain";
 
 /** Bump when thumbnails should be regenerated (new look or better rendering). */
-export const THUMBNAIL_VERSION = 2;
+export const THUMBNAIL_VERSION = 3;
 const WIDTH = 360;
 /** PDF pages render wider, so their small print stays legible when the card crops to the top of the page. */
 const PDF_WIDTH = 520;
@@ -27,7 +29,12 @@ const EXCEL_SCAN_ROWS = 120;
 const TEXT_CHARS = 700;
 
 /** What a card renders: an image URL, rows, text, or nothing (fall back to the drawing). */
-export type ThumbnailView = { kind: "image"; url: string } | { kind: "table"; rows: string[][]; title?: string } | { kind: "text"; text: string } | { kind: "none" };
+export type ThumbnailView =
+  | { kind: "image"; url: string }
+  | { kind: "table"; rows: string[][]; title?: string }
+  | { kind: "text"; text: string }
+  | { kind: "none" }
+  | { kind: "problem"; problem: ThumbnailProblem };
 
 async function canvasToBlob(canvas: HTMLCanvasElement) {
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", 0.82));
@@ -111,11 +118,50 @@ async function excelPreview(file: WorkspaceFile, blob: Blob): Promise<{ title?: 
   return { rows };
 }
 
-/** Makes a file's preview. `null` means it failed, so it isn't saved and is tried again next time. */
+/* ------------------------------------------------------------------
+   Why a file can't be previewed
+------------------------------------------------------------------- */
+
+const SIGNATURES: Partial<Record<WorkspaceFile["kind"], number[][]>> = {
+  png: [[0x89, 0x50, 0x4e, 0x47]],
+  jpg: [[0xff, 0xd8, 0xff]],
+  webp: [[0x52, 0x49, 0x46, 0x46]],
+  pdf: [[0x25, 0x50, 0x44, 0x46]],
+  xlsx: [[0x50, 0x4b, 0x03, 0x04]],
+};
+/** Old binary Office files — also how password-protected .xlsx files are stored. */
+const OLE = [0xd0, 0xcf, 0x11, 0xe0];
+
+const startsWith = (head: Uint8Array, signature: number[]) => signature.every((b, i) => head[i] === b);
+
+/**
+ * Explains a failed preview from the file's first bytes and the error.
+ * `null` = no clear reason (it will be retried).
+ */
+export function diagnoseProblem(kind: WorkspaceFile["kind"], head: Uint8Array, error: unknown): ThumbnailProblem | null {
+  const name = (error as { name?: string } | null)?.name ?? "";
+  const message = String((error as { message?: string } | null)?.message ?? error ?? "");
+  if (name === "PasswordException" || /password|encrypt/i.test(message)) return "locked";
+  const signatures = SIGNATURES[kind];
+  if (!signatures) return null;
+  if (kind === "xlsx" && startsWith(head, OLE)) return "unsupported";
+  // Bytes of another format under this extension (e.g. a HEIC photo named .jpg).
+  if (!signatures.some((s) => startsWith(head, s))) return head.length === 0 ? "empty" : kind === "pdf" || kind === "xlsx" ? "damaged" : "unsupported";
+  return "damaged";
+}
+
+/** Makes a file's preview. `null` means it failed for no clear reason, so it isn't saved and is tried again next time. */
 async function generate(file: WorkspaceFile): Promise<Thumbnail | null> {
   const base = { blobId: file.blobId, version: THUMBNAIL_VERSION };
+  let blob: Blob;
   try {
-    const { blob } = await getFileWithBlob(file.id);
+    ({ blob } = await getFileWithBlob(file.id));
+  } catch {
+    return null;
+  }
+  if (blob.size === 0) return { ...base, kind: "problem", problem: "empty" };
+  const head = new Uint8Array(await blob.slice(0, 8).arrayBuffer());
+  try {
     switch (file.kind) {
       case "png":
       case "jpg":
@@ -123,16 +169,24 @@ async function generate(file: WorkspaceFile): Promise<Thumbnail | null> {
         return { ...base, kind: "image", image: await imageThumbnail(blob) };
       case "pdf":
         return { ...base, kind: "image", image: await pdfThumbnail(blob) };
-      case "csv":
-        return { ...base, kind: "table", rows: clip(parseCsvPreview(await blob.slice(0, 64 * 1024).text(), TABLE_ROWS).rows) };
+      case "csv": {
+        const text = await blob.slice(0, 64 * 1024).text();
+        if (text.includes(" ")) return { ...base, kind: "problem", problem: "unsupported" };
+        return { ...base, kind: "table", rows: clip(parseCsvPreview(text, TABLE_ROWS).rows) };
+      }
       case "xlsx": {
         const { title, rows } = await excelPreview(file, blob);
         return rows.length ? { ...base, kind: "table", rows: clip(rows), ...(title ? { title } : {}) } : { ...base, kind: "none" };
       }
-      case "txt":
-        return { ...base, kind: "text", text: (await blob.slice(0, TEXT_CHARS * 4).text()).slice(0, TEXT_CHARS) };
+      case "txt": {
+        const text = await blob.slice(0, TEXT_CHARS * 4).text();
+        if (text.includes(" ")) return { ...base, kind: "problem", problem: "unsupported" };
+        return { ...base, kind: "text", text: text.slice(0, TEXT_CHARS) };
+      }
     }
   } catch (error) {
+    const problem = diagnoseProblem(file.kind, head, error);
+    if (problem) return { ...base, kind: "problem", problem };
     console.warn(`No thumbnail for ${file.name}`, error);
   }
   return null;
@@ -156,6 +210,8 @@ function toView(thumbnail: Thumbnail): ThumbnailView {
       return { kind: "table", rows: thumbnail.rows, title: thumbnail.title };
     case "text":
       return { kind: "text", text: thumbnail.text };
+    case "problem":
+      return { kind: "problem", problem: thumbnail.problem };
     default:
       return { kind: "none" };
   }

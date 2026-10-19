@@ -1,16 +1,21 @@
 /**
  * Scan Page (/scan)
- * Camera capture for paper documents: live viewfinder with a page frame,
- * capture/upload of pages, then save the pages into a workspace folder or
- * send them to Ask Salin AI.
+ * Camera capture for paper documents: live viewfinder with a page frame;
+ * each shot is shown for Retake or Use photo; pages can also come from the
+ * phone's own camera app (when the browser camera is blocked or missing) or
+ * be uploaded (JPG, PNG, WebP, PDF — wrong types and files over 50 MB are
+ * refused with a reason). Then: Read text (on-device OCR into a dataset),
+ * save the pages into a workspace folder, or send them to Ask Salin AI.
+ * Cancel leaves without saving anything.
  */
 
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useNavigate } from "react-router";
-import { CameraOff, FolderInput, Images, LoaderCircle, RotateCcw, Sparkles, SwitchCamera, X } from "lucide-react";
+import { Camera, CameraOff, Check, FolderInput, Images, LoaderCircle, RotateCcw, ScanText, Sparkles, SwitchCamera, X } from "lucide-react";
 
 import { PageFrame } from "@/components/layout/page-frame";
 import { CAMERA_ERROR_COPY, useCamera } from "@/features/capture/use-camera";
+import { scanUrl, startScanFromIntake } from "@/features/ocr/ocr-actions";
 import { FolderPickerDialog } from "@/features/workspace/components/folder-picker-dialog";
 import { folderUrl } from "@/features/workspace/use-open-item";
 import { saveIntakeFiles } from "@/features/workspace/workspace-actions";
@@ -58,6 +63,10 @@ export function ScanPage() {
   const attach = useIntakeStore((s) => s.attach);
 
   const [pages, setPages] = useState<IntakeFile[]>([]);
+  /** A photo just taken, waiting for Retake or Use photo. */
+  const [shot, setShot] = useState<IntakeFile | null>(null);
+  const [reading, setReading] = useState(false);
+  const nativeRef = useRef<HTMLInputElement>(null);
   const [flashes, setFlashes] = useState(0);
   const [choosingFolder, setChoosingFolder] = useState(false);
   const pagesRef = useRef<IntakeFile[]>([]);
@@ -90,7 +99,7 @@ export function ScanPage() {
         if (!blob) return;
         const file = new File([blob], scanFileName(pagesRef.current.length + 1), { type: "image/jpeg" });
         const { ok } = toIntakeFiles([file], "scan");
-        setPages((p) => [...p, ...ok]);
+        setShot(ok[0] ?? null);
       },
       "image/jpeg",
       0.92,
@@ -101,8 +110,51 @@ export function ScanPage() {
     const files = Array.from(event.target.files ?? []);
     event.target.value = "";
     const { ok, rejected } = toIntakeFiles(files, "scan");
-    setPages((p) => [...p, ...ok]);
-    if (rejected.length) toast(`Skipped ${rejected.length} file(s): use PNG, JPG or WebP under 50 MB.`);
+    const usable = ok.filter((f) => f.kind === "png" || f.kind === "jpg" || f.kind === "webp" || f.kind === "pdf");
+    const wrongType = ok.filter((f) => !usable.includes(f));
+    wrongType.forEach((f) => f.previewUrl && URL.revokeObjectURL(f.previewUrl));
+    setPages((p) => [...p, ...usable]);
+    const skipped = [...rejected, ...wrongType.map((f) => ({ name: f.name, reason: "Not a photo or PDF" }))];
+    if (skipped.length) toast(`Skipped ${skipped.map((r) => `${r.name} (${r.reason.toLowerCase()})`).join(", ")}. Use JPG, PNG, WebP or PDF under 50 MB.`);
+  }
+
+  /** A photo from the phone's camera app: checked like a live capture. */
+  function onNativeCapture(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    const { ok, rejected } = toIntakeFiles([file], "scan");
+    if (rejected.length) toast(`That photo can't be used (${rejected[0].reason.toLowerCase()}).`);
+    setShot(ok[0] ?? null);
+  }
+
+  function keepShot() {
+    if (!shot) return;
+    setPages((p) => [...p, shot]);
+    setShot(null);
+  }
+
+  function retake() {
+    if (shot?.previewUrl) URL.revokeObjectURL(shot.previewUrl);
+    setShot(null);
+  }
+
+  function cancel() {
+    retake();
+    pages.forEach((p) => p.previewUrl && URL.revokeObjectURL(p.previewUrl));
+    setPages([]);
+    handedOff.current = true;
+    navigate("/");
+  }
+
+  async function readText() {
+    setReading(true);
+    const id = await startScanFromIntake(pages, null);
+    setReading(false);
+    if (!id) return;
+    handedOff.current = true;
+    pages.forEach((p) => p.previewUrl && URL.revokeObjectURL(p.previewUrl));
+    navigate(scanUrl(id));
   }
 
   function removePage(id: string) {
@@ -132,7 +184,8 @@ export function ScanPage() {
 
   return (
     <PageFrame title="Scan Document" description="Capture paper forms with your camera. Pages stay on this device.">
-      <input ref={uploadRef} type="file" accept="image/png,image/jpeg,image/webp" multiple className="sr-only" tabIndex={-1} aria-hidden="true" onChange={onUpload} />
+      <input ref={uploadRef} type="file" accept="image/png,image/jpeg,image/webp,application/pdf,.pdf,.jpg,.jpeg,.png,.webp" multiple className="sr-only" tabIndex={-1} aria-hidden="true" onChange={onUpload} />
+      <input ref={nativeRef} type="file" accept="image/*" capture="environment" className="sr-only" tabIndex={-1} aria-hidden="true" onChange={onNativeCapture} />
 
       <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_17.5rem]">
         {/* Camera */}
@@ -170,14 +223,31 @@ export function ScanPage() {
                       <RotateCcw className="size-4" /> Try again
                     </button>
                   )}
-                  <button type="button" onClick={() => uploadRef.current?.click()} className="press inline-flex h-10 items-center gap-2 rounded-xl bg-salin-primary px-4 text-sm font-semibold hover:bg-salin-primary-strong">
-                    <Images className="size-4" /> Upload a photo
+                  <button type="button" onClick={() => nativeRef.current?.click()} className="press inline-flex h-10 items-center gap-2 rounded-xl bg-salin-primary px-4 text-sm font-semibold hover:bg-salin-primary-strong">
+                    <Camera className="size-4" /> Use the camera app
+                  </button>
+                  <button type="button" onClick={() => uploadRef.current?.click()} className="press inline-flex h-10 items-center gap-2 rounded-xl bg-white/10 px-4 text-sm font-semibold ring-1 ring-white/20 hover:bg-white/15">
+                    <Images className="size-4" /> Upload a photo or PDF
                   </button>
                 </div>
               </div>
             )}
 
             {flashes > 0 && <div key={flashes} aria-hidden="true" className="pointer-events-none absolute inset-0 animate-flash bg-white opacity-0" />}
+
+            {shot && (
+              <div role="dialog" aria-label="Check the photo" className="absolute inset-0 flex flex-col bg-[#0E1511]">
+                {shot.previewUrl && <img src={shot.previewUrl} alt="Photo just taken" className="min-h-0 flex-1 object-contain" />}
+                <div className="flex items-center justify-center gap-3 p-3">
+                  <button type="button" onClick={retake} className="press inline-flex h-11 items-center gap-2 rounded-xl bg-white/10 px-4 text-sm font-semibold text-white ring-1 ring-white/20 hover:bg-white/15">
+                    <RotateCcw className="size-4" /> Retake
+                  </button>
+                  <button type="button" onClick={keepShot} className="press inline-flex h-11 items-center gap-2 rounded-xl bg-salin-primary px-5 text-sm font-semibold text-white hover:bg-salin-primary-strong">
+                    <Check className="size-4" /> Use photo
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Controls */}
@@ -185,7 +255,7 @@ export function ScanPage() {
             <button
               type="button"
               onClick={() => uploadRef.current?.click()}
-              aria-label="Upload photos from your device"
+              aria-label="Upload photos or PDFs from your device"
               className="press grid size-12 place-items-center rounded-full bg-salin-tile text-salin-text hover:bg-salin-tile-hover"
             >
               <Images className="size-5" />
@@ -226,7 +296,11 @@ export function ScanPage() {
               <ul className="mt-3 grid grid-cols-3 gap-2">
                 {pages.map((page, i) => (
                   <li key={page.id} className="group relative aspect-[3/4] overflow-hidden rounded-lg bg-white ring-1 ring-salin-border">
-                    {page.previewUrl && <img src={page.previewUrl} alt={`Page ${i + 1}`} className="size-full object-cover" />}
+                    {page.previewUrl ? (
+                      <img src={page.previewUrl} alt={`Page ${i + 1}`} className="size-full object-cover" />
+                    ) : (
+                      <span className="grid size-full place-items-center text-[10px] font-semibold text-salin-muted">PDF</span>
+                    )}
                     <span className="absolute bottom-1 left-1 rounded bg-black/55 px-1.5 text-[10px] font-semibold text-white">{i + 1}</span>
                     <button
                       type="button"
@@ -245,9 +319,17 @@ export function ScanPage() {
           <div className="flex flex-col gap-2">
             <button
               type="button"
+              disabled={pages.length === 0 || reading}
+              onClick={() => void readText()}
+              className="press inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-salin-primary text-sm font-semibold text-white shadow-[0_6px_16px_-6px_rgb(1_168_90/0.6)] hover:bg-salin-primary-strong disabled:opacity-45 disabled:shadow-none"
+            >
+              {reading ? <LoaderCircle className="size-[18px] animate-spin" /> : <ScanText className="size-[18px]" />} Read text into a dataset
+            </button>
+            <button
+              type="button"
               disabled={pages.length === 0}
               onClick={askAi}
-              className="press inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-salin-primary text-sm font-semibold text-white shadow-[0_6px_16px_-6px_rgb(1_168_90/0.6)] hover:bg-salin-primary-strong disabled:opacity-45 disabled:shadow-none"
+              className="press inline-flex h-12 items-center justify-center gap-2 rounded-xl text-sm font-semibold text-salin-text ring-1 ring-salin-border hover:bg-salin-tile disabled:opacity-45"
             >
               <Sparkles className="size-[18px]" /> Ask Salin AI
             </button>
@@ -258,6 +340,9 @@ export function ScanPage() {
               className="press inline-flex h-12 items-center justify-center gap-2 rounded-xl text-sm font-semibold text-salin-text ring-1 ring-salin-border hover:bg-salin-tile disabled:opacity-45"
             >
               <FolderInput className="size-[18px]" /> Save to Workspace
+            </button>
+            <button type="button" onClick={cancel} className="press inline-flex h-10 items-center justify-center gap-2 rounded-xl text-sm font-semibold text-salin-muted hover:bg-salin-tile hover:text-salin-text">
+              <X className="size-4" /> Cancel
             </button>
           </div>
 

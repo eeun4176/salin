@@ -3,8 +3,8 @@
  * The body of the workspace card for one tab — Workspace (including any
  * open folder at /folders/:folderId), Recents, Favorites or Trash. Renders
  * breadcrumbs, filters, the sorter and the items, plus loading, error,
- * empty and "folder not found" states. On phones the top level also links
- * to Datasets.
+ * empty and "folder not found" states. The top level also has the Datasets
+ * card (Datasets lives inside Workspace, on phones and desktop alike).
  */
 
 import { useMemo } from "react";
@@ -31,14 +31,14 @@ const DATE_COLUMN: Record<WorkspaceSection, string> = {
   trash: "Date trashed",
 };
 
-/** Phones have no tab switcher in the card, so the workspace top level links to Datasets here. */
+/** The way into Datasets, at the top level of Workspace: how many there are, and scans still being reviewed. */
 function DatasetsEntry() {
   const state = useDatasets();
   const count = state.status === "ready" ? state.datasets.length : 0;
   return (
     <Link
       to="/datasets"
-      className="press mt-4 flex items-center gap-3 rounded-2xl bg-salin-primary-soft px-3.5 py-3 text-salin-text md:hidden"
+      className="press mt-4 flex items-center gap-3 rounded-2xl bg-salin-primary-soft px-3.5 py-3 text-salin-text transition-colors hover:bg-salin-primary-soft/70 md:px-4"
     >
       <Table2 aria-hidden="true" className="size-5 shrink-0 text-salin-primary" />
       <span className="min-w-0 flex-1">

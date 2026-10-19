@@ -3,16 +3,41 @@
  * The preview area of a file card, showing the file's actual content: the
  * photo or PDF page as an image, a mini table for CSV files and the main
  * table of an Excel workbook (with its title), or the first lines of a text
- * file. It starts loading when the card scrolls into view; until then (or if
- * no preview can be made) the drawn placeholder shows.
+ * file. A file that can't be previewed says why (damaged, password-protected,
+ * empty, unsupported format) instead of showing a normal-looking drawing. It
+ * starts loading when the card scrolls into view; until then (or if no
+ * preview can be made) the drawn placeholder shows.
  */
 
 import { useEffect, useRef, useState } from "react";
+import { FileLock2, FileQuestion, FileWarning, FileX2, type LucideIcon } from "lucide-react";
 
 import { DocThumbnail } from "@/components/brand/doc-thumbnail";
 import { cachedThumbnail, loadThumbnail, type ThumbnailView } from "@/features/workspace/thumbnails";
 import { cn } from "@/lib/utils";
-import type { WorkspaceFile } from "@/types/domain";
+import type { ThumbnailProblem, WorkspaceFile } from "@/types/domain";
+
+const PROBLEMS: Record<ThumbnailProblem, { icon: LucideIcon; title: string; detail: string }> = {
+  damaged: { icon: FileWarning, title: "Damaged file", detail: "It can't be opened" },
+  locked: { icon: FileLock2, title: "Password-protected", detail: "Remove the password to preview" },
+  empty: { icon: FileX2, title: "Empty file", detail: "It has no content" },
+  unsupported: { icon: FileQuestion, title: "Can't preview", detail: "Unsupported format inside" },
+};
+
+function ProblemPreview({ problem, kind }: { problem: ThumbnailProblem; kind: WorkspaceFile["kind"] }) {
+  const { icon: Icon, title, detail } = PROBLEMS[problem];
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-1 bg-[#FBF7F2] px-2 text-center" title={`${title} — ${detail}`}>
+      <span className="grid size-9 place-items-center rounded-xl bg-[#F6E7D6] text-[#9A5B12]">
+        <Icon className="size-5" strokeWidth={1.8} />
+      </span>
+      <p className="text-[11px] leading-tight font-semibold text-[#5B3A10]">{title}</p>
+      <p className="text-[9.5px] leading-tight text-[#8A6A45]">
+        {detail} · {kind.toUpperCase()}
+      </p>
+    </div>
+  );
+}
 
 export function FileThumbnail({ file, className }: { file: WorkspaceFile; className?: string }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -41,9 +66,17 @@ export function FileThumbnail({ file, className }: { file: WorkspaceFile; classN
   }, [file]);
 
   return (
-    <div ref={ref} data-thumbnail={view?.kind ?? "loading"} data-thumbnail-for={file.name} className={cn("h-full overflow-hidden rounded-lg", className)}>
+    <div
+      ref={ref}
+      data-thumbnail={view?.kind ?? "loading"}
+      data-thumbnail-problem={view?.kind === "problem" ? view.problem : undefined}
+      data-thumbnail-for={file.name}
+      className={cn("h-full overflow-hidden rounded-lg", className)}
+    >
       {!view || view.kind === "none" ? (
         <DocThumbnail kind={file.kind} className="h-full p-1.5" />
+      ) : view.kind === "problem" ? (
+        <ProblemPreview problem={view.problem} kind={file.kind} />
       ) : view.kind === "image" ? (
         <img
           src={view.url}

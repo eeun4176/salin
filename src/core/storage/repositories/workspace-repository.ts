@@ -1,8 +1,8 @@
 /**
  * Workspace Repository
  * Operations that span folders and files together: loading the whole
- * workspace's metadata, emptying the Trash, and wiping all workspace and
- * processing data (Settings → Privacy).
+ * workspace's metadata, emptying the Trash, and wiping all workspace,
+ * processing and OCR data (Settings → Privacy).
  */
 
 import { db } from "@/core/storage/database";
@@ -43,7 +43,7 @@ export function emptyTrash() {
   });
 }
 
-/** Every table holding the user's documents or data derived from them. */
+/** Every table holding the user's documents or data derived from them (what a backup restore replaces). */
 export const WORKSPACE_TABLES = [
   db.folders,
   db.files,
@@ -53,11 +53,15 @@ export const WORKSPACE_TABLES = [
   db.datasets,
   db.datasetRows,
   db.thumbnails,
+  db.ocrDocuments,
+  db.ocrPages,
+  db.templates,
 ] as const;
 
-/** Removes every folder, file, stored byte, extraction, job, dataset and thumbnail from this device. */
+/** Removes every folder, file, stored byte, extraction, job, dataset, thumbnail, scan, template and benchmark from this device. */
 export function clearWorkspace() {
-  return db.transaction("rw", WORKSPACE_TABLES, async () => {
-    await Promise.all(WORKSPACE_TABLES.map((table) => table.clear()));
+  const tables = [...WORKSPACE_TABLES, db.benchmarks];
+  return db.transaction("rw", tables, async () => {
+    await Promise.all(tables.map((table) => table.clear()));
   });
 }

@@ -2,8 +2,8 @@
  * Mobile E2E Tests (Pixel 7 emulation)
  * Layout regressions on a phone (no sideways scrolling on any screen), the
  * bottom tab bar and + quick actions, core folder/file flows by touch, and
- * the data tools (Datasets entry, guided Excel extraction, review screen) on
- * a small screen.
+ * the data tools (Datasets entry, guided Excel extraction, review screen,
+ * the Read text steps) on a small screen.
  */
 
 import { expect, test } from "@playwright/test";
@@ -75,4 +75,23 @@ test("the guided Excel extraction fits a phone without sideways scrolling", asyn
   await expect(page.getByRole("region", { name: "Name, Pet and 4 more" })).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(0);
+});
+
+test("the Read text steps fit a phone screen, from preparing a page to the dataset list", async ({ page }) => {
+  await openWorkspace(page);
+  await uploadFiles(page, [sample.png("Form photo.png")]);
+  await page.getByRole("button", { name: "More actions for Form photo.png", exact: true }).tap();
+  await page.getByRole("menuitem", { name: "Read text (OCR)" }).tap();
+  await expect(page).toHaveURL(/\/scans\/[\w-]+$/, { timeout: 30_000 });
+  const noOverflow = async () => expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+
+  // Step 1 (page editor), step 2 (templates, model status), back to Datasets with the scan listed.
+  await expect(page.getByRole("tab", { name: "Crop & rotate" })).toBeVisible();
+  await noOverflow();
+  await page.getByRole("button", { name: "Next: read text" }).tap();
+  await expect(page.getByRole("radio", { name: /Pet registration form/ })).toBeVisible();
+  await noOverflow();
+  await page.goto("/datasets");
+  await expect(page.getByRole("link", { name: /Form photo.*Continue/ })).toBeVisible();
+  await noOverflow();
 });

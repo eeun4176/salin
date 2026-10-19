@@ -1,8 +1,9 @@
 /**
  * Workspace Toolbar
- * Top row of the workspace card: the Workspace / Datasets / Recents /
- * Favorites / Trash tab switcher (desktop), the search field, and the quick
- * backup & restore button.
+ * Top row of the workspace card: the Workspace / Recents / Favorites /
+ * Trash tab switcher (desktop — the same four tabs as the phone's bottom
+ * bar; Datasets opens from a card inside Workspace), the search field, and
+ * the quick backup & restore button.
  */
 
 import { useLayoutEffect, useRef } from "react";
@@ -19,7 +20,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { exportWorkspaceBackup } from "@/features/backup/backup-actions";
 import { useRestoreBackup } from "@/features/backup/use-restore-backup";
-import { DATASETS_LINK, TOOLBAR_LINKS, isSectionActive } from "@/features/workspace/section-links";
+import { DATASETS_LINK, SECTION_LINKS, isSectionActive } from "@/features/workspace/section-links";
 import { useUiStore } from "@/stores/ui-store";
 import { cn } from "@/lib/utils";
 
@@ -59,7 +60,7 @@ function SectionTabs() {
           aria-hidden="true"
           className="absolute top-1.5 bottom-1.5 left-0 rounded-xl bg-salin-surface shadow-[0_1px_2px_rgb(0_0_0/0.06)] transition-[transform,width] duration-500 ease-spring motion-reduce:transition-none"
         />
-        {TOOLBAR_LINKS.map(({ to, label, icon: Icon }) => {
+        {SECTION_LINKS.map(({ to, label, icon: Icon }) => {
           const isActive = isSectionActive(to, pathname);
           return (
             <Link

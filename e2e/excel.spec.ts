@@ -159,7 +159,10 @@ test("Adjust selection: change column names, reset, and drag across the sheet; s
   // Column names live in the Adjust selection panel.
   const vets = section(page, "Vet and Since");
   await vets.getByRole("button", { name: "Adjust selection" }).click();
-  await vets.getByRole("combobox", { name: "Column names" }).selectOption("0");
+  // The dropdown shows which names each choice gives.
+  await vets.getByRole("combobox", { name: "Column names" }).click();
+  await expect(page.getByRole("option", { name: "Row 1" })).toContainText("Vet, Since");
+  await page.getByRole("option", { name: /No header row/ }).click();
   const unnamed = section(page, "Untitled section");
   await expect(unnamed.getByText("No column names", { exact: true })).toBeVisible();
   await expect(unnamed.getByRole("columnheader", { name: "Column D" })).toBeVisible();

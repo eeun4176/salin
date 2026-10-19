@@ -13,8 +13,10 @@
 
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { ArrowLeft, ArrowRight, Check, FileSpreadsheet, LoaderCircle, Plus, TriangleAlert } from "lucide-react";
+import { ArrowLeft, ArrowRight, FileSpreadsheet, LoaderCircle, Plus, TriangleAlert } from "lucide-react";
 
+import { primaryButton, secondaryButton, StepFooter } from "@/components/common/step-footer";
+import { Stepper, type StepInfo } from "@/components/common/stepper";
 import { PageFrame } from "@/components/layout/page-frame";
 import { sheetWarnings } from "@/core/processing/excel/sheet-warnings";
 import type { SheetModel, WorkbookModel } from "@/core/processing/excel/workbook-reader";
@@ -42,48 +44,12 @@ import { toast } from "@/stores/toast-store";
 import type { WorkspaceFile } from "@/types/domain";
 
 type Step = 1 | 2 | 3;
-const STEPS = ["Choose sheets", "Pick sections", "Create datasets"] as const;
+const STEPS: StepInfo[] = [
+  { label: "Choose sheets", description: "Pick the worksheets to read." },
+  { label: "Pick sections", description: "Tick the tables you want." },
+  { label: "Create datasets", description: "Name them and save." },
+];
 
-const primaryButton =
-  "press inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-salin-primary px-5 text-sm font-semibold text-white hover:bg-salin-primary-strong disabled:opacity-50";
-const secondaryButton = "press inline-flex h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold text-salin-text ring-1 ring-salin-border hover:bg-salin-tile";
-
-function Stepper({ step }: { step: Step }) {
-  return (
-    <ol aria-label="Steps" className="flex items-center gap-2 text-sm">
-      {STEPS.map((label, i) => {
-        const n = (i + 1) as Step;
-        const state = n < step ? "done" : n === step ? "current" : "todo";
-        return (
-          <li key={label} aria-current={state === "current" ? "step" : undefined} className="flex min-w-0 items-center gap-2">
-            {i > 0 && <span aria-hidden="true" className="h-px w-4 shrink-0 bg-salin-border-strong sm:w-8" />}
-            <span
-              className={cn(
-                "grid size-7 shrink-0 place-items-center rounded-full text-xs font-bold",
-                state === "todo" ? "bg-salin-tile text-salin-muted" : "bg-salin-primary text-white",
-              )}
-            >
-              {state === "done" ? <Check className="size-4" /> : n}
-            </span>
-            <span className={cn("truncate", state === "current" ? "font-semibold text-salin-text" : "hidden text-salin-muted sm:inline")}>{label}</span>
-          </li>
-        );
-      })}
-    </ol>
-  );
-}
-
-/** Buttons at the bottom of each step, kept in view while scrolling. */
-function StepFooter({ children, message }: { children: React.ReactNode; message?: React.ReactNode }) {
-  return (
-    <div className="sticky bottom-[calc(var(--mobile-nav-h)+env(safe-area-inset-bottom)+12px)] z-10 mt-6 rounded-2xl bg-salin-surface p-3 shadow-[0_-8px_24px_-16px_rgb(16_40_28/0.25)] ring-1 ring-salin-border md:bottom-4">
-      <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
-        {message && <div className="min-w-0 flex-1 basis-56 px-1 text-sm">{message}</div>}
-        <div className="flex gap-2">{children}</div>
-      </div>
-    </div>
-  );
-}
 
 /* ------------------------------------------------------------------
    Step 1 — Choose sheets
@@ -413,15 +379,13 @@ function GuidedExtraction({ file, workbook }: { file: WorkspaceFile; workbook: W
 
   return (
     <div>
-      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <FileSpreadsheet aria-hidden="true" className="size-6 shrink-0 text-salin-primary" />
-          <h2 className="truncate text-lg font-semibold text-salin-text">{file.name}</h2>
-        </div>
-        <Stepper step={step} />
+      <div className="flex min-w-0 items-center justify-center gap-2.5">
+        <FileSpreadsheet aria-hidden="true" className="size-6 shrink-0 text-salin-primary" />
+        <h2 className="truncate text-lg font-semibold text-salin-text">{file.name}</h2>
       </div>
+      <Stepper steps={STEPS} current={step} className="mt-5" />
 
-      <div className="mt-6">
+      <div className="mt-8 border-t border-salin-border pt-6">
         {step === 1 && <SheetsStep workbook={workbook} sheets={sheets} sectionsBySheet={sectionsBySheet} onToggle={toggleSheet} />}
         {step === 2 && (
           <SectionsStep

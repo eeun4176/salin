@@ -1,0 +1,189 @@
+/**
+ * OCR Model Manager
+ * Downloads the recognition files a device needs (only those), with
+ * progress and cancellation; keeps them in Cache Storage so recognition
+ * works offline; checks they are all present and intact; reports how much
+ * space they use; and removes them safely. Old copies left behind by an app
+ * update are cleaned up. Missing files while offline raise a clear,
+ * actionable error instead of a network failure.
+ */
+
+import { isQuotaError, QUOTA_MESSAGE, WorkspaceError } from "@/core/storage/errors";
+import { ensureSpaceFor, requestPersistentStorage } from "@/core/storage/storage-health";
+import { MODEL_ASSETS, type ModelAsset } from "@/core/ocr/models/model-assets";
+
+export const MODEL_CACHE = "salin-ocr-models";
+
+export type ModelErrorCode = "offline-missing" | "download-failed" | "quota" | "unavailable" | "corrupt";
+
+export class ModelError extends Error {
+  readonly code: ModelErrorCode;
+
+  constructor(code: ModelErrorCode, message: string) {
+    super(message);
+    this.name = "ModelError";
+    this.code = code;
+  }
+}
+
+export const OFFLINE_MISSING_MESSAGE =
+  "The text-recognition files aren't on this device yet, and you're offline. Connect to the internet once, then download them in Settings → Text recognition (or start reading again). Your pages are saved — you can also type the values yourself.";
+
+function openCache() {
+  if (typeof caches === "undefined") throw new ModelError("unavailable", "This browser can't store recognition files (Cache Storage is unavailable — private browsing?).");
+  return caches.open(MODEL_CACHE);
+}
+
+/** Absolute URL, so cache keys match however the asset URL was written. */
+const keyOf = (asset: ModelAsset) => new URL(asset.url, location.href).href;
+
+export interface AssetStatus {
+  asset: ModelAsset;
+  ready: boolean;
+  /** Stored size, when ready. */
+  storedBytes: number | null;
+}
+
+/** Which of `assets` are stored and complete. */
+export async function checkAssets(assets: ModelAsset[]): Promise<AssetStatus[]> {
+  const cache = await openCache();
+  return Promise.all(
+    assets.map(async (asset) => {
+      const response = await cache.match(keyOf(asset));
+      const verified = Number(response?.headers.get("x-salin-bytes") ?? NaN);
+      const ready = Boolean(response) && verified === asset.bytes;
+      return { asset, ready, storedBytes: ready ? Number(response!.headers.get("x-salin-stored")) : null };
+    }),
+  );
+}
+
+export async function allReady(assets: ModelAsset[]) {
+  try {
+    return (await checkAssets(assets)).every((s) => s.ready);
+  } catch {
+    return false;
+  }
+}
+
+export interface DownloadProgress {
+  loaded: number;
+  total: number;
+  /** The file being downloaded. */
+  asset: ModelAsset;
+}
+
+async function fetchWithProgress(asset: ModelAsset, signal: AbortSignal | undefined, onBytes: (n: number) => void): Promise<Blob> {
+  let response: Response;
+  try {
+    response = await fetch(asset.url, { signal, cache: "no-store" });
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    if (!navigator.onLine) throw new ModelError("offline-missing", OFFLINE_MISSING_MESSAGE);
+    throw new ModelError("download-failed", `${asset.label} couldn't be downloaded. Check your connection and try again.`);
+  }
+  if (!response.ok || !response.body) throw new ModelError("download-failed", `${asset.label} couldn't be downloaded (server said ${response.status}). Try again later.`);
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array<ArrayBuffer>[] = [];
+  let received = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    received += value.byteLength;
+    onBytes(value.byteLength);
+  }
+  // Some servers transparently decompress .gz files: a larger, un-gzipped language file is fine too.
+  const gzipped = chunks[0]?.[0] === 0x1f && chunks[0]?.[1] === 0x8b;
+  const decompressed = asset.kind === "language" && received > asset.bytes && !gzipped;
+  if (received !== asset.bytes && !decompressed) throw new ModelError("corrupt", `${asset.label} downloaded incompletely (${received} of ${asset.bytes} bytes). Try again.`);
+  return new Blob(chunks);
+}
+
+/**
+ * Downloads every asset that isn't stored yet. Reports overall progress.
+ * Nothing partial is stored: each file is saved only once it's complete.
+ */
+export async function downloadAssets(assets: ModelAsset[], options: { signal?: AbortSignal; onProgress?: (p: DownloadProgress) => void } = {}) {
+  const status = await checkAssets(assets);
+  const missing = status.filter((s) => !s.ready).map((s) => s.asset);
+  if (missing.length === 0) return;
+  const total = missing.reduce((sum, a) => sum + a.bytes, 0);
+  await ensureSpaceFor(total);
+  // Ask the browser not to evict the models (and the workspace) under storage pressure.
+  void requestPersistentStorage();
+
+  const cache = await openCache();
+  let loaded = 0;
+  for (const asset of missing) {
+    options.signal?.throwIfAborted();
+    options.onProgress?.({ loaded, total, asset });
+    const blob = await fetchWithProgress(asset, options.signal, (n) => {
+      loaded += n;
+      options.onProgress?.({ loaded, total, asset });
+    });
+    try {
+      await cache.put(
+        keyOf(asset),
+        new Response(blob, {
+          headers: {
+            "content-type": asset.url.endsWith(".js") ? "text/javascript" : "application/octet-stream",
+            // The catalogue size it was verified against, and what it actually takes up.
+            "x-salin-bytes": String(asset.bytes),
+            "x-salin-stored": String(blob.size),
+          },
+        }),
+      );
+    } catch (error) {
+      if (isQuotaError(error)) throw new WorkspaceError("quota", QUOTA_MESSAGE);
+      throw error;
+    }
+  }
+  await pruneStale();
+}
+
+/**
+ * The stored bytes of an asset. When it isn't stored yet it is downloaded
+ * first (only while online); offline, a clear "files missing" error is thrown.
+ */
+export async function loadAsset(asset: ModelAsset, signal?: AbortSignal): Promise<Blob> {
+  const cache = await openCache();
+  const cached = await cache.match(keyOf(asset));
+  if (cached) return cached.blob();
+  if (!navigator.onLine) throw new ModelError("offline-missing", OFFLINE_MISSING_MESSAGE);
+  await downloadAssets([asset], { signal });
+  const stored = await cache.match(keyOf(asset));
+  if (!stored) throw new ModelError("download-failed", `${asset.label} couldn't be saved on this device.`);
+  return stored.blob();
+}
+
+/** Bytes used by stored recognition files. */
+export async function storedBytes() {
+  if (typeof caches === "undefined") return 0;
+  const cache = await caches.open(MODEL_CACHE);
+  let sum = 0;
+  for (const request of await cache.keys()) {
+    const response = await cache.match(request);
+    sum += Number(response?.headers.get("x-salin-stored") ?? 0);
+  }
+  return sum;
+}
+
+/** Removes stored files: the given assets, or all of them. Callers stop recognition first. */
+export async function removeAssets(assets?: ModelAsset[]) {
+  if (typeof caches === "undefined") return;
+  if (!assets) {
+    await caches.delete(MODEL_CACHE);
+    return;
+  }
+  const cache = await caches.open(MODEL_CACHE);
+  await Promise.all(assets.map((a) => cache.delete(keyOf(a))));
+}
+
+/** Deletes cached files that no current asset points to (left over from an older app version). */
+export async function pruneStale() {
+  if (typeof caches === "undefined") return;
+  const cache = await caches.open(MODEL_CACHE);
+  const current = new Set(Object.values(MODEL_ASSETS).map(keyOf));
+  await Promise.all((await cache.keys()).filter((r) => !current.has(r.url)).map((r) => cache.delete(r)));
+}

@@ -63,7 +63,7 @@ export const parsePdf: ParseFn = async ({ file, blob }, { signal, onProgress }) 
       onProgress(number / pdf.numPages);
     }
     if (blankPages.length === pages.length) {
-      throw new ProcessingError("no-content", `"${file.name}" has no selectable text. It looks like a scan, which needs text recognition (not available yet).`);
+      throw new ProcessingError("no-content", `"${file.name}" has no selectable text. It looks like a scan — use Read text (OCR) on it instead.`);
     }
     const warnings = blankPages.length
       ? [`${blankPages.length === 1 ? "Page" : "Pages"} ${blankPages.join(", ")} had no selectable text (likely scanned images).`]

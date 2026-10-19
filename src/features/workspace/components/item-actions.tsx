@@ -1,13 +1,13 @@
 /**
  * Item Actions Menu
  * The ⋮ overflow menu on every folder/file card and list row: Extract data
- * (PDF, Excel, CSV, text), Download, Rename, Move to…, Make a copy, Favorite
+ * (PDF, Excel, CSV, text), Read text (OCR — photos and PDFs), Download, Rename, Move to…, Make a copy, Favorite
  * and Move to trash — or, in Trash,
  * Restore and Delete forever (with confirmation).
  */
 
 import { useState } from "react";
-import { ArchiveRestore, Copy, Download, EllipsisVertical, FolderInput, Heart, HeartOff, Pencil, Table2, Trash, X } from "lucide-react";
+import { ArchiveRestore, Copy, Download, EllipsisVertical, FolderInput, Heart, HeartOff, Pencil, ScanText, Table2, Trash, X } from "lucide-react";
 
 import {
   DropdownMenu,
@@ -18,6 +18,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { isProcessable } from "@/core/processing/parsers";
+import { useStartScan } from "@/features/ocr/hooks/use-start-scan";
+import { OCR_KINDS } from "@/features/ocr/ocr-actions";
 import { useExtractData } from "@/features/processing/hooks/use-document-processing";
 import { NameDialog } from "@/components/common/name-dialog";
 import { FolderPickerDialog } from "@/features/workspace/components/folder-picker-dialog";
@@ -43,6 +45,8 @@ export function ItemActions({ item, className }: { item: WorkspaceItem; classNam
   const extract = useExtractData();
   const trashed = item.deletedAt !== null;
   const processable = item.kind === "file" && isProcessable(item.fileType);
+  const readable = item.kind === "file" && item.fileType !== undefined && OCR_KINDS.has(item.fileType);
+  const startScan = useStartScan();
   const noun = item.kind === "folder" ? "folder" : "file";
   const close = (open: boolean) => !open && setDialog(null);
 
@@ -76,6 +80,11 @@ export function ItemActions({ item, className }: { item: WorkspaceItem; classNam
               {processable && (
                 <DropdownMenuItem className="gap-2.5 py-2" onSelect={() => extract([item.id])}>
                   <Table2 /> Extract data
+                </DropdownMenuItem>
+              )}
+              {readable && (
+                <DropdownMenuItem className="gap-2.5 py-2" onSelect={() => void startScan([item.id])}>
+                  <ScanText /> Read text (OCR)
                 </DropdownMenuItem>
               )}
               <DropdownMenuItem className="gap-2.5 py-2" onSelect={() => void downloadItem(item)}>

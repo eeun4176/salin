@@ -13,13 +13,14 @@ import { assertValidContent } from "@/core/processing/dataset-validator";
 import { db } from "@/core/storage/database";
 import { WorkspaceError } from "@/core/storage/errors";
 import { normalizeName, validateName } from "@/core/storage/names";
-import type { Dataset, DatasetColumn, DatasetContent, DatasetRow, DatasetStatus } from "@/types/processing";
+import type { Dataset, DatasetColumn, DatasetContent, DatasetOrigin, DatasetRow, DatasetStatus } from "@/types/processing";
 
 export interface NewDataset {
   name: string;
   sourceFileIds: string[];
   jobId?: string | null;
   content: DatasetContent;
+  origin?: DatasetOrigin;
 }
 
 function invalid(message: string): never {
@@ -97,6 +98,7 @@ export async function createDataset(input: NewDataset): Promise<Dataset> {
       createdAt: now,
       updatedAt: now,
       lastExportedAt: null,
+      ...(input.origin ? { origin: input.origin } : {}),
     };
     await db.datasets.add(dataset);
     await db.datasetRows.bulkAdd(toRows(dataset.id, input.content));

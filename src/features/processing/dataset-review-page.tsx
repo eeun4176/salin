@@ -4,6 +4,8 @@
  * data came from, an autosave indicator, Export (CSV / Excel / JSON) and
  * "Mark as reviewed", a note when cells need attention (with a filter to just
  * those rows), any notes from reading the files, and the editable table.
+ * Datasets read from a scan link back to it, and their rows' "view source"
+ * shows the scanned page with the row's region highlighted.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -19,6 +21,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { ExportFormat } from "@/core/processing/dataset-export";
 import { listExtractionsForBlobs } from "@/core/storage/repositories/processing.repository";
+import { OcrSourceDialog } from "@/features/ocr/components/ocr-source-dialog";
+import { scanUrl } from "@/features/ocr/ocr-actions";
 import { DatasetTable } from "@/features/processing/components/dataset-table";
 import { useDatasetReview, type DatasetReview, type SaveState } from "@/features/processing/hooks/use-dataset-review";
 import { downloadDataset, EXPORT_FORMATS } from "@/features/processing/processing-actions";
@@ -26,6 +30,7 @@ import { usePreviewFile } from "@/features/workspace/use-open-item";
 import { cn } from "@/lib/utils";
 import { toast } from "@/stores/toast-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
+import type { SourceReference } from "@/types/processing";
 
 const secondaryButton =
   "press inline-flex h-10 items-center gap-2 rounded-xl px-3.5 text-sm font-semibold text-salin-text ring-1 ring-salin-border hover:bg-salin-tile disabled:opacity-50";
@@ -149,6 +154,14 @@ function ReviewHeader({ review, sourceNames, onViewSource }: { review: DatasetRe
               ))}
             </>
           )}
+          {dataset?.origin?.kind === "ocr" && (
+            <>
+              <span aria-hidden="true">·</span>
+              <Link to={scanUrl(dataset.origin.documentId)} className="font-medium text-salin-primary hover:underline">
+                View scan
+              </Link>
+            </>
+          )}
           <span aria-hidden="true">·</span>
           <SaveIndicator save={save} onRetry={() => void review.flush()} />
         </div>
@@ -182,6 +195,9 @@ export function DatasetReviewPage() {
   const sourceNames = useMemo(() => new Map(files.filter((f) => f.deletedAt === null).map((f) => [f.id, f.name])), [files]);
   const previewFile = usePreviewFile();
   const onViewSource = useCallback((fileId: string) => (sourceNames.has(fileId) ? previewFile(fileId) : toast("That document was deleted.")), [previewFile, sourceNames]);
+  // Rows read from a scan open the page with their region highlighted; others open the file.
+  const [ocrSource, setOcrSource] = useState<SourceReference | null>(null);
+  const onViewRowSource = useCallback((source: SourceReference) => (source.ocr ? setOcrSource(source) : onViewSource(source.fileId)), [onViewSource]);
   const notes = useExtractionNotes(review.dataset?.sourceFileIds);
   const issueCount = review.issues.length;
 
@@ -243,8 +259,18 @@ export function DatasetReviewPage() {
       )}
 
       <div className="mt-4">
-        <DatasetTable review={review} issuesOnly={issuesOnly && issueCount > 0} sourceNames={sourceNames} onViewSource={onViewSource} />
+        <DatasetTable review={review} issuesOnly={issuesOnly && issueCount > 0} sourceNames={sourceNames} onViewSource={onViewRowSource} />
       </div>
+
+      <OcrSourceDialog
+        source={ocrSource?.ocr ?? null}
+        onClose={() => setOcrSource(null)}
+        onOpenFile={() => {
+          const fileId = ocrSource?.fileId;
+          setOcrSource(null);
+          if (fileId) onViewSource(fileId);
+        }}
+      />
     </PageFrame>
   );
 }

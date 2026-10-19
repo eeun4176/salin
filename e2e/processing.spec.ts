@@ -3,7 +3,7 @@
  * The Phase 3 workflow in a real browser: extract CSV, Excel, PDF and text
  * files into datasets; review and edit them (types, issues, rows, name);
  * autosave and reopen after a reload; export CSV / Excel / JSON; combine
- * documents from the Datasets tab; fail safely on damaged or unsupported
+ * documents from the Datasets page; fail safely on damaged or unsupported
  * files; and do all of it offline.
  */
 
@@ -87,7 +87,7 @@ test("a CSV becomes a typed, editable dataset that survives a reload and exports
 
   await page.getByRole("link", { name: "Datasets" }).click();
   await expect(page.getByRole("link", { name: "Pet visits" })).toBeVisible();
-  await expect(page.getByText("Reviewed")).toBeVisible();
+  await expect(page.getByRole("listitem").filter({ hasText: "Pet visits" }).getByText("Reviewed", { exact: true })).toBeVisible();
 });
 
 test("Excel workbooks and text PDFs are read on the device, with links back to the source", async ({ page }) => {
@@ -127,7 +127,7 @@ test("New dataset combines documents, and deleting a dataset can be undone", asy
   await openWorkspace(page);
   await uploadFiles(page, [sample.txt("a.txt", "Line one\nLine two"), sample.txt("b.txt", "Line three")]);
 
-  await page.getByRole("navigation", { name: "Workspace sections" }).getByRole("link", { name: "Datasets" }).click();
+  await page.getByRole("link", { name: /^Datasets/ }).click();
   await expect(page.getByText("No datasets yet")).toBeVisible();
   await page.getByRole("button", { name: "New dataset" }).click();
   const picker = page.getByRole("dialog");
@@ -162,9 +162,9 @@ test("damaged and unsupported files fail safely and the original is kept", async
   await page.reload();
   await expect(card(page, "Broken.xlsx")).toBeVisible();
 
-  // Images need OCR, so they don't offer extraction.
+  // Images are read with OCR (Read text), not table extraction.
   await page.getByRole("button", { name: "More actions for Photo.png", exact: true }).click();
-  await expect(page.getByRole("menuitem", { name: "Download" })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Read text (OCR)" })).toBeVisible();
   await expect(page.getByRole("menuitem", { name: "Extract data" })).toHaveCount(0);
   await page.keyboard.press("Escape");
 

@@ -73,12 +73,27 @@ async function runWithProgress(job: ProcessingJob, onReady: OnDatasetReady, run:
   }
   // Retrying can't help when the file type or its content is the problem.
   const retryable = done.error?.code !== "unsupported-file" && done.error?.code !== "no-content";
+  // A scanned PDF (no text layer) can be read with OCR instead.
+  const files = useWorkspaceStore.getState().files;
+  const scanned = done.error?.code === "no-content" && done.sourceFileIds.every((id) => files.find((f) => f.id === id)?.kind === "pdf");
   toast(
     done.error?.message ?? "The data couldn't be extracted.",
-    retryable ? { label: "Retry", onClick: () => void retry(done, onReady) } : undefined,
+    scanned
+      ? { label: "Read text", onClick: () => void readWithOcr(done.sourceFileIds) }
+      : retryable
+        ? { label: "Retry", onClick: () => void retry(done, onReady) }
+        : undefined,
     { duration: 8000 },
   );
   return null;
+}
+
+/** Opens the Read text (OCR) workflow for scanned PDFs. Loaded on demand (the router imports this module). */
+async function readWithOcr(fileIds: string[]) {
+  const [{ router }, { scanUrl, startScan }] = await Promise.all([import("@/app/router"), import("@/features/ocr/ocr-actions")]);
+  const files = useWorkspaceStore.getState().files.filter((f) => fileIds.includes(f.id));
+  const id = await startScan(files);
+  if (id) await router.navigate(scanUrl(id));
 }
 
 async function retry(job: ProcessingJob, onReady: OnDatasetReady) {

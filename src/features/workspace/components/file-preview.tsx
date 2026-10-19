@@ -4,12 +4,12 @@
  * URL parameter, on any screen. Shows images, PDFs (browser viewer, with an
  * "Open" fallback on phones), the first rows of CSV files, the start of text
  * files, and Excel workbooks sheet by sheet. Files Salin can read have an
- * "Extract data" button.
+ * "Extract data" button; photos and PDFs also have "Read text" (OCR).
  */
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
-import { Download, ExternalLink, FileWarning, LoaderCircle, Table2, X } from "lucide-react";
+import { Download, ExternalLink, FileWarning, LoaderCircle, ScanText, Table2, X } from "lucide-react";
 
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { FILE_KIND_META } from "@/components/brand/file-kinds";
@@ -17,6 +17,8 @@ import { FileTypeIcon } from "@/components/brand/file-type-icon";
 import { isProcessable } from "@/core/processing/parsers";
 import { errorMessage } from "@/core/storage/errors";
 import { getFileWithBlob } from "@/core/storage/repositories/file-repository";
+import { useStartScan } from "@/features/ocr/hooks/use-start-scan";
+import { OCR_KINDS } from "@/features/ocr/ocr-actions";
 import { useExtractData } from "@/features/processing/hooks/use-document-processing";
 import { ExcelPreview } from "@/features/workspace/components/excel-preview";
 import { formatBytes, formatDate } from "@/features/workspace/query";
@@ -147,6 +149,7 @@ function PreviewContent({ file }: { file: WorkspaceFile }) {
 
 export function FilePreview() {
   const extract = useExtractData();
+  const startScan = useStartScan();
   const [params] = useSearchParams();
   const previewId = params.get(PREVIEW_PARAM);
   const closePreview = useClosePreview();
@@ -177,6 +180,20 @@ export function FilePreview() {
                 className="press inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-salin-primary px-3 text-[13px] font-semibold text-white hover:bg-salin-primary-strong"
               >
                 <Table2 className="size-4" /> <span className="hidden sm:inline">Extract data</span>
+              </button>
+            )}
+            {file && file.deletedAt === null && OCR_KINDS.has(file.kind) && (
+              <button
+                type="button"
+                aria-label="Read text"
+                onClick={() => void startScan([file.id])}
+                className={
+                  file.kind === "pdf"
+                    ? "press inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg px-3 text-[13px] font-semibold text-salin-text ring-1 ring-salin-border hover:bg-salin-tile"
+                    : "press inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-salin-primary px-3 text-[13px] font-semibold text-white hover:bg-salin-primary-strong"
+                }
+              >
+                <ScanText className="size-4" /> <span className="hidden sm:inline">Read text</span>
               </button>
             )}
             {file && (
