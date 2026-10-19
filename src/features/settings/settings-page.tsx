@@ -2,24 +2,41 @@
  * Settings Page (/settings)
  * Device storage (usage, quota, low-space warning, persistent storage
  * request), workspace backup & restore, privacy controls (delete all data
- * on this device), and placeholders for later-phase settings.
+ * on this device), appearance (light / dark / match device theme,
+ * comfortable / compact density), and placeholders for later-phase settings.
  */
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { ArchiveRestore, Cpu, Download, HardDrive, Palette, ShieldCheck, Trash, TriangleAlert, type LucideIcon } from "lucide-react";
+import {
+  ArchiveRestore,
+  Cpu,
+  Download,
+  HardDrive,
+  Monitor,
+  Moon,
+  Palette,
+  Rows3,
+  Rows4,
+  ShieldCheck,
+  Sun,
+  Trash,
+  TriangleAlert,
+  type LucideIcon,
+} from "lucide-react";
 
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { PageFrame } from "@/components/layout/page-frame";
 import { getStorageStatus, isStorageLow, requestPersistentStorage, type StorageStatus } from "@/core/storage/storage-health";
 import { deleteAllWorkspaceData, exportWorkspaceBackup } from "@/features/backup/backup-actions";
+import { useDatasets } from "@/features/processing/hooks/use-datasets";
 import { useRestoreBackup } from "@/features/backup/use-restore-backup";
 import { formatBytes } from "@/features/workspace/query";
+import { useAppearanceStore, type Density, type Theme } from "@/stores/appearance-store";
 import { toast } from "@/stores/toast-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { cn } from "@/lib/utils";
 
 const LATER: { icon: LucideIcon; title: string; body: string; phase: string }[] = [
-  { icon: Palette, title: "Appearance", body: "Theme and density preferences.", phase: "Later" },
   { icon: Cpu, title: "Offline models", body: "Download and manage on-device OCR models.", phase: "Phase 4" },
 ];
 
@@ -71,7 +88,7 @@ function StorageCard() {
   return (
     <section aria-labelledby="storage-heading" className="rounded-2xl bg-salin-tile p-5">
       <div className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-xl bg-white text-salin-primary">
+        <span className="grid size-10 place-items-center rounded-xl bg-salin-surface text-salin-primary">
           <HardDrive className="size-5" />
         </span>
         <div>
@@ -89,7 +106,7 @@ function StorageCard() {
       </div>
       {status?.supported && (
         <div
-          className="mt-4 h-2 overflow-hidden rounded-full bg-white"
+          className="mt-4 h-2 overflow-hidden rounded-full bg-salin-surface"
           role="progressbar"
           aria-label="Storage used"
           aria-valuemin={0}
@@ -100,7 +117,7 @@ function StorageCard() {
         </div>
       )}
       {low && (
-        <p role="alert" className="mt-3 flex items-start gap-2 text-sm font-medium text-[#B4232A]">
+        <p role="alert" className="mt-3 flex items-start gap-2 text-sm font-medium text-destructive">
           <TriangleAlert className="mt-0.5 size-4 shrink-0" /> Storage is almost full. Back up your workspace, then empty Trash or delete files you no longer need.
         </p>
       )}
@@ -112,7 +129,7 @@ function StorageCard() {
             : "Browsers may clear site data when the device runs low on space. Protect it, and keep regular backups."}
         </p>
         {status?.persisted === false && (
-          <button type="button" onClick={persist} disabled={requesting} className={cn(button, "bg-white")}>
+          <button type="button" onClick={persist} disabled={requesting} className={cn(button, "bg-salin-surface")}>
             <ShieldCheck className="size-4 text-salin-primary" /> Protect my data
           </button>
         )}
@@ -129,7 +146,7 @@ function BackupCard() {
     <SectionCard icon={ArchiveRestore} title="Backup & restore" id="backup-heading">
       {restore.elements}
       <p className="text-sm text-salin-muted">
-        A backup is one .zip file with every folder and original document. Restoring checks every file before replacing your workspace.
+        A backup is one .zip file with every folder, original document and dataset. Restoring checks every file before replacing your workspace.
       </p>
       <div className="mt-4 flex flex-wrap gap-2">
         <button
@@ -140,7 +157,7 @@ function BackupCard() {
             await exportWorkspaceBackup();
             setBusy(false);
           }}
-          className={cn(button, "bg-salin-primary text-white ring-0 hover:bg-[#019A53]")}
+          className={cn(button, "bg-salin-primary text-white ring-0 hover:bg-salin-primary-strong")}
         >
           <Download className="size-4" /> {busy ? "Preparing…" : "Back up workspace"}
         </button>
@@ -152,9 +169,67 @@ function BackupCard() {
   );
 }
 
+/** A row of mutually exclusive choices, styled like the workspace tab switcher. */
+function Segmented<T extends string>({ label, value, options, onChange }: { label: string; value: T; options: { value: T; label: string; icon: LucideIcon }[]; onChange: (value: T) => void }) {
+  return (
+    <div>
+      <p id={`${label}-label`} className="mb-2 text-sm font-medium text-salin-text">
+        {label}
+      </p>
+      <div role="radiogroup" aria-labelledby={`${label}-label`} className="inline-flex flex-wrap gap-1 rounded-xl bg-salin-tile p-1">
+        {options.map(({ value: option, label: text, icon: Icon }) => (
+          <button
+            key={option}
+            type="button"
+            role="radio"
+            aria-checked={value === option}
+            onClick={() => onChange(option)}
+            className={cn(
+              "press inline-flex h-9 items-center gap-2 rounded-lg px-3.5 text-sm font-medium",
+              value === option ? "bg-salin-surface text-salin-primary shadow-[0_1px_2px_rgb(0_0_0/0.08)]" : "text-salin-muted hover:text-salin-text",
+            )}
+          >
+            <Icon className="size-4" /> {text}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const THEMES: { value: Theme; label: string; icon: LucideIcon }[] = [
+  { value: "light", label: "Light", icon: Sun },
+  { value: "dark", label: "Dark", icon: Moon },
+  { value: "system", label: "Match device", icon: Monitor },
+];
+
+const DENSITIES: { value: Density; label: string; icon: LucideIcon }[] = [
+  { value: "comfortable", label: "Comfortable", icon: Rows3 },
+  { value: "compact", label: "Compact", icon: Rows4 },
+];
+
+function AppearanceCard() {
+  const theme = useAppearanceStore((s) => s.theme);
+  const density = useAppearanceStore((s) => s.density);
+  const setTheme = useAppearanceStore((s) => s.setTheme);
+  const setDensity = useAppearanceStore((s) => s.setDensity);
+
+  return (
+    <SectionCard icon={Palette} title="Appearance" id="appearance-heading">
+      <p className="text-sm text-salin-muted">Saved in this browser only.</p>
+      <div className="mt-4 flex flex-wrap gap-x-8 gap-y-4">
+        <Segmented label="Theme" value={theme} options={THEMES} onChange={setTheme} />
+        <Segmented label="Density" value={density} options={DENSITIES} onChange={setDensity} />
+      </div>
+    </SectionCard>
+  );
+}
+
 function PrivacyCard() {
   const [confirming, setConfirming] = useState(false);
   const count = useWorkspaceStore((s) => s.items.length);
+  const datasets = useDatasets();
+  const datasetCount = datasets.status === "ready" ? datasets.datasets.length : 0;
 
   return (
     <SectionCard icon={ShieldCheck} title="Privacy" id="privacy-heading">
@@ -165,7 +240,7 @@ function PrivacyCard() {
       <button
         type="button"
         onClick={() => setConfirming(true)}
-        disabled={count === 0}
+        disabled={count + datasetCount === 0}
         className={cn(button, "mt-4 text-destructive hover:bg-destructive/10")}
       >
         <Trash className="size-4" /> Delete all workspace data
@@ -174,7 +249,7 @@ function PrivacyCard() {
         open={confirming}
         onOpenChange={setConfirming}
         title="Delete all workspace data?"
-        description={`Every folder and file (${count} item${count === 1 ? "" : "s"}), including Trash, will be permanently removed from this device. Back up first if you might need them. This can't be undone.`}
+        description={`Every folder and file (${count} item${count === 1 ? "" : "s"}), including Trash, and every dataset (${datasetCount}) will be permanently removed from this device. Back up first if you might need them. This can't be undone.`}
         confirmLabel="Delete everything"
         destructive
         onConfirm={deleteAllWorkspaceData}
@@ -185,11 +260,12 @@ function PrivacyCard() {
 
 export function SettingsPage() {
   return (
-    <PageFrame title="Settings" description="Storage, backups and privacy for this device.">
+    <PageFrame title="Settings" description="Storage, backups, privacy and appearance for this device.">
       <div className="space-y-5">
         <StorageCard />
         <BackupCard />
         <PrivacyCard />
+        <AppearanceCard />
         <ul className="divide-y divide-salin-border rounded-2xl ring-1 ring-salin-border">
           {LATER.map(({ icon: Icon, title, body, phase }) => (
             <li key={title} className="flex items-center gap-4 px-4 py-4">

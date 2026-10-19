@@ -1,12 +1,13 @@
 /**
  * Item Actions Menu
- * The ⋮ overflow menu on every folder/file card and list row: Download,
- * Rename, Move to…, Make a copy, Favorite and Move to trash — or, in Trash,
+ * The ⋮ overflow menu on every folder/file card and list row: Extract data
+ * (PDF, Excel, CSV, text), Download, Rename, Move to…, Make a copy, Favorite
+ * and Move to trash — or, in Trash,
  * Restore and Delete forever (with confirmation).
  */
 
 import { useState } from "react";
-import { ArchiveRestore, Copy, Download, EllipsisVertical, FolderInput, Heart, HeartOff, Pencil, Trash, X } from "lucide-react";
+import { ArchiveRestore, Copy, Download, EllipsisVertical, FolderInput, Heart, HeartOff, Pencil, Table2, Trash, X } from "lucide-react";
 
 import {
   DropdownMenu,
@@ -16,6 +17,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
+import { isProcessable } from "@/core/processing/parsers";
+import { useExtractData } from "@/features/processing/hooks/use-document-processing";
 import { NameDialog } from "@/components/common/name-dialog";
 import { FolderPickerDialog } from "@/features/workspace/components/folder-picker-dialog";
 import type { WorkspaceItem } from "@/features/workspace/types";
@@ -37,7 +40,9 @@ type DialogKind = "rename" | "move" | "delete" | null;
 /** Three-dot overflow menu for a folder or file card. */
 export function ItemActions({ item, className }: { item: WorkspaceItem; className?: string }) {
   const [dialog, setDialog] = useState<DialogKind>(null);
+  const extract = useExtractData();
   const trashed = item.deletedAt !== null;
+  const processable = item.kind === "file" && isProcessable(item.fileType);
   const noun = item.kind === "folder" ? "folder" : "file";
   const close = (open: boolean) => !open && setDialog(null);
 
@@ -68,6 +73,11 @@ export function ItemActions({ item, className }: { item: WorkspaceItem; classNam
             </>
           ) : (
             <>
+              {processable && (
+                <DropdownMenuItem className="gap-2.5 py-2" onSelect={() => extract([item.id])}>
+                  <Table2 /> Extract data
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem className="gap-2.5 py-2" onSelect={() => void downloadItem(item)}>
                 <Download /> Download
               </DropdownMenuItem>

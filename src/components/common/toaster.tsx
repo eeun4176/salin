@@ -22,7 +22,7 @@ export function Toaster() {
       {toasts.map((t) => (
         <div
           key={t.id}
-          className="pointer-events-auto flex max-w-md items-center gap-3 rounded-xl bg-salin-text px-4 py-3 text-sm text-white shadow-lg animate-in fade-in-0 slide-in-from-bottom-2 motion-reduce:animate-none"
+          className="pointer-events-auto flex max-w-md items-center gap-3 rounded-xl bg-salin-toast px-4 py-3 text-sm text-white shadow-lg ring-white/10 dark:ring-1 animate-in fade-in-0 slide-in-from-bottom-2 motion-reduce:animate-none"
         >
           <span className="min-w-0 flex-1">{t.message}</span>
           {t.action && (

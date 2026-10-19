@@ -149,7 +149,7 @@ export function restoreFolder(id: string) {
 
 /** Permanently removes a folder, every subfolder and file inside it, and bytes no other file uses. */
 export function deleteFolderForever(id: string) {
-  return db.transaction("rw", db.folders, db.files, db.fileBlobs, async () => {
+  return db.transaction("rw", db.folders, db.files, db.fileBlobs, db.extractedDocuments, async () => {
     const { folders, files } = await collectSubtree(id);
     await deleteFilesAndOrphanBlobs(files);
     await db.folders.bulkDelete(folders.map((f) => f.id));

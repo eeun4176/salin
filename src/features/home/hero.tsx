@@ -26,9 +26,9 @@ const BADGES: { kind: FileKind; className: string; tilt: number; delay: number; 
 ];
 
 const primaryCta =
-  "press inline-flex h-11 items-center gap-2 rounded-xl bg-salin-primary px-5 text-sm font-semibold text-white shadow-[0_6px_16px_-6px_rgb(1_168_90/0.6)] hover:bg-[#019A53]";
+  "press inline-flex h-11 items-center gap-2 rounded-xl bg-salin-primary px-5 text-sm font-semibold text-white shadow-[0_6px_16px_-6px_rgb(1_168_90/0.6)] hover:bg-salin-primary-strong";
 const secondaryCta =
-  "press inline-flex h-11 items-center gap-2 rounded-xl bg-white/80 px-5 text-sm font-semibold text-salin-text ring-1 ring-salin-border backdrop-blur hover:bg-white";
+  "press inline-flex h-11 items-center gap-2 rounded-xl bg-salin-surface/80 px-5 text-sm font-semibold text-salin-text ring-1 ring-salin-border backdrop-blur hover:bg-salin-surface";
 
 export function Hero() {
   return (

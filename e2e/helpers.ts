@@ -1,13 +1,17 @@
 /**
  * E2E Helpers
- * Shared steps for the Playwright tests: sample files, uploading through the
- * workspace menu, creating folders, using an item's ⋮ menu, and reading
- * downloads.
+ * Shared steps for the Playwright tests: sample files (including real
+ * text PDFs and Excel workbooks), uploading through the workspace menu,
+ * creating folders, using an item's ⋮ menu, reading downloads, and waiting
+ * until the app works offline.
  */
 
 import { readFile } from "node:fs/promises";
 
 import { expect, type Download, type Locator, type Page } from "@playwright/test";
+import * as XLSX from "xlsx";
+
+import { minimalPdf } from "../src/test/minimal-pdf";
 
 export interface SampleFile {
   name: string;
@@ -26,6 +30,22 @@ export const sample = {
     mimeType: "text/csv",
     buffer: Buffer.from(body),
   }),
+  /** A real text-based PDF: one page per array, one line per string. */
+  textPdf: (name: string, pages: string[][]): SampleFile => ({
+    name,
+    mimeType: "application/pdf",
+    buffer: Buffer.from(minimalPdf(pages), "latin1"),
+  }),
+  xlsx: (name: string, sheets: Record<string, unknown[][]>): SampleFile => {
+    const book = XLSX.utils.book_new();
+    for (const [sheet, rows] of Object.entries(sheets)) XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet(rows), sheet);
+    return {
+      name,
+      mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      buffer: XLSX.write(book, { type: "buffer", bookType: "xlsx" }) as Buffer,
+    };
+  },
+  txt: (name: string, body: string): SampleFile => ({ name, mimeType: "text/plain", buffer: Buffer.from(body) }),
   png: (name = "Receipt.png"): SampleFile => ({
     name,
     mimeType: "image/png",
@@ -69,4 +89,17 @@ export async function itemAction(page: Page, name: string, action: string) {
 
 export async function downloadText(download: Download) {
   return (await readFile(await download.path())).toString();
+}
+
+export async function downloadBytes(download: Download) {
+  return readFile(await download.path());
+}
+
+/** Waits until the service worker controls the page, so the app keeps working offline. */
+export async function waitForOfflineReady(page: Page) {
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.ready;
+  });
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => navigator.serviceWorker.controller !== null)).toBe(true);
 }

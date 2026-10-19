@@ -209,7 +209,7 @@ export function restoreFile(id: string) {
 
 /** Permanently removes a file, and its bytes if no copy still uses them. */
 export function deleteFileForever(id: string) {
-  return db.transaction("rw", db.files, db.fileBlobs, async () => {
+  return db.transaction("rw", db.files, db.fileBlobs, db.extractedDocuments, async () => {
     await deleteFilesAndOrphanBlobs([await getFileOrThrow(id)]);
   });
 }

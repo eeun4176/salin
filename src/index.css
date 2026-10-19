@@ -1,8 +1,9 @@
 /*
  * Global Styles
- * Tailwind setup, Salin design tokens (colours, easing, animations), shadcn
- * theme variables, base element styles, and the custom utilities `press`
- * (Apple-style tap feedback), `no-scrollbar` and `pb-mobile-nav`.
+ * Tailwind setup, Salin design tokens (colours, easing, animations) with
+ * their dark-theme values, compact density, shadcn theme variables, base
+ * element styles, and the custom utilities `press` (Apple-style tap
+ * feedback), `no-scrollbar` and `pb-mobile-nav`.
  */
 
 @import "tailwindcss";
@@ -20,6 +21,8 @@
   --color-salin-primary: #01a85a;
   --color-salin-primary-strong: #018a4a;
   --color-salin-primary-soft: #e6f6ee;
+  /* Green text on light-green backgrounds. */
+  --color-salin-primary-ink: #016a39;
   --color-salin-text: #1d1f1e;
   --color-salin-muted: #5f6662;
   --color-salin-subtle: #858c88;
@@ -28,6 +31,11 @@
   --color-salin-surface: #ffffff;
   --color-salin-tile: #f1f4f2;
   --color-salin-tile-hover: #e8eeea;
+  --color-salin-border-strong: #c9d1cc;
+  /* Hero dot grid. */
+  --color-salin-dot: #d6ddd9;
+  /* Toast background (dark in both themes). */
+  --color-salin-toast: #1d1f1e;
 
   --ease-spring: linear(0, 0.083 5.6%, 0.26 11.1%, 0.457 16.7%, 0.633 22.2%, 0.774 27.8%, 0.876 33.3%, 0.944 38.9%, 0.986 44.4%, 1.008 50%, 1.018 55.6%, 1.02 61.1%, 1.018 66.7%, 1.014 72.2%, 1 100%);
   --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
@@ -172,38 +180,58 @@
   --mobile-nav-h: 68px;
 }
 
+/* ---------------------------------------------------------------
+   Dark theme (Settings → Appearance). The brand green stays the same so
+   white text on green buttons keeps its contrast; surfaces, text and
+   borders switch to a dark green-grey palette.
+---------------------------------------------------------------- */
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  color-scheme: dark;
+  --color-salin-primary-soft: #133524;
+  --color-salin-primary-ink: #7fe0ae;
+  --color-salin-text: #e6ece8;
+  --color-salin-muted: #a5aea9;
+  --color-salin-subtle: #7d8782;
+  --color-salin-canvas: #0e1311;
+  --color-salin-border: #28322d;
+  --color-salin-border-strong: #3b4741;
+  --color-salin-surface: #151c19;
+  --color-salin-tile: #1c2420;
+  --color-salin-tile-hover: #242e29;
+  --color-salin-dot: #27312c;
+  --color-salin-toast: #26302b;
+
+  --background: #0e1311;
+  --foreground: #e6ece8;
+  --card: #151c19;
+  --card-foreground: #e6ece8;
+  --popover: #1a221e;
+  --popover-foreground: #e6ece8;
+  --primary: #01a85a;
+  --primary-foreground: #ffffff;
+  --secondary: #1c2420;
+  --secondary-foreground: #e6ece8;
+  --muted: #1c2420;
+  --muted-foreground: #a5aea9;
+  --accent: #133524;
+  --accent-foreground: #7fe0ae;
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --border: #28322d;
+  --input: #34403a;
+  --ring: #01a85a;
+  --sidebar: #151c19;
+  --sidebar-foreground: #e6ece8;
+  --sidebar-primary: #01a85a;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #133524;
+  --sidebar-accent-foreground: #7fe0ae;
+  --sidebar-border: #28322d;
+  --sidebar-ring: #01a85a;
+}
+
+/* Compact density (Settings → Appearance): every spacing step is a little tighter. */
+:root[data-density="compact"] {
+  --spacing: 0.22rem;
 }
 
 @layer base {

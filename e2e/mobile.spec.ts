@@ -1,14 +1,16 @@
 /**
  * Mobile E2E Tests (Pixel 7 emulation)
  * Layout regressions on a phone (no sideways scrolling on any screen), the
- * bottom tab bar and + quick actions, and core folder/file flows by touch.
+ * bottom tab bar and + quick actions, core folder/file flows by touch, and
+ * the data tools (Datasets entry, guided Excel extraction, review screen) on
+ * a small screen.
  */
 
 import { expect, test } from "@playwright/test";
 
 import { card, createFolder, openWorkspace, sample, uploadFiles } from "./helpers";
 
-for (const path of ["/", "/recents", "/trash", "/import", "/scan", "/ai-studio", "/settings"]) {
+for (const path of ["/", "/recents", "/trash", "/datasets", "/import", "/scan", "/ai-studio", "/settings"]) {
   test(`no horizontal overflow on ${path}`, async ({ page }) => {
     await page.goto(path);
     await page.waitForLoadState("networkidle");
@@ -42,6 +44,35 @@ test("folders and files work by touch, and Workspace stays the active tab inside
   await expect.poll(async () => Math.round((await preview.boundingBox())?.width ?? 0)).toBe(viewport.width);
   await page.getByRole("button", { name: "Close preview" }).tap();
 
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+});
+
+test("datasets are reachable on a phone and the review screen fits without sideways scrolling", async ({ page }) => {
+  await openWorkspace(page);
+  await uploadFiles(page, [sample.csv("Wide.csv", "Name,Pet,Breed,Colour,Vaccine,Date\nAna,Bantay,Aspin,Brown,Rabies,2026-10-01")]);
+  await page.getByRole("button", { name: "More actions for Wide.csv", exact: true }).tap();
+  await page.getByRole("menuitem", { name: "Extract data" }).tap();
+  await expect(page.getByRole("textbox", { name: "Dataset name" })).toHaveValue("Wide");
+
+  // The table scrolls inside its own box; the page itself must not.
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+
+  await page.goto("/");
+  await page.getByRole("link", { name: /^Datasets/ }).tap();
+  await expect(page).toHaveURL(/\/datasets$/);
+  await expect(page.getByRole("link", { name: "Wide" })).toBeVisible();
+});
+
+test("the guided Excel extraction fits a phone without sideways scrolling", async ({ page }) => {
+  await openWorkspace(page);
+  await uploadFiles(page, [sample.xlsx("Wide.xlsx", { Data: [["Name", "Pet", "Breed", "Colour", "Vaccine", "Date"], ["Ana", "Bantay", "Aspin", "Brown", "Rabies", "2026-10-01"], ["Ben", "Choco", "Aspin", "Black", "5-in-1", "2026-10-02"]] })]);
+  await page.getByRole("button", { name: "More actions for Wide.xlsx", exact: true }).tap();
+  await page.getByRole("menuitem", { name: "Extract data" }).tap();
+  await expect(page.getByRole("button", { name: "Next: pick sections" })).toBeVisible({ timeout: 30_000 });
+  await page.getByRole("button", { name: "Next: pick sections" }).tap();
+  await expect(page.getByRole("region", { name: "Name, Pet and 4 more" })).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(0);
 });

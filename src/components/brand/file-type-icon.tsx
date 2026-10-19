@@ -18,6 +18,8 @@ function Glyph({ kind, color }: { kind: FileKind; color: string }) {
           <path d="M11 20.7h20M11 26.3h20M17.7 15v17M24.3 15v17" />
         </g>
       );
+    case "txt":
+      return <g stroke={color} strokeWidth="2.2" strokeLinecap="round"><path d="M13 17h20M13 22h20M13 27h14" /></g>;
     case "pdf":
       return (
         <g stroke={color} strokeWidth="2.4" strokeLinecap="round">

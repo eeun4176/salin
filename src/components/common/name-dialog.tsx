@@ -76,7 +76,7 @@ function NameForm({ initialValue, confirmLabel, validate, selectBaseName, onSubm
         aria-invalid={!!error}
         aria-describedby={error ? "item-name-error" : undefined}
         className={cn(
-          "h-11 w-full rounded-xl border bg-white px-3 text-[15px] outline-none focus:ring-3",
+          "h-11 w-full rounded-xl border bg-salin-surface px-3 text-[15px] outline-none focus:ring-3",
           error ? "border-destructive focus:ring-destructive/15" : "border-salin-border focus:border-salin-primary focus:ring-salin-primary/20",
         )}
       />
@@ -90,7 +90,7 @@ function NameForm({ initialValue, confirmLabel, validate, selectBaseName, onSubm
         <button
           type="submit"
           disabled={!trimmed || busy}
-          className="press h-10 rounded-xl bg-salin-primary px-4 text-sm font-semibold text-white hover:bg-[#019A53] disabled:opacity-50"
+          className="press h-10 rounded-xl bg-salin-primary px-4 text-sm font-semibold text-white hover:bg-salin-primary-strong disabled:opacity-50"
         >
           {confirmLabel}
         </button>

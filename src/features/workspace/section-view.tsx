@@ -3,13 +3,15 @@
  * The body of the workspace card for one tab — Workspace (including any
  * open folder at /folders/:folderId), Recents, Favorites or Trash. Renders
  * breadcrumbs, filters, the sorter and the items, plus loading, error,
- * empty and "folder not found" states.
+ * empty and "folder not found" states. On phones the top level also links
+ * to Datasets.
  */
 
 import { useMemo } from "react";
 import { Link, useParams } from "react-router";
-import { ChevronRight, FolderOpen, FolderSearch, Heart, House, RotateCcw, RotateCcwClock, Trash, TriangleAlert } from "lucide-react";
+import { ChevronRight, FolderOpen, FolderSearch, Heart, House, RotateCcw, RotateCcwClock, Table2, Trash, TriangleAlert } from "lucide-react";
 
+import { useDatasets } from "@/features/processing/hooks/use-datasets";
 import { FilterBar } from "@/features/workspace/components/filter-bar";
 import { FileCard, FolderCard, ItemRow } from "@/features/workspace/components/item-cards";
 import { SortControl } from "@/features/workspace/components/sort-control";
@@ -28,6 +30,27 @@ const DATE_COLUMN: Record<WorkspaceSection, string> = {
   recents: "Last opened",
   trash: "Date trashed",
 };
+
+/** Phones have no tab switcher in the card, so the workspace top level links to Datasets here. */
+function DatasetsEntry() {
+  const state = useDatasets();
+  const count = state.status === "ready" ? state.datasets.length : 0;
+  return (
+    <Link
+      to="/datasets"
+      className="press mt-4 flex items-center gap-3 rounded-2xl bg-salin-primary-soft px-3.5 py-3 text-salin-text md:hidden"
+    >
+      <Table2 aria-hidden="true" className="size-5 shrink-0 text-salin-primary" />
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold">Datasets</span>
+        <span className="block truncate text-xs text-salin-muted">
+          {count ? `${count} saved · tables extracted from your files` : "Turn PDF, Excel, CSV or text files into tables"}
+        </span>
+      </span>
+      <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-salin-muted" />
+    </Link>
+  );
+}
 
 function ItemsBlock({
   items,
@@ -249,6 +272,7 @@ export function SectionView({ section }: { section: WorkspaceSection }) {
       {folderId !== null && <Breadcrumbs folderId={folderId} />}
       <div className="mt-5 md:mt-6">
         <FilterBar section={section} folderId={folderId} />
+        {section === "workspace" && folderId === null && <DatasetsEntry />}
 
         {section !== "recents" && (
           <div className="mt-4 flex flex-wrap items-center justify-between gap-2">

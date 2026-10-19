@@ -87,8 +87,8 @@ function FilterChip<T extends string>({
         className={cn(
           "press inline-flex h-8 shrink-0 items-center gap-1 rounded-lg border px-2.5 text-[13px] font-medium outline-none",
           active
-            ? "border-salin-primary bg-salin-primary-soft text-[#016A39]"
-            : "border-[#C9D1CC] bg-white text-salin-text hover:bg-salin-tile",
+            ? "border-salin-primary bg-salin-primary-soft text-salin-primary-ink"
+            : "border-salin-border-strong bg-salin-surface text-salin-text hover:bg-salin-tile",
         )}
       >
         {label}
@@ -199,7 +199,7 @@ function ViewToggle() {
             onClick={() => setViewMode(value)}
             className={cn(
               "grid size-8 place-items-center rounded-lg transition-colors",
-              selected ? "bg-white text-salin-primary shadow-[0_1px_2px_rgb(0_0_0/0.06)]" : "text-salin-muted hover:text-salin-text",
+              selected ? "bg-salin-surface text-salin-primary shadow-[0_1px_2px_rgb(0_0_0/0.06)]" : "text-salin-muted hover:text-salin-text",
             )}
           >
             <Icon className="size-[17px]" />
@@ -219,7 +219,7 @@ export function FilterBar({ section, folderId }: { section: WorkspaceSection; fo
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-3">
       <SectionMenu section={section} folderId={folderId} />
-      <span aria-hidden="true" className="hidden h-5 w-px bg-[#C9D1CC] sm:block" />
+      <span aria-hidden="true" className="hidden h-5 w-px bg-salin-border-strong sm:block" />
       <div className="order-last flex w-full gap-2 sm:order-none sm:w-auto">
         <FilterChip
           heading="Type"

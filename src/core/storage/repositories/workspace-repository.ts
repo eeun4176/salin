@@ -1,8 +1,8 @@
 /**
  * Workspace Repository
  * Operations that span folders and files together: loading the whole
- * workspace's metadata, emptying the Trash, and wiping all workspace data
- * (Settings → Privacy).
+ * workspace's metadata, emptying the Trash, and wiping all workspace and
+ * processing data (Settings → Privacy).
  */
 
 import { db } from "@/core/storage/database";
@@ -25,7 +25,7 @@ export function loadWorkspace(): Promise<WorkspaceSnapshot> {
 
 /** Permanently deletes everything in Trash (trashed folders take their contents with them). */
 export function emptyTrash() {
-  return db.transaction("rw", db.folders, db.files, db.fileBlobs, async () => {
+  return db.transaction("rw", db.folders, db.files, db.fileBlobs, db.extractedDocuments, async () => {
     const trashedFolders = await db.folders.filter((f) => f.deletedAt !== null).toArray();
     const folderIds = new Set<string>();
     const files = new Map<string, WorkspaceFile>();
@@ -43,9 +43,21 @@ export function emptyTrash() {
   });
 }
 
-/** Removes every folder, file and stored byte from this device. */
+/** Every table holding the user's documents or data derived from them. */
+export const WORKSPACE_TABLES = [
+  db.folders,
+  db.files,
+  db.fileBlobs,
+  db.processingJobs,
+  db.extractedDocuments,
+  db.datasets,
+  db.datasetRows,
+  db.thumbnails,
+] as const;
+
+/** Removes every folder, file, stored byte, extraction, job, dataset and thumbnail from this device. */
 export function clearWorkspace() {
-  return db.transaction("rw", db.folders, db.files, db.fileBlobs, async () => {
-    await Promise.all([db.folders.clear(), db.files.clear(), db.fileBlobs.clear()]);
+  return db.transaction("rw", WORKSPACE_TABLES, async () => {
+    await Promise.all(WORKSPACE_TABLES.map((table) => table.clear()));
   });
 }

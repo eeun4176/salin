@@ -33,6 +33,7 @@ const EXTENSION_KINDS: Record<string, FileKind> = {
   pdf: "pdf",
   xlsx: "xlsx",
   csv: "csv",
+  txt: "txt",
   png: "png",
   jpg: "jpg",
   jpeg: "jpg",
@@ -41,7 +42,7 @@ const EXTENSION_KINDS: Record<string, FileKind> = {
 
 /** `accept` attribute for every supported import format (docs 5.2). */
 export const ACCEPT_ATTR =
-  ".pdf,.xlsx,.csv,.png,.jpg,.jpeg,.webp,application/pdf,text/csv,image/png,image/jpeg,image/webp,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+  ".pdf,.xlsx,.csv,.txt,.png,.jpg,.jpeg,.webp,application/pdf,text/csv,text/plain,image/png,image/jpeg,image/webp,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
 export const MAX_FILE_BYTES = 50 * 1024 * 1024;
 

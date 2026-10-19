@@ -22,9 +22,25 @@ export function folderUrl(folderId: string | null) {
   return folderId === null ? "/" : `/folders/${folderId}`;
 }
 
+/** Opens a stored file in the full-screen preview on top of the current screen. */
+export function usePreviewFile() {
+  const [, setParams] = useSearchParams();
+  return useCallback(
+    (fileId: string) =>
+      setParams(
+        (params) => {
+          params.set(PREVIEW_PARAM, fileId);
+          return params;
+        },
+        { state: { previewPushed: true } },
+      ),
+    [setParams],
+  );
+}
+
 export function useOpenItem() {
   const navigate = useNavigate();
-  const [, setParams] = useSearchParams();
+  const previewFile = usePreviewFile();
 
   return useCallback(
     (item: WorkspaceItem) => {
@@ -38,15 +54,9 @@ export function useOpenItem() {
         navigate(folderUrl(item.id));
         return;
       }
-      setParams(
-        (params) => {
-          params.set(PREVIEW_PARAM, item.id);
-          return params;
-        },
-        { state: { previewPushed: true } },
-      );
+      previewFile(item.id);
     },
-    [navigate, setParams],
+    [navigate, previewFile],
   );
 }
 

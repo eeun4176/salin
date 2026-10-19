@@ -1,8 +1,8 @@
 /**
  * Workspace Toolbar
- * Top row of the workspace card: the Workspace / Recents / Favorites / Trash
- * tab switcher (desktop), the search field, and the quick backup & restore
- * button.
+ * Top row of the workspace card: the Workspace / Datasets / Recents /
+ * Favorites / Trash tab switcher (desktop), the search field, and the quick
+ * backup & restore button.
  */
 
 import { useLayoutEffect, useRef } from "react";
@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { exportWorkspaceBackup } from "@/features/backup/backup-actions";
 import { useRestoreBackup } from "@/features/backup/use-restore-backup";
-import { SECTION_LINKS, isSectionActive } from "@/features/workspace/section-links";
+import { DATASETS_LINK, TOOLBAR_LINKS, isSectionActive } from "@/features/workspace/section-links";
 import { useUiStore } from "@/stores/ui-store";
 import { cn } from "@/lib/utils";
 
@@ -57,9 +57,9 @@ function SectionTabs() {
         <span
           ref={pillRef}
           aria-hidden="true"
-          className="absolute top-1.5 bottom-1.5 left-0 rounded-xl bg-white shadow-[0_1px_2px_rgb(0_0_0/0.06)] transition-[transform,width] duration-500 ease-spring motion-reduce:transition-none"
+          className="absolute top-1.5 bottom-1.5 left-0 rounded-xl bg-salin-surface shadow-[0_1px_2px_rgb(0_0_0/0.06)] transition-[transform,width] duration-500 ease-spring motion-reduce:transition-none"
         />
-        {SECTION_LINKS.map(({ to, label, icon: Icon }) => {
+        {TOOLBAR_LINKS.map(({ to, label, icon: Icon }) => {
           const isActive = isSectionActive(to, pathname);
           return (
             <Link
@@ -84,11 +84,12 @@ function SectionTabs() {
 function SearchField() {
   const query = useUiStore((s) => s.query);
   const setQuery = useUiStore((s) => s.setQuery);
+  const onDatasets = isSectionActive(DATASETS_LINK.to, useLocation().pathname);
 
   return (
     <div role="search" className="relative min-w-0 flex-1">
       <label htmlFor="workspace-search" className="sr-only">
-        Search files and folders
+        {onDatasets ? "Search datasets" : "Search files and folders"}
       </label>
       <Search aria-hidden="true" className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-salin-subtle" />
       <input
@@ -99,7 +100,7 @@ function SearchField() {
         onKeyDown={(e) => e.key === "Escape" && setQuery("")}
         placeholder="Search"
         autoComplete="off"
-        className="h-12 w-full rounded-2xl border border-salin-border bg-white pr-10 pl-10 text-[15px] text-salin-text outline-none placeholder:text-salin-subtle focus:border-salin-primary focus:ring-3 focus:ring-salin-primary/15 [&::-webkit-search-cancel-button]:hidden"
+        className="h-12 w-full rounded-2xl border border-salin-border bg-salin-surface pr-10 pl-10 text-[15px] text-salin-text outline-none placeholder:text-salin-subtle focus:border-salin-primary focus:ring-3 focus:ring-salin-primary/15 [&::-webkit-search-cancel-button]:hidden"
       />
       {query && (
         <button
@@ -126,7 +127,7 @@ function BackupMenu() {
         <DropdownMenuTrigger
           aria-label="Backup and restore"
           title="Backup and restore"
-          className="press grid size-12 shrink-0 place-items-center rounded-2xl border border-salin-border bg-white text-salin-text outline-none hover:bg-salin-tile focus-visible:ring-3 focus-visible:ring-salin-primary/15 data-[state=open]:border-salin-primary data-[state=open]:text-salin-primary"
+          className="press grid size-12 shrink-0 place-items-center rounded-2xl border border-salin-border bg-salin-surface text-salin-text outline-none hover:bg-salin-tile focus-visible:ring-3 focus-visible:ring-salin-primary/15 data-[state=open]:border-salin-primary data-[state=open]:text-salin-primary"
         >
           <DatabaseBackup className="size-5" strokeWidth={1.9} />
         </DropdownMenuTrigger>
@@ -139,7 +140,7 @@ function BackupMenu() {
             <ArchiveRestore /> Restore from backup…
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <p className="px-1.5 py-1 text-xs text-salin-muted">Saves every folder and original file into one .zip on this device.</p>
+          <p className="px-1.5 py-1 text-xs text-salin-muted">Saves every folder, original file and dataset into one .zip on this device.</p>
         </DropdownMenuContent>
       </DropdownMenu>
     </>

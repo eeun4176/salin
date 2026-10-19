@@ -1,7 +1,7 @@
 /**
  * Page Frame
- * Shared layout for Scan, Import, AI Studio and Settings: a compact hero band
- * with back link and title, then the white content card.
+ * Shared layout for Scan, Import, AI Studio, Settings and dataset review: a
+ * compact hero band with back link and title, then the white content card.
  */
 
 import type { ReactNode } from "react";
@@ -17,6 +17,8 @@ interface PageFrameProps {
   description?: string;
   /** Extra content on the right of the title row (badges, actions). */
   aside?: ReactNode;
+  /** Where the back link goes (default: the workspace). */
+  back?: { to: string; label: string };
   children: ReactNode;
   className?: string;
 }
@@ -25,7 +27,7 @@ interface PageFrameProps {
  * Shared frame for Scan, Import, AI Studio and Settings: a compact version of
  * the hero band with the same spotlight grid, then the white card overlay.
  */
-export function PageFrame({ title, description, aside, children, className }: PageFrameProps) {
+export function PageFrame({ title, description, aside, back = { to: "/", label: "Workspace" }, children, className }: PageFrameProps) {
   return (
     <>
       <section className="relative isolate overflow-hidden bg-salin-canvas">
@@ -39,11 +41,11 @@ export function PageFrame({ title, description, aside, children, className }: Pa
           <div className="mt-8 flex flex-wrap items-end justify-between gap-4 md:mt-10">
             <div>
               <Link
-                to="/"
+                to={back.to}
                 className="mb-3 inline-flex items-center gap-1.5 rounded-md text-[13px] font-medium text-salin-muted hover:text-salin-text"
               >
                 <ArrowLeft className="size-4" />
-                Workspace
+                {back.label}
               </Link>
               <h1 className="text-[clamp(1.75rem,5vw,2.4rem)] leading-tight font-bold tracking-[-0.03em] text-salin-text">{title}</h1>
               {description && <p className="mt-1.5 max-w-xl text-[15px] text-salin-muted">{description}</p>}
@@ -57,7 +59,7 @@ export function PageFrame({ title, description, aside, children, className }: Pa
         <main
           id="main"
           className={cn(
-            "rounded-[28px] bg-white p-4 shadow-[0_1px_2px_rgb(16_40_28/0.04),0_24px_48px_-28px_rgb(16_40_28/0.18)] ring-1 ring-salin-border/70 sm:p-6 md:p-7",
+            "rounded-[28px] bg-salin-surface p-4 shadow-[0_1px_2px_rgb(16_40_28/0.04),0_24px_48px_-28px_rgb(16_40_28/0.18)] ring-1 ring-salin-border/70 sm:p-6 md:p-7",
             className,
           )}
         >

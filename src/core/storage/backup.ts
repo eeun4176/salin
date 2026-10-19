@@ -1,8 +1,9 @@
 /**
  * Workspace Backup & Restore
  * Creates a complete, recoverable workspace archive (.zip containing
- * `manifest.json` with every folder/file record plus the original document
- * bytes under `blobs/`), and restores one. Restores are fully validated
+ * `manifest.json` with every folder/file record and structured dataset, plus
+ * the original document bytes under `blobs/`), and restores one. Extraction
+ * caches and job history are not backed up; they are rebuilt by processing. Restores are fully validated
  * (format, version, sizes, SHA-256 checksums, references) before anything is
  * written, then replace the workspace in a single transaction.
  */
@@ -10,15 +11,20 @@
 import { strFromU8, strToU8, unzipSync } from "fflate";
 import { z } from "zod";
 
+import { datasetRowSchema, datasetSchema } from "@/core/processing/dataset-validator";
 import { db } from "@/core/storage/database";
 import { WorkspaceError } from "@/core/storage/errors";
 import { MAX_NAME_LENGTH } from "@/core/storage/names";
 import { sha256 } from "@/core/storage/repositories/file-repository";
+import { WORKSPACE_TABLES } from "@/core/storage/repositories/workspace-repository";
 import { ensureSpaceFor } from "@/core/storage/storage-health";
 import { createZip } from "@/core/storage/zip";
 import type { FileBlob, Folder, WorkspaceFile } from "@/types/domain";
+import type { Dataset, DatasetRow } from "@/types/processing";
 
-export const BACKUP_VERSION = 2;
+/** v3 added datasets. v2 backups (workspace only) still restore. */
+export const BACKUP_VERSION = 3;
+const OLDEST_SUPPORTED_VERSION = 2;
 const MANIFEST_PATH = "manifest.json";
 const MAX_BACKUP_BYTES = 1024 * 1024 * 1024;
 
@@ -41,7 +47,7 @@ const fileSchema = z.object({
   id,
   name,
   mimeType: z.string().max(200),
-  kind: z.enum(["pdf", "xlsx", "csv", "png", "jpg", "webp"]),
+  kind: z.enum(["pdf", "xlsx", "csv", "txt", "png", "jpg", "webp"]),
   size: z.number().int().nonnegative(),
   folderId: id.nullable(),
   blobId: id,
@@ -68,15 +74,19 @@ const manifestSchema = z.object({
   folders: z.array(folderSchema),
   files: z.array(fileSchema),
   blobs: z.array(blobEntrySchema),
+  datasets: z.array(datasetSchema).default([]),
+  datasetRows: z.array(datasetRowSchema).default([]),
 });
 
-export type BackupManifest = z.infer<typeof manifestSchema>;
+export type BackupManifest = z.input<typeof manifestSchema>;
 
 export interface ParsedBackup {
   exportedAt: string;
   folders: Folder[];
   files: WorkspaceFile[];
   blobs: FileBlob[];
+  datasets: Dataset[];
+  datasetRows: DatasetRow[];
   totalBytes: number;
 }
 
@@ -84,11 +94,17 @@ const COMPRESSIBLE = new Set(["csv"]);
 
 /** Builds the backup archive from a consistent snapshot of the database. */
 export async function createBackupArchive(now = new Date()): Promise<Blob> {
-  const { folders, files, blobs } = await db.transaction("r", db.folders, db.files, db.fileBlobs, async () => ({
-    folders: await db.folders.toArray(),
-    files: await db.files.toArray(),
-    blobs: await db.fileBlobs.toArray(),
-  }));
+  const { folders, files, blobs, datasets, datasetRows } = await db.transaction(
+    "r",
+    [db.folders, db.files, db.fileBlobs, db.datasets, db.datasetRows],
+    async () => ({
+      folders: await db.folders.toArray(),
+      files: await db.files.toArray(),
+      blobs: await db.fileBlobs.toArray(),
+      datasets: await db.datasets.toArray(),
+      datasetRows: await db.datasetRows.toArray(),
+    }),
+  );
 
   const kindByBlob = new Map(files.map((f) => [f.blobId, f.kind]));
   const manifest: BackupManifest = {
@@ -99,6 +115,8 @@ export async function createBackupArchive(now = new Date()): Promise<Blob> {
     folders,
     files,
     blobs: blobs.map((b) => ({ id: b.id, size: b.size, checksum: b.checksum, path: `blobs/${b.id}` })),
+    datasets,
+    datasetRows,
   };
 
   return createZip([
@@ -135,6 +153,21 @@ function assertFolderTree(folders: Folder[]) {
   }
 }
 
+/** Every row belongs to a dataset, only uses its columns, and row counts add up. */
+function assertDatasets(datasets: Dataset[], rows: DatasetRow[]) {
+  const columnsByDataset = new Map(datasets.map((d) => [d.id, new Set(d.columns.map((c) => c.id))]));
+  const rowCounts = new Map<string, number>();
+  for (const row of rows) {
+    const columns = columnsByDataset.get(row.datasetId);
+    if (!columns) reject("This backup has table rows that don't belong to any dataset.");
+    if (Object.keys(row.values).some((key) => !columns.has(key))) reject("This backup has a dataset row with values for unknown columns.");
+    rowCounts.set(row.datasetId, (rowCounts.get(row.datasetId) ?? 0) + 1);
+  }
+  for (const dataset of datasets) {
+    if ((rowCounts.get(dataset.id) ?? 0) !== dataset.rowCount) reject(`Some rows of the dataset "${dataset.name}" are missing from the backup.`);
+  }
+}
+
 /**
  * Reads and fully validates a backup file. Throws a WorkspaceError with a
  * readable message for anything that isn't a complete, intact Salin backup.
@@ -167,7 +200,7 @@ export async function readBackupArchive(file: Blob): Promise<ParsedBackup> {
   const versionCheck = z.object({ app: z.literal("salin"), version: z.number() }).safeParse(json);
   if (!versionCheck.success) reject("That file isn't a Salin backup.");
   if (versionCheck.data.version > BACKUP_VERSION) reject("This backup was made by a newer version of Salin. Update the app, then try again.");
-  if (versionCheck.data.version < BACKUP_VERSION) reject("This backup format is no longer supported.");
+  if (versionCheck.data.version < OLDEST_SUPPORTED_VERSION) reject("This backup format is no longer supported.");
 
   const parsed = manifestSchema.safeParse(json);
   if (!parsed.success) reject("That backup's manifest is incomplete or damaged.");
@@ -176,7 +209,10 @@ export async function readBackupArchive(file: Blob): Promise<ParsedBackup> {
   assertUnique(manifest.folders.map((f) => f.id), "folder");
   assertUnique(manifest.files.map((f) => f.id), "file");
   assertUnique(manifest.blobs.map((b) => b.id), "document");
+  assertUnique(manifest.datasets.map((d) => d.id), "dataset");
+  assertUnique(manifest.datasetRows.map((r) => r.id), "dataset row");
   assertFolderTree(manifest.folders);
+  assertDatasets(manifest.datasets, manifest.datasetRows);
 
   const folderIds = new Set(manifest.folders.map((f) => f.id));
   const blobSizes = new Map(manifest.blobs.map((b) => [b.id, b.size]));
@@ -205,6 +241,8 @@ export async function readBackupArchive(file: Blob): Promise<ParsedBackup> {
     folders: manifest.folders,
     files: manifest.files,
     blobs,
+    datasets: manifest.datasets,
+    datasetRows: manifest.datasetRows,
     totalBytes: blobs.reduce((sum, b) => sum + b.size, 0),
   };
 }
@@ -216,10 +254,12 @@ export async function readBackupArchive(file: Blob): Promise<ParsedBackup> {
  */
 export async function restoreBackup(backup: ParsedBackup) {
   await ensureSpaceFor(backup.totalBytes);
-  await db.transaction("rw", db.folders, db.files, db.fileBlobs, async () => {
-    await Promise.all([db.folders.clear(), db.files.clear(), db.fileBlobs.clear()]);
+  await db.transaction("rw", WORKSPACE_TABLES, async () => {
+    await Promise.all(WORKSPACE_TABLES.map((table) => table.clear()));
     await db.fileBlobs.bulkAdd(backup.blobs);
     await db.folders.bulkAdd(backup.folders);
     await db.files.bulkAdd(backup.files);
+    await db.datasets.bulkAdd(backup.datasets);
+    await db.datasetRows.bulkAdd(backup.datasetRows);
   });
 }

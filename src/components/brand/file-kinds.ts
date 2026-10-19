@@ -8,6 +8,7 @@ import type { FileKind } from "@/features/workspace/types";
 
 export const FILE_KIND_META: Record<FileKind, { label: string; color: string; name: string }> = {
   csv: { label: ".CSV", color: "#01A85A", name: "CSV spreadsheet" },
+  txt: { label: ".TXT", color: "#64748B", name: "Text file" },
   xlsx: { label: ".XLSX", color: "#14955A", name: "Excel workbook" },
   pdf: { label: ".PDF", color: "#E5484D", name: "PDF document" },
   png: { label: ".PNG", color: "#2F6FE0", name: "PNG image" },

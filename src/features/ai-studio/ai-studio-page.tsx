@@ -48,7 +48,7 @@ const SUGGESTIONS = [
 
 function AttachmentChip({ file, onRemove }: { file: IntakeFile; onRemove?: () => void }) {
   return (
-    <div className="flex max-w-full min-w-0 items-center gap-2.5 rounded-xl bg-white py-1.5 pr-1.5 pl-1.5 ring-1 ring-salin-border">
+    <div className="flex max-w-full min-w-0 items-center gap-2.5 rounded-xl bg-salin-surface py-1.5 pr-1.5 pl-1.5 ring-1 ring-salin-border">
       {file.previewUrl ? (
         <img src={file.previewUrl} alt="" className="size-9 shrink-0 rounded-lg object-cover" />
       ) : (
@@ -71,7 +71,7 @@ function AttachmentChip({ file, onRemove }: { file: IntakeFile; onRemove?: () =>
 
 function ResultTable({ table }: { table: ExtractedTable }) {
   return (
-    <div className="mt-3 overflow-hidden rounded-2xl bg-white ring-1 ring-salin-border">
+    <div className="mt-3 overflow-hidden rounded-2xl bg-salin-surface ring-1 ring-salin-border">
       <div className="flex items-center justify-between gap-3 border-b border-salin-border px-4 py-3">
         <p className="flex items-center gap-2 text-sm font-semibold text-salin-text">
           <FileSpreadsheet className="size-[18px] text-salin-primary" /> {table.title}
@@ -295,7 +295,7 @@ export function AiStudioPage() {
       description="Ask about scanned pages or imported files — extract fields, build tables, organize."
       className="flex min-h-[70vh] flex-col"
     >
-      <div className="flex items-start gap-2.5 rounded-2xl bg-salin-primary-soft/70 px-4 py-3 text-[13px] text-[#0B5A33]">
+      <div className="flex items-start gap-2.5 rounded-2xl bg-salin-primary-soft/70 px-4 py-3 text-[13px] text-salin-primary-ink">
         <Info className="mt-px size-4 shrink-0" />
         <p>
           <span className="font-semibold">Phase 1 preview.</span> Replies use sample data so you can try the flow. On-device extraction arrives in Phase 4, and
@@ -334,8 +334,8 @@ export function AiStudioPage() {
       </div>
 
       {/* Composer — sticks above the mobile tab bar while the thread scrolls */}
-      <div className="sticky bottom-[calc(var(--mobile-nav-h)+env(safe-area-inset-bottom)+40px)] z-20 mt-6 -mx-1 bg-white/90 px-1 pt-2 pb-1 backdrop-blur md:bottom-4">
-        <form onSubmit={send} className="rounded-2xl bg-white p-2 shadow-[0_8px_28px_-14px_rgb(16_40_28/0.28)] ring-1 ring-salin-border focus-within:ring-2 focus-within:ring-salin-primary/50">
+      <div className="sticky bottom-[calc(var(--mobile-nav-h)+env(safe-area-inset-bottom)+40px)] z-20 mt-6 -mx-1 bg-salin-surface/90 px-1 pt-2 pb-1 backdrop-blur md:bottom-4">
+        <form onSubmit={send} className="rounded-2xl bg-salin-surface p-2 shadow-[0_8px_28px_-14px_rgb(16_40_28/0.28)] ring-1 ring-salin-border focus-within:ring-2 focus-within:ring-salin-primary/50">
           <input ref={fileRef} type="file" multiple accept={ACCEPT_ATTR} className="sr-only" tabIndex={-1} aria-hidden="true" onChange={onPick} />
 
           {attachments.length > 0 && (
@@ -385,7 +385,7 @@ export function AiStudioPage() {
               type="submit"
               disabled={!canSend}
               aria-label="Send"
-              className="press grid size-11 shrink-0 place-items-center rounded-full bg-salin-primary text-white shadow-[0_6px_14px_-6px_rgb(1_168_90/0.7)] hover:bg-[#019A53] disabled:bg-salin-tile disabled:text-salin-subtle disabled:shadow-none"
+              className="press grid size-11 shrink-0 place-items-center rounded-full bg-salin-primary text-white shadow-[0_6px_14px_-6px_rgb(1_168_90/0.7)] hover:bg-salin-primary-strong disabled:bg-salin-tile disabled:text-salin-subtle disabled:shadow-none"
             >
               <SendHorizontal className="size-5" />
             </button>

@@ -40,7 +40,7 @@ function InstallButton() {
       disabled={installed}
       className={cn(
         "press inline-flex h-10 items-center gap-2 rounded-xl bg-salin-primary px-3.5 text-sm font-semibold text-white",
-        "shadow-[0_1px_0_rgb(255_255_255/0.25)_inset,0_6px_16px_-6px_rgb(1_168_90/0.6)] hover:bg-[#019A53] disabled:opacity-80",
+        "shadow-[0_1px_0_rgb(255_255_255/0.25)_inset,0_6px_16px_-6px_rgb(1_168_90/0.6)] hover:bg-salin-primary-strong disabled:opacity-80",
         "sm:px-4",
       )}
     >
@@ -60,7 +60,7 @@ export function AppHeader({ className }: { className?: string }) {
         <Link
           to="/settings"
           aria-label="Settings"
-          className="press grid size-10 place-items-center rounded-full bg-white text-salin-primary shadow-[0_1px_2px_rgb(0_0_0/0.06),0_0_0_1px_var(--color-salin-border)] hover:bg-salin-primary-soft"
+          className="press grid size-10 place-items-center rounded-full bg-salin-surface text-salin-primary shadow-[0_1px_2px_rgb(0_0_0/0.06),0_0_0_1px_var(--color-salin-border)] hover:bg-salin-primary-soft"
         >
           <Settings className="size-[18px]" />
         </Link>

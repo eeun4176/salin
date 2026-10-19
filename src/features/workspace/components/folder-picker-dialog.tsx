@@ -101,7 +101,7 @@ function PickerBody({ initialFolderId = null, excludeIds = [], currentFolderId, 
           type="button"
           disabled={busy || unchanged}
           onClick={confirm}
-          className={cn("press h-10 rounded-xl bg-salin-primary px-4 text-sm font-semibold text-white hover:bg-[#019A53] disabled:opacity-50")}
+          className={cn("press h-10 rounded-xl bg-salin-primary px-4 text-sm font-semibold text-white hover:bg-salin-primary-strong disabled:opacity-50")}
         >
           {busy ? "Working…" : confirmLabel}
         </button>

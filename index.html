@@ -3,6 +3,7 @@
   App HTML Shell
   The single page every Salin URL loads. React mounts into #root; the PWA
   build adds the web app manifest link and caches this file for offline use.
+  A tiny inline script applies the saved theme before the first paint.
 -->
 <html lang="en">
 
@@ -14,6 +15,15 @@
   <meta name="theme-color" content="#F8FAF9" />
   <meta name="description" content="Salin AI — turn documents into structured data, on your device." />
   <title>Salin AI</title>
+  <!-- Apply the saved theme and density before first paint (see src/stores/appearance-store.ts). -->
+  <script>
+    try {
+      var a = JSON.parse(localStorage.getItem("salin.appearance") || "{}");
+      var dark = a.theme === "dark" || (a.theme === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
+      if (dark) document.documentElement.classList.add("dark");
+      if (a.density === "compact") document.documentElement.dataset.density = "compact";
+    } catch (e) {}
+  </script>
 </head>
 
 <body>

@@ -1,8 +1,9 @@
 /**
  * Domain Types
  * Shapes of every record Salin stores in IndexedDB (folders, files, file bytes,
- * and the later-phase datasets/jobs/templates). Repositories and the database
- * schema use these; UI code works with the WorkspaceItem view model instead.
+ * and the later-phase templates/models). Processing jobs, extracted content and
+ * datasets live in processing.ts. Repositories and the database schema use
+ * these; UI code works with the WorkspaceItem view model instead.
  */
 
 export type ID = string;
@@ -11,18 +12,7 @@ export type ID = string;
 export type Timestamp = number;
 
 /** File formats Salin accepts (docs 5.2). */
-export type FileKind = "pdf" | "xlsx" | "csv" | "png" | "jpg" | "webp";
-
-export type JobStatus =
-  | "draft"
-  | "imported"
-  | "processing"
-  | "needs_review"
-  | "reviewed"
-  | "saved"
-  | "exported"
-  | "failed"
-  | "cancelled";
+export type FileKind = "pdf" | "xlsx" | "csv" | "txt" | "png" | "jpg" | "webp";
 
 export interface Folder {
   id: ID;
@@ -62,36 +52,19 @@ export interface FileBlob {
   checksum: string | null;
 }
 
-export interface Dataset {
-  id: ID;
-  name: string;
-  folderId: ID | null;
-  sourceFileIds: ID[];
-  schema: Record<string, unknown>;
-  version: number;
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
-  deletedAt: Timestamp | null;
-  isFavorite: boolean;
-}
-
-export interface DatasetRow {
-  id: ID;
-  datasetId: ID;
-  values: Record<string, unknown>;
-  sourceReference?: string;
-}
-
-export interface ProcessingJob {
-  id: ID;
-  taskType: string;
-  sourceFileIds: ID[];
-  status: JobStatus;
-  progress: number;
-  error?: string;
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
-}
+/**
+ * A file card's preview, made from the file's bytes: a small image (photos,
+ * PDF first page), the first rows of a table (CSV, or an Excel workbook's main
+ * table with its title) or the first lines of text. `none` records that the
+ * file has nothing to show (e.g. an empty workbook); failed attempts aren't
+ * saved, so they're tried again.
+ */
+export type Thumbnail = { blobId: ID; version: number } & (
+  | { kind: "image"; image: Blob }
+  | { kind: "table"; rows: string[][]; title?: string }
+  | { kind: "text"; text: string }
+  | { kind: "none" }
+);
 
 export interface DocumentTemplate {
   id: ID;

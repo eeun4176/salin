@@ -170,7 +170,7 @@ export function ScanPage() {
                       <RotateCcw className="size-4" /> Try again
                     </button>
                   )}
-                  <button type="button" onClick={() => uploadRef.current?.click()} className="press inline-flex h-10 items-center gap-2 rounded-xl bg-salin-primary px-4 text-sm font-semibold hover:bg-[#019A53]">
+                  <button type="button" onClick={() => uploadRef.current?.click()} className="press inline-flex h-10 items-center gap-2 rounded-xl bg-salin-primary px-4 text-sm font-semibold hover:bg-salin-primary-strong">
                     <Images className="size-4" /> Upload a photo
                   </button>
                 </div>
@@ -247,7 +247,7 @@ export function ScanPage() {
               type="button"
               disabled={pages.length === 0}
               onClick={askAi}
-              className="press inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-salin-primary text-sm font-semibold text-white shadow-[0_6px_16px_-6px_rgb(1_168_90/0.6)] hover:bg-[#019A53] disabled:opacity-45 disabled:shadow-none"
+              className="press inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-salin-primary text-sm font-semibold text-white shadow-[0_6px_16px_-6px_rgb(1_168_90/0.6)] hover:bg-salin-primary-strong disabled:opacity-45 disabled:shadow-none"
             >
               <Sparkles className="size-[18px]" /> Ask Salin AI
             </button>

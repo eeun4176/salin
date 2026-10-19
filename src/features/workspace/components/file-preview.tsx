@@ -1,20 +1,24 @@
 /**
  * File Preview
  * Full-screen viewer for a stored file, opened via the `?preview=<fileId>`
- * URL parameter. Shows images, PDFs (browser viewer, with an "Open" fallback
- * on phones), and the first rows of CSV files; Excel workbooks get a download
- * card until spreadsheet tools arrive in Phase 3.
+ * URL parameter, on any screen. Shows images, PDFs (browser viewer, with an
+ * "Open" fallback on phones), the first rows of CSV files, the start of text
+ * files, and Excel workbooks sheet by sheet. Files Salin can read have an
+ * "Extract data" button.
  */
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
-import { Download, ExternalLink, FileWarning, LoaderCircle, X } from "lucide-react";
+import { Download, ExternalLink, FileWarning, LoaderCircle, Table2, X } from "lucide-react";
 
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { FILE_KIND_META } from "@/components/brand/file-kinds";
 import { FileTypeIcon } from "@/components/brand/file-type-icon";
+import { isProcessable } from "@/core/processing/parsers";
 import { errorMessage } from "@/core/storage/errors";
 import { getFileWithBlob } from "@/core/storage/repositories/file-repository";
+import { useExtractData } from "@/features/processing/hooks/use-document-processing";
+import { ExcelPreview } from "@/features/workspace/components/excel-preview";
 import { formatBytes, formatDate } from "@/features/workspace/query";
 import { PREVIEW_PARAM, useClosePreview } from "@/features/workspace/use-open-item";
 import { downloadItem } from "@/features/workspace/workspace-actions";
@@ -23,9 +27,9 @@ import { parseCsvPreview, type CsvPreview } from "@/lib/csv";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import type { WorkspaceFile } from "@/types/domain";
 
-const CSV_PREVIEW_BYTES = 2 * 1024 * 1024;
+const TEXT_PREVIEW_BYTES = 2 * 1024 * 1024;
 
-type Loaded = { url: string; csv: CsvPreview | null } | { error: string };
+type Loaded = { url: string; csv: CsvPreview | null; text: string | null } | { error: string };
 
 function CsvTable({ csv }: { csv: CsvPreview }) {
   const [header, ...rows] = csv.rows;
@@ -67,10 +71,10 @@ function PreviewContent({ file }: { file: WorkspaceFile }) {
     let cancelled = false;
     getFileWithBlob(file.id)
       .then(async ({ blob }) => {
-        const csv = file.kind === "csv" ? parseCsvPreview(await blob.slice(0, CSV_PREVIEW_BYTES).text()) : null;
+        const head = file.kind === "csv" || file.kind === "txt" ? await blob.slice(0, TEXT_PREVIEW_BYTES).text() : null;
         if (cancelled) return;
         url = URL.createObjectURL(blob.type ? blob : new Blob([blob], { type: file.mimeType }));
-        setLoaded({ url, csv });
+        setLoaded({ url, csv: file.kind === "csv" && head !== null ? parseCsvPreview(head) : null, text: file.kind === "txt" ? head : null });
       })
       .catch((error: unknown) => !cancelled && setLoaded({ error: errorMessage(error, "This file couldn't be opened.") }));
     return () => {
@@ -109,25 +113,30 @@ function PreviewContent({ file }: { file: WorkspaceFile }) {
 
   if (file.kind === "csv" && loaded.csv) return <CsvTable csv={loaded.csv} />;
 
+  if (file.kind === "txt" && loaded.text !== null) {
+    return (
+      <pre className="h-full overflow-auto p-4 font-mono text-[13px] leading-relaxed break-words whitespace-pre-wrap text-salin-text" data-lenis-prevent="">
+        {loaded.text || "This file is empty."}
+        {file.size > TEXT_PREVIEW_BYTES && "\n\n… Download the file to see the rest."}
+      </pre>
+    );
+  }
+
   // Phones (and browsers without a built-in PDF viewer) get a card instead of a blank frame.
   const inlinePdf = file.kind === "pdf" && navigator.pdfViewerEnabled !== false;
-  if (inlinePdf) return <iframe src={loaded.url} title={file.name} className="size-full border-0 bg-white" />;
+  if (inlinePdf) return <iframe src={loaded.url} title={file.name} className="size-full border-0 bg-salin-surface" />;
 
   return (
     <div className="flex h-full flex-col items-center justify-center px-6 text-center">
       <FileTypeIcon kind={file.kind} className="size-16" />
-      <p className="mt-4 font-semibold text-salin-text">{file.kind === "pdf" ? "Open this PDF in your viewer" : "No preview for Excel workbooks yet"}</p>
-      <p className="mt-1 max-w-sm text-sm text-salin-muted">
-        {file.kind === "pdf"
-          ? "This browser can't show PDFs inside the app."
-          : "Reading and editing spreadsheets arrives with the data tools. You can download the original now."}
-      </p>
+      <p className="mt-4 font-semibold text-salin-text">Open this PDF in your viewer</p>
+      <p className="mt-1 max-w-sm text-sm text-salin-muted">This browser can't show PDFs inside the app.</p>
       {file.kind === "pdf" && (
         <a
           href={loaded.url}
           target="_blank"
           rel="noopener"
-          className="press mt-5 inline-flex h-10 items-center gap-2 rounded-xl bg-salin-primary px-4 text-sm font-semibold text-white hover:bg-[#019A53]"
+          className="press mt-5 inline-flex h-10 items-center gap-2 rounded-xl bg-salin-primary px-4 text-sm font-semibold text-white hover:bg-salin-primary-strong"
         >
           <ExternalLink className="size-4" /> Open PDF
         </a>
@@ -137,6 +146,7 @@ function PreviewContent({ file }: { file: WorkspaceFile }) {
 }
 
 export function FilePreview() {
+  const extract = useExtractData();
   const [params] = useSearchParams();
   const previewId = params.get(PREVIEW_PARAM);
   const closePreview = useClosePreview();
@@ -159,6 +169,16 @@ export function FilePreview() {
                 {file ? `${FILE_KIND_META[file.kind].name} · ${formatBytes(file.size)} · Modified ${formatDate(file.updatedAt)}` : "It may have been deleted."}
               </DialogDescription>
             </div>
+            {file && file.deletedAt === null && isProcessable(file.kind) && (
+              <button
+                type="button"
+                aria-label="Extract data"
+                onClick={() => extract([file.id])}
+                className="press inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-salin-primary px-3 text-[13px] font-semibold text-white hover:bg-salin-primary-strong"
+              >
+                <Table2 className="size-4" /> <span className="hidden sm:inline">Extract data</span>
+              </button>
+            )}
             {file && (
               <button
                 type="button"
@@ -172,9 +192,13 @@ export function FilePreview() {
               <X className="size-5" />
             </DialogClose>
           </header>
-          <div className="min-h-0 flex-1 bg-white">
+          <div className="min-h-0 flex-1 bg-salin-surface">
             {file && file.deletedAt === null ? (
-              <PreviewContent key={file.id} file={file} />
+              file.kind === "xlsx" ? (
+                <ExcelPreview key={file.id} fileId={file.id} />
+              ) : (
+                <PreviewContent key={file.id} file={file} />
+              )
             ) : (
               <div className="grid h-full place-items-center px-6 text-center text-sm text-salin-muted">
                 {file ? "This file is in Trash. Restore it to open it." : "This file isn't in your workspace anymore."}

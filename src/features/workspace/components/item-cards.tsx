@@ -1,7 +1,8 @@
 /**
  * Item Cards & Rows
  * How a folder or file looks in the workspace: compact folder pills, file
- * thumbnail cards for grid view, and rows for list view. Clicking anywhere
+ * cards previewing the file's real content for grid view, and rows for list
+ * view. Clicking anywhere
  * on one opens it; the ⋮ button opens its actions menu.
  */
 
@@ -10,11 +11,13 @@ import { Folder, Heart } from "lucide-react";
 import { DocThumbnail } from "@/components/brand/doc-thumbnail";
 import { FILE_KIND_META } from "@/components/brand/file-kinds";
 import { FileTypeIcon } from "@/components/brand/file-type-icon";
+import { FileThumbnail } from "@/features/workspace/components/file-thumbnail";
 import { ItemActions } from "@/features/workspace/components/item-actions";
 import { formatBytes, formatDate, sectionTime } from "@/features/workspace/query";
 import type { WorkspaceItem, WorkspaceSection } from "@/features/workspace/types";
 import { useOpenItem } from "@/features/workspace/use-open-item";
 import { cn } from "@/lib/utils";
+import { useWorkspaceStore } from "@/stores/workspace-store";
 
 // Names wrap to two lines on phones instead of truncating after a few letters.
 const nameClass = "line-clamp-2 text-[13px] leading-snug font-medium break-words text-salin-text sm:line-clamp-none sm:truncate sm:text-sm";
@@ -60,19 +63,26 @@ export function FolderCard({ item }: { item: WorkspaceItem }) {
   );
 }
 
+/** The file's real content as a preview (see file-thumbnail.tsx). */
+function CardThumbnail({ item }: { item: WorkspaceItem }) {
+  const file = useWorkspaceStore((s) => s.files.find((f) => f.id === item.id));
+  const className = "transition-transform duration-300 ease-out-soft group-hover:scale-[1.02]";
+  return file ? <FileThumbnail file={file} className={className} /> : <DocThumbnail kind={item.fileType} className={cn("h-full p-1.5", className)} />;
+}
+
 /** Thumbnail card for files (and for folders when mixed with files). */
 export function FileCard({ item }: { item: WorkspaceItem }) {
   const isFolder = item.kind === "folder";
   return (
     <div className={cn(tileBase, "flex flex-col p-2")}>
       <OpenTarget item={item} />
-      <div className="pointer-events-none relative aspect-[5/4] overflow-hidden rounded-xl bg-white">
+      <div className="pointer-events-none relative aspect-[5/4] overflow-hidden rounded-xl bg-salin-surface">
         {isFolder ? (
-          <div className="grid h-full place-items-center bg-white">
+          <div className="grid h-full place-items-center bg-salin-surface">
             <Folder aria-hidden="true" className="size-12 text-salin-subtle" strokeWidth={1.4} />
           </div>
         ) : (
-          <DocThumbnail kind={item.fileType} className="h-full p-1.5 transition-transform duration-300 ease-out-soft group-hover:scale-[1.02]" />
+          <CardThumbnail item={item} />
         )}
       </div>
       <div className="pointer-events-none relative flex items-center gap-1.5 pt-2.5 pb-0.5 pl-1 sm:gap-2 sm:pl-1.5">
@@ -100,7 +110,7 @@ export function ItemRow({ item, section }: { item: WorkspaceItem; section: Works
       <OpenTarget item={item} />
       <div role="cell" className="pointer-events-none relative flex min-w-0 items-center gap-3">
         {item.kind === "folder" ? (
-          <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-salin-tile group-hover:bg-white">
+          <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-salin-tile group-hover:bg-salin-surface">
             <Folder className="size-[18px]" strokeWidth={1.9} />
           </span>
         ) : (

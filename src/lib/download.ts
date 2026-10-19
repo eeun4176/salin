@@ -11,6 +11,7 @@ const EXTENSIONS: Record<FileKind, string[]> = {
   pdf: [".pdf"],
   xlsx: [".xlsx"],
   csv: [".csv"],
+  txt: [".txt"],
   png: [".png"],
   jpg: [".jpg", ".jpeg"],
   webp: [".webp"],

@@ -37,7 +37,7 @@ export async function exportWorkspaceBackup() {
   }
 }
 
-/** Deletes every folder, file and stored document on this device. */
+/** Deletes every folder, file, stored document and dataset on this device. */
 export async function deleteAllWorkspaceData() {
   try {
     await clearWorkspace();

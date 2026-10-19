@@ -2,7 +2,8 @@
  * Vite Configuration
  * Build setup: React, Tailwind CSS, the "@/…" import alias, and the PWA
  * plugin that writes the web app manifest and a Workbox service worker which
- * precaches the app shell (HTML, JS, CSS, fonts, icons) for offline use.
+ * precaches the app shell (HTML, JS, CSS, fonts, icons — including the
+ * document parsers and the pdf.js worker) for offline use.
  * User documents are never put in these caches — they live in IndexedDB.
  */
 
@@ -38,7 +39,8 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ["**/*.{js,css,html,svg,png,woff2,webmanifest}"],
+        // mjs: the pdf.js worker, so PDFs can be read offline.
+        globPatterns: ["**/*.{js,mjs,css,html,svg,png,woff2,webmanifest}"],
         // Any in-app URL (e.g. /folders/…) opens from the cached app shell when offline.
         navigateFallback: "/index.html",
         cleanupOutdatedCaches: true,

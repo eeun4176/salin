@@ -4,6 +4,7 @@
  * lookups, "is this folder usable" checks, subtree collection and blob
  * clean-up. They must be called inside a Dexie transaction that includes the
  * tables they touch, so multi-step changes stay all-or-nothing.
+ * `deleteFilesAndOrphanBlobs` also needs `extractedDocuments` in the transaction.
  */
 
 import { db } from "@/core/storage/database";
@@ -82,13 +83,15 @@ export async function collectSubtree(rootId: string) {
   return { folders, files };
 }
 
-/** Deletes file records, then any blob no remaining file points to. */
+/** Deletes file records, then any blob no remaining file points to (and text extracted from it). */
 export async function deleteFilesAndOrphanBlobs(files: WorkspaceFile[]) {
   if (files.length === 0) return;
   await db.files.bulkDelete(files.map((f) => f.id));
   const blobIds = [...new Set(files.map((f) => f.blobId))];
   for (const blobId of blobIds) {
-    if ((await db.files.where("blobId").equals(blobId).count()) === 0) await db.fileBlobs.delete(blobId);
+    if ((await db.files.where("blobId").equals(blobId).count()) > 0) continue;
+    await db.fileBlobs.delete(blobId);
+    await db.extractedDocuments.where("blobId").equals(blobId).delete();
   }
 }
 

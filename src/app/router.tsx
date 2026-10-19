@@ -1,8 +1,11 @@
 /**
  * App Router
- * Maps every URL to a screen. The four workspace tabs (and open folders at
- * /folders/:folderId) share HomeLayout so the hero stays mounted while
- * switching between them; other screens render inside AppShell directly.
+ * Maps every URL to a screen. The workspace tabs (Workspace, Datasets,
+ * Recents, Favorites, Trash — and open folders at /folders/:folderId) share
+ * HomeLayout so the hero stays mounted while switching between them; other
+ * screens, including the guided Excel extraction at /files/:fileId/tables
+ * and dataset review at /datasets/:datasetId, render
+ * inside AppShell directly.
  */
 
 import { createBrowserRouter, Navigate } from "react-router";
@@ -12,6 +15,9 @@ import { AiStudioPage } from "@/features/ai-studio/ai-studio-page";
 import { ScanPage } from "@/features/capture/scan-page";
 import { HomeLayout } from "@/features/home/home-layout";
 import { ImportPage } from "@/features/import/import-page";
+import { ChooseTablesPage } from "@/features/processing/choose-tables-page";
+import { DatasetReviewPage } from "@/features/processing/dataset-review-page";
+import { DatasetsView } from "@/features/processing/datasets-view";
 import { SettingsPage } from "@/features/settings/settings-page";
 import { SectionView } from "@/features/workspace/section-view";
 
@@ -29,11 +35,14 @@ export const router = createBrowserRouter([
           { path: "recents", element: <SectionView section="recents" /> },
           { path: "favorites", element: <SectionView section="favorites" /> },
           { path: "trash", element: <SectionView section="trash" /> },
+          { path: "datasets", Component: DatasetsView },
         ],
       },
       { path: "workspace", element: <Navigate to="/" replace /> },
       { path: "scan", Component: ScanPage },
       { path: "import", Component: ImportPage },
+      { path: "files/:fileId/tables", Component: ChooseTablesPage },
+      { path: "datasets/:datasetId", Component: DatasetReviewPage },
       { path: "ai-studio", Component: AiStudioPage },
       { path: "settings", Component: SettingsPage },
       { path: "*", element: <Navigate to="/" replace /> },

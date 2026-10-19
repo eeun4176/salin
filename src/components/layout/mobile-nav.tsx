@@ -87,14 +87,14 @@ export function MobileNav() {
         aria-hidden="true"
         onClick={() => setOpen(false)}
         className={cn(
-          "fixed inset-0 z-[60] bg-white/72 backdrop-blur-[1.5px] transition-opacity duration-200",
+          "fixed inset-0 z-[60] bg-salin-surface/72 backdrop-blur-[1.5px] transition-opacity duration-200",
           open ? "opacity-100" : "pointer-events-none opacity-0",
         )}
       />
 
       <nav
         aria-label="Primary"
-        className="fixed inset-x-0 bottom-0 z-50 border-t border-salin-border bg-white pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_-16px_rgb(16_40_28/0.18)]"
+        className="fixed inset-x-0 bottom-0 z-50 border-t border-salin-border bg-salin-surface pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_-16px_rgb(16_40_28/0.18)]"
       >
         <div className="grid h-(--mobile-nav-h) grid-cols-5">
           {left.map((link) => (
@@ -135,7 +135,7 @@ export function MobileNav() {
                 onClick={() => go(action.to)}
                 style={style}
                 className={cn(
-                  "absolute flex flex-col items-center justify-center gap-0.5 rounded-full bg-white text-salin-primary",
+                  "absolute flex flex-col items-center justify-center gap-0.5 rounded-full bg-salin-surface text-salin-primary",
                   "shadow-[0_10px_24px_-8px_rgb(16_40_28/0.3),0_0_0_1px_var(--color-salin-border)] active:bg-salin-primary-soft",
                   !open && "pointer-events-none",
                 )}

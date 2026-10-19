@@ -2,7 +2,8 @@
  * Toast Store
  * Queue of the small notification bars shown at the bottom of the screen
  * (rendered by components/common/toaster.tsx). Call `toast("message")` from
- * anywhere, optionally with an action button such as Undo.
+ * anywhere, optionally with an action button such as Undo; `update` changes a
+ * shown toast's text (used for progress).
  */
 
 import { create } from "zustand";
@@ -26,6 +27,7 @@ interface ToastOptions {
 interface ToastState {
   toasts: Toast[];
   show: (message: string, action?: ToastAction, options?: ToastOptions) => string;
+  update: (id: string, message: string) => void;
   dismiss: (id: string) => void;
 }
 
@@ -40,6 +42,7 @@ export const useToastStore = create<ToastState>()((set, get) => ({
     if (duration !== null) window.setTimeout(() => get().dismiss(id), duration);
     return id;
   },
+  update: (id, message) => set((s) => ({ toasts: s.toasts.map((t) => (t.id === id ? { ...t, message } : t)) })),
   dismiss: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
 }));
 

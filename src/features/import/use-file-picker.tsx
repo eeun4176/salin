@@ -9,7 +9,7 @@ import { useCallback, useEffect, useRef, type ChangeEvent } from "react";
 
 import { saveIntakeFiles } from "@/features/workspace/workspace-actions";
 import { ACCEPT_ATTR, toIntakeFiles, useIntakeStore, type IntakeResult, type PickedFile } from "@/stores/intake-store";
-import { toast } from "@/stores/toast-store";
+import { toast, useToastStore } from "@/stores/toast-store";
 
 /**
  * Hidden file / folder inputs plus functions that open them. Render `inputs`
@@ -51,7 +51,7 @@ export function reportRejected(rejected: IntakeResult["rejected"]) {
   toast(
     rejected.length === 1
       ? `Skipped “${first.name}”: ${first.reason.toLowerCase()}.`
-      : `Skipped ${rejected.length} files that aren't PDF, XLSX, CSV, PNG, JPG or WebP (or are over 50 MB).`,
+      : `Skipped ${rejected.length} files that aren't PDF, XLSX, CSV, TXT, PNG, JPG or WebP (or are over 50 MB).`,
   );
 }
 
@@ -77,9 +77,14 @@ export function useUploadToFolder(folderId: string | null) {
       const { ok, rejected } = toIntakeFiles(files, "import");
       reportRejected(rejected);
       if (ok.length === 0) return;
-      toast(`Saving ${ok.length} file${ok.length === 1 ? "" : "s"}…`);
-      await saveIntakeFiles(ok, folderId);
-      ok.forEach((f) => f.previewUrl && URL.revokeObjectURL(f.previewUrl));
+      // Shown until the save finishes, so it never sits next to "Saved".
+      const saving = toast(`Saving ${ok.length} file${ok.length === 1 ? "" : "s"}…`, undefined, { duration: null });
+      try {
+        await saveIntakeFiles(ok, folderId);
+      } finally {
+        useToastStore.getState().dismiss(saving);
+        ok.forEach((f) => f.previewUrl && URL.revokeObjectURL(f.previewUrl));
+      }
     },
     [folderId],
   );

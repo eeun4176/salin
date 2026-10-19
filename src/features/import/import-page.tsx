@@ -22,7 +22,7 @@ import { useIntakeStore, type PickedFile } from "@/stores/intake-store";
 import { toast } from "@/stores/toast-store";
 import { cn } from "@/lib/utils";
 
-const FORMATS: FileKind[] = ["pdf", "xlsx", "csv", "png", "jpg", "webp"];
+const FORMATS: FileKind[] = ["pdf", "xlsx", "csv", "txt", "png", "jpg", "webp"];
 
 const hasFiles = (event: DragEvent) => event.dataTransfer?.types.includes("Files") ?? false;
 
@@ -133,12 +133,12 @@ export function ImportPage() {
       <div
         className={cn(
           "relative flex flex-col items-center rounded-3xl border-2 border-dashed px-5 py-10 text-center transition-[background-color,border-color,transform] duration-300 ease-out-soft md:py-14",
-          dragging ? "scale-[1.01] border-salin-primary bg-salin-primary-soft motion-reduce:scale-100" : "border-[#CBD5CF] bg-salin-canvas",
+          dragging ? "scale-[1.01] border-salin-primary bg-salin-primary-soft motion-reduce:scale-100" : "border-salin-border-strong bg-salin-canvas",
         )}
       >
         <span
           className={cn(
-            "grid size-16 place-items-center rounded-2xl bg-white text-salin-primary shadow-[0_8px_20px_-10px_rgb(1_168_90/0.5)] ring-1 ring-salin-border transition-transform duration-500 ease-spring motion-reduce:transition-none",
+            "grid size-16 place-items-center rounded-2xl bg-salin-surface text-salin-primary shadow-[0_8px_20px_-10px_rgb(1_168_90/0.5)] ring-1 ring-salin-border transition-transform duration-500 ease-spring motion-reduce:transition-none",
             dragging && "-translate-y-1.5",
           )}
         >
@@ -151,20 +151,20 @@ export function ImportPage() {
         </p>
 
         <div className="mt-6 flex flex-wrap justify-center gap-2.5">
-          <button type="button" onClick={pickFiles} className="press inline-flex h-11 items-center gap-2 rounded-xl bg-salin-primary px-5 text-sm font-semibold text-white shadow-[0_6px_16px_-6px_rgb(1_168_90/0.6)] hover:bg-[#019A53]">
+          <button type="button" onClick={pickFiles} className="press inline-flex h-11 items-center gap-2 rounded-xl bg-salin-primary px-5 text-sm font-semibold text-white shadow-[0_6px_16px_-6px_rgb(1_168_90/0.6)] hover:bg-salin-primary-strong">
             <FileUp className="size-[18px]" /> Browse files
           </button>
-          <button type="button" onClick={pickFolder} className="press inline-flex h-11 items-center gap-2 rounded-xl bg-white px-5 text-sm font-semibold text-salin-text ring-1 ring-salin-border hover:bg-salin-tile">
+          <button type="button" onClick={pickFolder} className="press inline-flex h-11 items-center gap-2 rounded-xl bg-salin-surface px-5 text-sm font-semibold text-salin-text ring-1 ring-salin-border hover:bg-salin-tile">
             <FolderUp className="size-[18px]" /> Upload a folder
           </button>
         </div>
 
-        <div className="mt-7 flex flex-wrap items-center justify-center gap-1.5" aria-label="Supported formats: PDF, XLSX, CSV, PNG, JPG, WebP">
+        <div className="mt-7 flex flex-wrap items-center justify-center gap-1.5" aria-label="Supported formats: PDF, XLSX, CSV, TXT, PNG, JPG, WebP">
           {FORMATS.map((kind) => (
             <FileTypeIcon key={kind} kind={kind} className="size-9" />
           ))}
         </div>
-        <p className="mt-2 text-xs text-salin-subtle">PDF, XLSX, CSV, PNG, JPG, WebP · up to 50 MB each</p>
+        <p className="mt-2 text-xs text-salin-subtle">PDF, XLSX, CSV, TXT, PNG, JPG, WebP · up to 50 MB each</p>
       </div>
 
       {queue.length > 0 && (
@@ -198,7 +198,7 @@ export function ImportPage() {
                     {file.folderPath && <span className="hidden sm:inline"> · in {file.folderPath}</span>}
                   </p>
                 </div>
-                <span className="hidden items-center gap-1 rounded-full bg-salin-primary-soft px-2 py-0.5 text-xs font-medium text-[#016A39] sm:inline-flex">
+                <span className="hidden items-center gap-1 rounded-full bg-salin-primary-soft px-2 py-0.5 text-xs font-medium text-salin-primary-ink sm:inline-flex">
                   <CheckCircle2 className="size-3.5" /> Ready
                 </span>
                 <button
@@ -227,7 +227,7 @@ export function ImportPage() {
                 queueToAttachments();
                 navigate("/ai-studio");
               }}
-              className="press inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-salin-primary px-6 text-sm font-semibold text-white shadow-[0_6px_16px_-6px_rgb(1_168_90/0.6)] hover:bg-[#019A53]"
+              className="press inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-salin-primary px-6 text-sm font-semibold text-white shadow-[0_6px_16px_-6px_rgb(1_168_90/0.6)] hover:bg-salin-primary-strong"
             >
               <Sparkles className="size-[18px]" /> Ask Salin AI
             </button>

@@ -15,8 +15,8 @@ const LERP = 0.14;
 const RADIUS = 120;
 
 const baseLayer: CSSProperties = {
-  // A step darker than the #E6EBE8 border token, which nearly vanished on the canvas.
-  backgroundImage: "radial-gradient(circle at center, #D6DDD9 1.5px, transparent 2px)",
+  // A step darker than the border token, which nearly vanished on the canvas (themeable: --color-salin-dot).
+  backgroundImage: "radial-gradient(circle at center, var(--color-salin-dot) 1.5px, transparent 2px)",
   backgroundSize: "16px 16px",
 };
 

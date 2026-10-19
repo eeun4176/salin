@@ -2,18 +2,21 @@
  * Backup & Restore Tests
  * Round-trips a workspace through a backup archive, and checks that damaged,
  * tampered, outdated or inconsistent archives are rejected and that a failed
- * restore leaves the existing workspace untouched.
+ * restore leaves the existing workspace untouched. Datasets travel with the
+ * backup; job history and extraction caches are rebuilt, not restored.
  */
 
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 import { describe, expect, it, vi } from "vitest";
 
 import { db } from "@/core/storage/database";
-import { counts, entry } from "@/test/fixtures";
+import { content, counts, entry } from "@/test/fixtures";
 
 import { BACKUP_VERSION, createBackupArchive, readBackupArchive, restoreBackup } from "./backup";
+import { createDataset } from "./repositories/dataset.repository";
 import { importFiles } from "./repositories/file-repository";
 import { createFolder, trashFolder } from "./repositories/folder-repository";
+import { createJob, saveExtraction } from "./repositories/processing.repository";
 import { clearWorkspace } from "./repositories/workspace-repository";
 
 async function seed() {
@@ -57,6 +60,64 @@ describe("workspace backup", () => {
     expect(await db.files.orderBy("id").toArray()).toEqual(before.files);
     const form = before.files.find((f) => f.name === "form.pdf")!;
     expect(await (await db.fileBlobs.get(form.blobId))!.blob.text()).toBe("pdf bytes");
+  });
+
+  it("round-trips datasets and drops derived processing data", async () => {
+    await seed();
+    const file = (await db.files.toArray())[0];
+    const dataset = await createDataset({
+      name: "Pets",
+      sourceFileIds: [file.id],
+      content: content(["Name", "Pet"], [["Ana", "Bantay"], ["Ben", null]]),
+    });
+    await createJob([file.id]);
+    await saveExtraction({ blobId: file.blobId, fileId: file.id, kind: file.kind, parserId: "p", parserVersion: 1, pages: [], tables: [], warnings: [] });
+    const rows = await db.datasetRows.orderBy("id").toArray();
+
+    const parsed = await readBackupArchive(await createBackupArchive());
+    await restoreBackup(parsed);
+
+    expect(await db.datasets.toArray()).toEqual([dataset]);
+    expect(await db.datasetRows.orderBy("id").toArray()).toEqual(rows);
+    expect(await db.processingJobs.count()).toBe(0);
+    expect(await db.extractedDocuments.count()).toBe(0);
+  });
+
+  it("restores version 2 backups, which have no datasets", async () => {
+    await seed();
+    const v2 = await tamper(await createBackupArchive(), (entries) =>
+      editManifest(entries, (m) => {
+        m.version = 2;
+        delete m.datasets;
+        delete m.datasetRows;
+      }),
+    );
+    const parsed = await readBackupArchive(v2);
+    expect(parsed.datasets).toEqual([]);
+    await restoreBackup(parsed);
+    expect(await counts()).toEqual({ folders: 3, files: 3, blobs: 3 });
+  });
+
+  it("rejects datasets with orphaned, unknown-column or missing rows", async () => {
+    await seed();
+    await createDataset({ name: "Pets", sourceFileIds: [], content: content(["Name"], [["Ana"], ["Ben"]]) });
+    const archive = await createBackupArchive();
+    type Manifest = { datasetRows: { datasetId: string; values: Record<string, unknown> }[] };
+
+    const orphan = await tamper(archive, (entries) =>
+      editManifest(entries, (m) => ((m as unknown as Manifest).datasetRows[0].datasetId = "nope")),
+    );
+    await expect(readBackupArchive(orphan)).rejects.toThrow("don't belong to any dataset");
+
+    const unknownColumn = await tamper(archive, (entries) =>
+      editManifest(entries, (m) => ((m as unknown as Manifest).datasetRows[0].values.ghost = "x")),
+    );
+    await expect(readBackupArchive(unknownColumn)).rejects.toThrow("unknown columns");
+
+    const missingRow = await tamper(archive, (entries) =>
+      editManifest(entries, (m) => (m as unknown as Manifest).datasetRows.pop()),
+    );
+    await expect(readBackupArchive(missingRow)).rejects.toThrow("missing from the backup");
   });
 
   it("rejects archives whose document bytes were altered", async () => {

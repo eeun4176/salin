@@ -54,7 +54,7 @@ export function ConfirmDialog({ open, onOpenChange, title, description, confirmL
               onClick={confirm}
               className={cn(
                 "press h-10 rounded-xl px-4 text-sm font-semibold text-white disabled:opacity-60",
-                destructive ? "bg-destructive hover:bg-destructive/90" : "bg-salin-primary hover:bg-[#019A53]",
+                destructive ? "bg-destructive hover:bg-destructive/90" : "bg-salin-primary hover:bg-salin-primary-strong",
               )}
             >
               {busy ? "Working…" : confirmLabel}

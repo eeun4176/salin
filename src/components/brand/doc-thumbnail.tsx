@@ -1,7 +1,7 @@
 /**
  * Document Thumbnail
- * The mini table-form drawing shown on file cards (an image placeholder for
- * photos), matching the mockup's thumbnail style.
+ * The mini table-form drawing (an image placeholder for photos) shown on a
+ * file card while its real preview loads, or when no preview can be made.
  */
 
 import { ImageIcon } from "lucide-react";
@@ -44,9 +44,9 @@ function TablePreview({ withTitle }: { withTitle: boolean }) {
 export function DocThumbnail({ kind, className }: { kind?: FileKind; className?: string }) {
   const isImage = kind === "png" || kind === "jpg" || kind === "webp";
   return (
-    <div className={cn("overflow-hidden rounded-lg bg-white ring-1 ring-black/[0.04]", className)}>
+    <div className={cn("overflow-hidden rounded-lg bg-salin-surface ring-1 ring-black/[0.04]", className)}>
       {isImage ? (
-        <div className="grid h-full place-items-center bg-[linear-gradient(160deg,#EEF5F1,#DDEBE3)] text-salin-primary/60">
+        <div className="grid h-full place-items-center bg-[linear-gradient(160deg,#EEF5F1,#DDEBE3)] text-salin-primary/60 dark:bg-[linear-gradient(160deg,#1C2A23,#15201B)]">
           <ImageIcon className="size-8" strokeWidth={1.5} />
         </div>
       ) : (
