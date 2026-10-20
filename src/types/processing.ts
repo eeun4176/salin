@@ -176,6 +176,8 @@ export interface OcrSourceReference {
   cells: Record<ID, Box>;
   /** What OCR originally read, by column id, where the reviewer changed it. */
   original: Record<ID, string>;
+  /** Values that came from a suggestion the reviewer accepted, by column id: a rule, the handwriting reader or the on-device assistant. */
+  suggested?: Record<ID, "rule" | "handwriting" | "ai">;
 }
 
 /** How a dataset was made, beyond its source files. */

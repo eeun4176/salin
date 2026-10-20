@@ -1,6 +1,6 @@
 # Phase 4 — On-Device OCR & Document Recognition
 
-How Salin reads photos and scanned PDFs on the device, which technologies were chosen (and which were evaluated and left out), how the code is organised, and the status of every Phase 4 task. Benchmarks and accuracy results are in [OCR_BENCHMARKS.md](OCR_BENCHMARKS.md).
+How Salin reads photos and scanned PDFs on the device, which technologies were chosen (and which were evaluated and left out), how the code is organised, and the status of every Phase 4 task. Benchmarks and accuracy results are in [OCR_BENCHMARKS.md](OCR_BENCHMARKS.md). Phase 5 later added optional on-device AI (Transformers.js and ONNX Runtime Web, for handwriting and an assistant) on top of this engine — see [PHASE5_AI.md](PHASE5_AI.md).
 
 ## 1. Technology evaluation
 

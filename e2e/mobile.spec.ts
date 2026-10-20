@@ -79,13 +79,13 @@ test("the guided Excel extraction fits a phone without sideways scrolling", asyn
 
 test("the Read text steps fit a phone screen, from preparing a page to the dataset list", async ({ page }) => {
   await openWorkspace(page);
-  await uploadFiles(page, [sample.png("Form photo.png")]);
-  await page.getByRole("button", { name: "More actions for Form photo.png", exact: true }).tap();
+  await uploadFiles(page, [sample.png("Form photo from the census of barangay Tungkong Mangga 2026.png")]);
+  await page.getByRole("button", { name: "More actions for Form photo from the census of barangay Tungkong Mangga 2026.png", exact: true }).tap();
   await page.getByRole("menuitem", { name: "Read text (OCR)" }).tap();
   await expect(page).toHaveURL(/\/scans\/[\w-]+$/, { timeout: 30_000 });
   const noOverflow = async () => expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
 
-  // Step 1 (page editor), step 2 (templates, model status), back to Datasets with the scan listed.
+  // Step 1 (page editor), step 2 (templates, model status), back to Datasets with the scan listed — a long name must not push the list sideways.
   await expect(page.getByRole("tab", { name: "Crop & rotate" })).toBeVisible();
   await noOverflow();
   await page.getByRole("button", { name: "Next: read text" }).tap();

@@ -6,8 +6,11 @@
  * and mapping confidence separately, and why it needs a look. Values can be
  * typed, checked, or re-assigned by tapping text on the page; table records
  * can be added, removed, or rebuilt by drawing the table's area. Required
- * values must be resolved before continuing. Corrections are saved as you
- * go, and what OCR originally read is kept for traceability.
+ * values must be resolved before continuing. Suggestions (rules, the
+ * handwriting reader, the on-device assistant) are listed with Use / Edit /
+ * Dismiss and shown beside their values; the optional AI tools add more.
+ * Corrections are saved as you go, and what OCR originally read is kept for
+ * traceability.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -23,6 +26,9 @@ import { errorMessage } from "@/core/storage/errors";
 import { updateOcrDocument } from "@/core/storage/repositories/ocr.repository";
 import { PageViewer, type Overlay, type OverlayTone, type PickableWord } from "@/features/ocr/components/page-viewer";
 import { FieldRow, RecordTable, StateChip } from "@/features/ocr/components/review-parts";
+import { AiTools, SuggestionCard, SuggestionsPanel } from "@/features/ai/components/review-assist";
+import { TemplateHint } from "@/features/ocr/components/template-hint";
+import { acceptSuggestion, pendingSuggestions, refLabel, rejectSuggestion } from "@/core/ai/suggestions";
 import { useObjectUrls } from "@/features/ocr/hooks/use-scan";
 import { saveTemplateFromScan, templateById } from "@/features/ocr/ocr-actions";
 import { ensureProcessed } from "@/features/ocr/ocr-runner";
@@ -81,6 +87,21 @@ export function ReviewStep({ doc, pages, onBack, onNext }: ReviewStepProps) {
   const items = useMemo(() => reviewItems(extraction), [extraction]);
   const counts = useMemo(() => stateCounts(extraction), [extraction]);
   const critical = useMemo(() => unresolvedCritical(extraction), [extraction]);
+  const suggestions = useMemo(() => new Map(pendingSuggestions(extraction).map((s) => [refKey(s.ref), s])), [extraction]);
+  const [templateChanged, setTemplateChanged] = useState(false);
+  useEffect(() => {
+    let active = true;
+    void templateById(extraction.templateId).then((t) => active && setTemplateChanged(Boolean(t && extraction.templateVersion && t.version !== extraction.templateVersion)));
+    return () => {
+      active = false;
+    };
+  }, [extraction.templateId, extraction.templateVersion]);
+  const inlineSuggestion = (key: string) => {
+    const s = suggestions.get(key);
+    return s ? (
+      <SuggestionCard compact suggestion={s} label={refLabel(extraction, s.ref)} box={null} pageImage={null} onAccept={(edited) => change((x) => acceptSuggestion(x, s.id, edited))} onReject={() => change((x) => rejectSuggestion(x, s.id))} />
+    ) : null;
+  };
 
   const overlays: Overlay[] = items
     .filter((i) => i.value.box && i.value.page === pageIndex + 1)
@@ -162,12 +183,20 @@ export function ReviewStep({ doc, pages, onBack, onNext }: ReviewStepProps) {
         </label>
       </div>
 
+      <div className="mt-4 empty:hidden">
+        <TemplateHint doc={doc} pages={pages} />
+      </div>
       {extraction.unsupported && (
         <p role="alert" className="mt-4 flex gap-2 rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:bg-amber-400/10 dark:text-amber-200">
           <TriangleAlert className="mt-0.5 size-4 shrink-0" />
           <span>
             <span className="font-semibold">Not a supported layout.</span> {extraction.unsupported}
           </span>
+        </p>
+      )}
+      {templateChanged && (
+        <p className="mt-3 flex gap-2 text-sm text-salin-muted">
+          <Info className="mt-0.5 size-4 shrink-0" /> This template was updated after these pages were matched. Go back to Read text and pick it again to use the new version — this review stays as it is until then.
         </p>
       )}
       {template?.experimental && (
@@ -236,6 +265,8 @@ export function ReviewStep({ doc, pages, onBack, onNext }: ReviewStepProps) {
         </div>
 
         <div className="min-w-0 space-y-5">
+          <AiTools extraction={extraction} pages={pages} generic={extraction.templateId === "generic"} onResult={change} />
+          <SuggestionsPanel extraction={extraction} pageImage={pageImage} onChange={change} onSelect={(key) => setSelected(key)} />
           {extraction.forms.map((form, g) => {
             const fields = form.fields.filter((f) => visible(valueState(f.value, f)));
             return (
@@ -256,6 +287,7 @@ export function ReviewStep({ doc, pages, onBack, onNext }: ReviewStepProps) {
                         selected={selected === refKey(ref)}
                         picking={picking !== null && refKey(picking) === refKey(ref)}
                         pageImage={pageImage(field.value.page)}
+                        suggestion={inlineSuggestion(refKey(ref))}
                         onSelect={() => select(ref)}
                         onChange={(text) => change((x) => editValue(x, ref, text))}
                         onConfirm={(confirmed) => change((x) => confirmValue(x, ref, confirmed))}
@@ -278,6 +310,7 @@ export function ReviewStep({ doc, pages, onBack, onNext }: ReviewStepProps) {
               set={set}
               group={g}
               selectedKey={selected}
+              suggested={suggestions}
               attentionOnly={attentionOnly}
               drawing={drawing === g}
               onSelect={select}
@@ -309,6 +342,7 @@ export function ReviewStep({ doc, pages, onBack, onNext }: ReviewStepProps) {
                         selected={selected === refKey(ref)}
                         picking={picking !== null && refKey(picking) === refKey(ref)}
                         pageImage={pageImage(field.value.page)}
+                        suggestion={inlineSuggestion(refKey(ref))}
                         onSelect={() => select(ref)}
                         onChange={(text) => change((x) => editValue(x, ref, text))}
                         onConfirm={(confirmed) => change((x) => confirmValue(x, ref, confirmed))}

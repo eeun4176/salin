@@ -5,12 +5,15 @@
  * "Mark as reviewed", a note when cells need attention (with a filter to just
  * those rows), any notes from reading the files, and the editable table.
  * Datasets read from a scan link back to it, and their rows' "view source"
- * shows the scanned page with the row's region highlighted.
+ * shows the scanned page with the row's region highlighted. Transform
+ * (manual) and Ask (the on-device assistant, in plain words) both produce a
+ * validated command shown in a preview; applied changes can be undone, and
+ * filters show a view of matching rows without changing anything.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router";
-import { Check, ChevronDown, CircleAlert, Download, LoaderCircle, RotateCcw } from "lucide-react";
+import { Link, useLocation, useNavigate, useParams } from "react-router";
+import { Check, ChevronDown, CircleAlert, Download, Filter, LoaderCircle, RotateCcw, Undo2, Wand2, X } from "lucide-react";
 
 import { PageFrame } from "@/components/layout/page-frame";
 import {
@@ -24,6 +27,14 @@ import { listExtractionsForBlobs } from "@/core/storage/repositories/processing.
 import { OcrSourceDialog } from "@/features/ocr/components/ocr-source-dialog";
 import { scanUrl } from "@/features/ocr/ocr-actions";
 import { DatasetTable } from "@/features/processing/components/dataset-table";
+import { AskBox } from "@/features/processing/components/ask-box";
+import { CommandPreview } from "@/features/processing/components/command-preview";
+import { TransformDialog } from "@/features/processing/components/transform-dialog";
+import { describeCommand, resolveCommand, runCommand, type CommandOutcome, type DatasetCommand } from "@/core/processing/dataset-commands";
+import { inferColumnTypes } from "@/core/processing/dataset-inference";
+import { createDataset } from "@/core/storage/repositories/dataset.repository";
+import { errorMessage } from "@/core/storage/errors";
+import { datasetUrl } from "@/features/processing/hooks/use-document-processing";
 import { useDatasetReview, type DatasetReview, type SaveState } from "@/features/processing/hooks/use-dataset-review";
 import { downloadDataset, EXPORT_FORMATS } from "@/features/processing/processing-actions";
 import { usePreviewFile } from "@/features/workspace/use-open-item";
@@ -200,6 +211,57 @@ export function DatasetReviewPage() {
   const onViewRowSource = useCallback((source: SourceReference) => (source.ocr ? setOcrSource(source) : onViewSource(source.fileId)), [onViewSource]);
   const notes = useExtractionNotes(review.dataset?.sourceFileIds);
   const issueCount = review.issues.length;
+  const navigate = useNavigate();
+
+  // Transform / Ask → preview → apply (undoable) or a filtered view.
+  const [transforming, setTransforming] = useState(false);
+  const [preview, setPreview] = useState<{ title: string; outcome: CommandOutcome; fromAssistant: boolean } | null>(null);
+  const [view, setView] = useState<{ rowIds: Set<string>; title: string } | null>(null);
+  const target = { columns: review.draft.columns, rows: review.draft.rows };
+
+  function previewCommand(command: unknown, fromAssistant: boolean) {
+    const resolved = resolveCommand(command, review.draft.columns);
+    if (!resolved.ok) {
+      toast(resolved.message);
+      return;
+    }
+    setTransforming(false);
+    setPreview({ title: describeCommand(resolved.command, review.draft.columns), outcome: runCommand(resolved.command, target), fromAssistant });
+  }
+
+  function apply(outcome: Extract<CommandOutcome, { kind: "change" | "view" }>, title: string) {
+    if (outcome.kind === "view") {
+      setView({ rowIds: new Set(outcome.rowIds), title });
+      return;
+    }
+    review.applyContent(title, outcome.columns, outcome.rows);
+    setView(null);
+    toast(`Done: ${title}.`, { label: "Undo", onClick: () => review.undo() });
+  }
+
+  // A request answered on the Ask Salin AI page arrives as a command: preview it here, once.
+  const location = useLocation();
+  const handedOver = (location.state as { command?: DatasetCommand } | null)?.command;
+  const ready = review.load.status === "ready";
+  useEffect(() => {
+    if (!ready || !handedOver) return;
+    navigate(location.pathname, { replace: true, state: null });
+    void Promise.resolve().then(() => previewCommand(handedOver, true));
+    // previewCommand reads the loaded dataset; run once per hand-over.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, handedOver]);
+
+  async function saveTable(outcome: Extract<CommandOutcome, { kind: "table" }>) {
+    const columns = outcome.headers.map((name) => ({ id: crypto.randomUUID(), name, type: "text" as const, required: false, sourceHeader: null }));
+    const content = inferColumnTypes({ columns, rows: outcome.rows.map((row) => ({ values: Object.fromEntries(columns.map((c, i) => [c.id, row[i] === null ? null : String(row[i])])), source: null })) });
+    try {
+      const created = await createDataset({ name: `${review.draft.name} – ${outcome.title}`.slice(0, 120), sourceFileIds: review.dataset?.sourceFileIds ?? [], content });
+      setPreview(null);
+      toast(`Saved “${created.name}”.`, { label: "Open", onClick: () => navigate(datasetUrl(created.id)) });
+    } catch (error) {
+      toast(errorMessage(error, "The summary couldn't be saved."));
+    }
+  }
 
   const frame = { title: "Review data", back: { to: "/datasets", label: "Datasets" } };
 
@@ -245,6 +307,32 @@ export function DatasetReviewPage() {
         </div>
       ) : null}
 
+      <div className="mt-4 grid gap-2 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-start">
+        <div className="flex gap-2">
+          <button type="button" onClick={() => setTransforming(true)} className={secondaryButton}>
+            <Wand2 className="size-4" /> Transform
+          </button>
+          {review.undoLabel && (
+            <button type="button" onClick={() => review.undo()} title={`Undo: ${review.undoLabel}`} className={secondaryButton}>
+              <Undo2 className="size-4" /> Undo
+            </button>
+          )}
+        </div>
+        <AskBox columns={review.draft.columns} rows={review.draft.rows} onCommand={(command: DatasetCommand) => previewCommand(command, true)} onOpenTransform={() => setTransforming(true)} />
+      </div>
+
+      {view && (
+        <div role="status" className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl bg-sky-50 px-3.5 py-2.5 text-sm text-sky-900 dark:bg-sky-400/10 dark:text-sky-200">
+          <Filter className="size-4 shrink-0" />
+          <span className="min-w-0 flex-1">
+            Showing {review.draft.rows.filter((r) => view.rowIds.has(r.id)).length.toLocaleString()} of {review.draft.rows.length.toLocaleString()} rows — {view.title}
+          </span>
+          <button type="button" onClick={() => setView(null)} className="inline-flex items-center gap-1 font-semibold hover:underline">
+            <X className="size-3.5" /> Show all rows
+          </button>
+        </div>
+      )}
+
       {notes.length > 0 && (
         <details className="mt-3 text-sm text-salin-muted">
           <summary className="cursor-pointer font-medium text-salin-text">
@@ -259,8 +347,11 @@ export function DatasetReviewPage() {
       )}
 
       <div className="mt-4">
-        <DatasetTable review={review} issuesOnly={issuesOnly && issueCount > 0} sourceNames={sourceNames} onViewSource={onViewRowSource} />
+        <DatasetTable review={review} issuesOnly={issuesOnly && issueCount > 0} onlyRows={view?.rowIds ?? null} sourceNames={sourceNames} onViewSource={onViewRowSource} />
       </div>
+
+      {transforming && <TransformDialog open onOpenChange={setTransforming} columns={review.draft.columns} onPreview={(command) => previewCommand(command, false)} />}
+      <CommandPreview title={preview?.title ?? null} outcome={preview?.outcome ?? null} target={target} fromAssistant={preview?.fromAssistant} onClose={() => setPreview(null)} onApply={apply} onSaveTable={saveTable} />
 
       <OcrSourceDialog
         source={ocrSource?.ocr ?? null}

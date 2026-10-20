@@ -1,0 +1,357 @@
+{
+  "summary": {
+    "model": "onnx-community/LFM2.5-350M-ONNX",
+    "dtype": "q4",
+    "loadMs": 134856,
+    "commandAccuracy": 0.041666666666666664,
+    "heldOutAccuracy": 0.08333333333333333,
+    "validReplies": 0.05555555555555555,
+    "meanCommandMs": 7923,
+    "fieldAccuracy": 0.2857142857142857,
+    "inventedFields": [],
+    "fieldMs": 9401,
+    "files": [
+      "https://huggingface.co/onnx-community/LFM2.5-350M-ONNX/resolve/main/tokenizer_config.json",
+      "https://huggingface.co/onnx-community/LFM2.5-350M-ONNX/resolve/main/tokenizer.json",
+      "https://huggingface.co/onnx-community/LFM2.5-350M-ONNX/resolve/main/config.json",
+      "https://huggingface.co/onnx-community/LFM2.5-350M-ONNX/resolve/main/onnx/model_q4.onnx",
+      "https://huggingface.co/onnx-community/LFM2.5-350M-ONNX/resolve/main/onnx/model_q4.onnx_data",
+      "https://huggingface.co/onnx-community/LFM2.5-350M-ONNX/resolve/main/generation_config.json"
+    ]
+  },
+  "commands": [
+    {
+      "set": "dev",
+      "request": "Show only dogs",
+      "reply": "{\"unsupported\": true}",
+      "valid": false,
+      "correct": false,
+      "ms": 5257
+    },
+    {
+      "set": "dev",
+      "request": "Show unvaccinated dogs in Barangay Muzon",
+      "reply": "{\"unsupported\": true}",
+      "valid": false,
+      "correct": false,
+      "ms": 5609
+    },
+    {
+      "set": "dev",
+      "request": "sort by owner name",
+      "reply": "{\"sorted_by\": [\"owner\", \"barangay\", \"pet\", \"sex\", \"age\", \"vaccinated\", \"date_registered\"]}",
+      "valid": false,
+      "correct": false,
+      "ms": 7135
+    },
+    {
+      "set": "dev",
+      "request": "oldest pets first",
+      "reply": "{\"unsupported\": true}",
+      "valid": false,
+      "correct": false,
+      "ms": 6640
+    },
+    {
+      "set": "dev",
+      "request": "rename Pet name to Name of pet",
+      "reply": "{\"action\":\"rename_column\",\"column\":\"Pet\",\"to\":\"Name of pet\"}",
+      "valid": false,
+      "correct": false,
+      "ms": 7113
+    },
+    {
+      "set": "dev",
+      "request": "make Age a number column",
+      "reply": "{\"unsupported\": true}",
+      "valid": false,
+      "correct": false,
+      "ms": 6708
+    },
+    {
+      "set": "dev",
+      "request": "how many pets per barangay",
+      "reply": "{\"unsupported\": true}",
+      "valid": false,
+      "correct": false,
+      "ms": 7069
+    },
+    {
+      "set": "dev",
+      "request": "count dogs and cats",
+      "reply": "{\"summary\": \"There are 3 dogs and 2 cats registered in Muzon, Tungkong Mangga, and Gaya-gaya.\"}",
+      "valid": false,
+      "correct": false,
+      "ms": 12185
+    },
+    {
+      "set": "dev",
+      "request": "average age by species",
+      "reply": "{\"summary\": \"Dog\"}",
+      "valid": false,
+      "correct": false,
+      "ms": 8029
+    },
+    {
+      "set": "dev",
+      "request": "standardize the sex column",
+      "reply": "{\"normalize\":{\"column\": \"Sex\",\"rule\":\"title_case\"}}",
+      "valid": false,
+      "correct": false,
+      "ms": 8775
+    },
+    {
+      "set": "dev",
+      "request": "capitalize the owner names properly",
+      "reply": "{\"action\":\"normalize\",\"column\":\"Owner\",\"rule\":\"title_case\"}",
+      "valid": true,
+      "correct": true,
+      "ms": 7180
+    },
+    {
+      "set": "dev",
+      "request": "find duplicate pets",
+      "reply": "{\"unsupported\": true}",
+      "valid": false,
+      "correct": false,
+      "ms": 6524
+    },
+    {
+      "set": "dev",
+      "request": "mark all cats in Tungkong Mangga as vaccinated",
+      "reply": "{\"unsupported\": true}",
+      "valid": false,
+      "correct": false,
+      "ms": 6060
+    },
+    {
+      "set": "dev",
+      "request": "delete rows with no owner",
+      "reply": "{\"unsupported\": true}",
+      "valid": false,
+      "correct": false,
+      "ms": 5842
+    },
+    {
+      "set": "dev",
+      "request": "show pets registered after June 30, 2026",
+      "reply": "{\"unsupported\": true}",
+      "valid": false,
+      "correct": false,
+      "ms": 6416
+    },
+    {
+      "set": "dev",
+      "request": "Ipakita ang mga aso sa Muzon",
+      "reply": "{\"request\": \"Ipakita ang mga aso sa Muzon\"}",
+      "valid": false,
+      "correct": false,
+      "ms": 7357
+    },
+    {
+      "set": "dev",
+      "request": "Ilan ang alagang hayop bawat barangay?",
+      "reply": "{\"suggestion\": \"Barangay Muzon\"}",
+      "valid": false,
+      "correct": false,
+      "ms": 6953
+    },
+    {
+      "set": "dev",
+      "request": "show pets without a contact number",
+      "reply": "{\"unsupported\": true}",
+      "valid": false,
+      "correct": false,
+      "ms": 6140
+    },
+    {
+      "set": "dev",
+      "request": "show female dogs older than 3",
+      "reply": "{\"unsupported\": true}",
+      "valid": false,
+      "correct": false,
+      "ms": 6020
+    },
+    {
+      "set": "dev",
+      "request": "summarize this dataset",
+      "reply": "{\"summary\": \"The dataset contains information about individuals in Muzon, Tungkong Mangga, and Gaya-gaya, including their names, barangay, pet names, species, sex, age, vaccinated status, and registration dates. The most common pet names are Bantay, Mingming, and Brownie, with males and females being the predominant sexes.\"}",
+      "valid": false,
+      "correct": false,
+      "ms": 12872
+    },
+    {
+      "set": "dev",
+      "request": "send this list to my email",
+      "reply": "{\"sender\": \"Juan Dela Cruz\", \"recipient\": \"Salin\", \"subject\": \"Email List\", \"message\": \"Dear Salin, please find the list of people in Muzon, Tungkong Mangga, Gaya-gaya. Contact no. 09171234567.\"}",
+      "valid": false,
+      "correct": false,
+      "ms": 13791
+    },
+    {
+      "set": "dev",
+      "request": "print a bar chart of the species",
+      "reply": "{\"chart\": {\"title\": \"Species Distribution\", \"type\": \"barchart\"}}",
+      "valid": false,
+      "correct": false,
+      "ms": 8650
+    },
+    {
+      "set": "dev",
+      "request": "Pagsunod-sunurin ayon sa edad",
+      "reply": "{\"unsupported\": true}",
+      "valid": false,
+      "correct": false,
+      "ms": 6129
+    },
+    {
+      "set": "dev",
+      "request": "change Bantay's species to Cat",
+      "reply": "{\"unsupported\": true}",
+      "valid": false,
+      "correct": false,
+      "ms": 6899
+    },
+    {
+      "set": "held-out",
+      "request": "only cats please",
+      "reply": "{\"unsupported\": true}",
+      "valid": false,
+      "correct": false,
+      "ms": 7247
+    },
+    {
+      "set": "held-out",
+      "request": "list pets from Gaya-gaya that are not vaccinated",
+      "reply": "{\"unsupported\": true}",
+      "valid": false,
+      "correct": false,
+      "ms": 7598
+    },
+    {
+      "set": "held-out",
+      "request": "youngest first",
+      "reply": "{\"summary\": \"Juan Dela Cruz is the youngest.\"}",
+      "valid": false,
+      "correct": false,
+      "ms": 7856
+    },
+    {
+      "set": "held-out",
+      "request": "how many are vaccinated?",
+      "reply": "{\"unsupported\": true}",
+      "valid": false,
+      "correct": false,
+      "ms": 7100
+    },
+    {
+      "set": "held-out",
+      "request": "total number of pets per species",
+      "reply": "{\"summary\": \"Bantay has 3 pets per species\"}",
+      "valid": false,
+      "correct": false,
+      "ms": 7724
+    },
+    {
+      "set": "held-out",
+      "request": "rename Contact no. to Phone",
+      "reply": "{\"action\":\"rename_column\",\"column\":\"Contact\",\"to\":\"Phone\"}",
+      "valid": true,
+      "correct": true,
+      "ms": 7791
+    },
+    {
+      "set": "held-out",
+      "request": "fix the species values",
+      "reply": "{\"unsupported\": true}",
+      "valid": false,
+      "correct": false,
+      "ms": 7054
+    },
+    {
+      "set": "held-out",
+      "request": "remove pets older than 10",
+      "reply": "{\"unsupported\": true}",
+      "valid": false,
+      "correct": false,
+      "ms": 8872
+    },
+    {
+      "set": "held-out",
+      "request": "set Barangay to Muzon for Juan Dela Cruz",
+      "reply": "{\"unsupported\": true}",
+      "valid": false,
+      "correct": false,
+      "ms": 8585
+    },
+    {
+      "set": "held-out",
+      "request": "Ilan ang aso at pusa?",
+      "reply": "{\"unsupported\": true}",
+      "valid": false,
+      "correct": false,
+      "ms": 9105
+    },
+    {
+      "set": "held-out",
+      "request": "show dogs registered in 2026",
+      "reply": "{\"unsupported\": true}",
+      "valid": false,
+      "correct": false,
+      "ms": 7017
+    },
+    {
+      "set": "held-out",
+      "request": "translate this table to Japanese",
+      "reply": "以下のテーブルを日本語に翻訳します。\n\n| Owner (日本語: Juan Dela Cruz, Maria Santos, Pedro Reyes) | Barangay (日本語: Muzon, Tungkong Mangga, Gaya-gaya) | Pet (日本語: Bantay, Mingming, Brownie) | Species (日本語: Dog, Cat) | Sex (日本語: Male, Female) | Age (日本語: 2, 1, 5) | Vaccinated (日本語: true/false) | Date Registered (日本語: 2026-03-14, 2026-07-02, 2026-08-21) | Contact no. (日本語: 09171234567, 09281234567) |",
+      "valid": false,
+      "correct": false,
+      "ms": 17918
+    }
+  ],
+  "fieldScores": [
+    {
+      "key": "owner_name",
+      "want": "Juan Dela Cruz",
+      "got": null,
+      "correct": false
+    },
+    {
+      "key": "address",
+      "want": "Purok 2, Brgy. Muzon",
+      "got": null,
+      "correct": false
+    },
+    {
+      "key": "contact",
+      "want": "0917 555 0142",
+      "got": null,
+      "correct": false
+    },
+    {
+      "key": "pet_name",
+      "want": "Bantay",
+      "got": null,
+      "correct": false
+    },
+    {
+      "key": "color",
+      "want": "Brown and white",
+      "got": null,
+      "correct": false
+    },
+    {
+      "key": "breed",
+      "want": null,
+      "got": null,
+      "correct": true
+    },
+    {
+      "key": "email",
+      "want": null,
+      "got": null,
+      "correct": true
+    }
+  ],
+  "fieldReply": "```json\n{\n  \"CITY_VETERINARY_OFFICE\": \"DOG REGISTRATION DATA BASE FORM\",\n  \"DATE_REGISTERED\": \"10/18/2026\",\n  \"CONTACT_NUMBER\": \"0917 555 0142\",\n  \"PET_OWNER_FULL_NAME\": \"Juan Dela Cruz\",\n  \"BUONG_PANGALNG_MAY_ARI\": \"Purok 2, Brgy. Muzon\",\n  \"COMPLETE_ADDRESS\": \"Purok 2, Brgy. Muzon\",\n  \"DOG_SEX\": \"MALE\",\n  \"COLOR_MARKINGS\": \"Brown and white\",\n  \"SEX"
+}

@@ -207,7 +207,9 @@ export type ValueFlag =
   | "checkbox-unclear"
   | "type-mismatch"
   | "possibly-handwritten"
-  | "count-mismatch";
+  | "count-mismatch"
+  /** Handwriting recognition couldn't read it reliably: type it from the close-up. */
+  | "illegible";
 
 /** One extracted value with everything needed to review it against the page. */
 export interface ExtractedValue {
@@ -228,6 +230,8 @@ export interface ExtractedValue {
   edited: boolean;
   /** The reviewer checked this value against the page. */
   confirmed: boolean;
+  /** Set when the value came from a suggestion the reviewer accepted (cleared when they type over it). */
+  suggestedBy?: SuggestionSource;
 }
 
 export interface FieldSpec {
@@ -273,6 +277,46 @@ export interface Extraction {
   /** Set when the pages don't match the template (or nothing could be read): nothing is claimed as extracted. */
   unsupported: string | null;
   warnings: string[];
+  /** Version of the template the pages were mapped with (saved templates can change later). */
+  templateVersion?: number;
+  /** Suggested corrections, standard forms and handwriting readings — applied only when the reviewer accepts them. */
+  suggestions?: Suggestion[];
+}
+
+/** A value in an extraction: a form field, a table cell (`rowId:columnKey`) or a summary field. */
+export interface ValueRef {
+  kind: "form" | "table" | "summary";
+  /** Form/table index (0 for summaries). */
+  group: number;
+  /** Field key or `${rowId}:${columnKey}`. */
+  id: string;
+}
+
+/** rule = a deterministic rule (OCR slip, standard form); handwriting = the handwriting model; ai = the local language model. */
+export type SuggestionSource = "rule" | "handwriting" | "ai";
+
+export interface Suggestion {
+  id: string;
+  ref: ValueRef;
+  /** correction = fix what was read; standardize = same value in standard form; fill = a value for an empty field; move = the value belongs in another column. */
+  kind: "correction" | "standardize" | "fill" | "move";
+  source: SuggestionSource;
+  /** The value now (what OCR read, or the reviewer's text). */
+  before: string;
+  after: string;
+  /** Why, in plain words. */
+  reason: string;
+  /** Backed by the page: found in the text read, a small fix of it, a validated rule, or read from the value's own region. */
+  grounded: boolean;
+  /** 0–1 where the source gives one. */
+  confidence: number | null;
+  /** Where the suggested value was found on the page (fill suggestions from page text). */
+  page?: number | null;
+  box?: Box | null;
+  /** For move suggestions: the value it should go to. */
+  to?: ValueRef;
+  status: "pending" | "accepted" | "rejected";
+  decidedAt?: number;
 }
 
 export type ReviewState = "ready" | "needs_review" | "unreadable" | "missing";

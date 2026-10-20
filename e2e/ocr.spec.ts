@@ -85,7 +85,7 @@ test("a printed registration form is read on the device, reviewed against the pa
   // Review: values with their state; the missing required address blocks saving.
   await expect(page.getByRole("textbox", { name: "Owner's name" })).toHaveValue("Juan Dela Cruz");
   await expect(page.getByRole("textbox", { name: "Pet's name" })).toHaveValue("Bantay");
-  await expect(page.getByRole("combobox", { name: "Species" })).toHaveValue("Dog");
+  await expect(page.getByRole("button", { name: "Species: Dog" })).toBeVisible();
   await expect(page.getByRole("textbox", { name: "Address" })).toHaveValue("");
   await page.getByRole("button", { name: "Next: save" }).click();
   await expect(page.getByText(/1 required value needs attention/)).toBeVisible();
@@ -155,12 +155,12 @@ test("recognition works offline once downloaded, and explains what to do when th
   await context.setOffline(true);
   await page.goto("/settings");
   await expect(page.getByText(/Download the text-recognition files once/)).toBeVisible();
-  await page.getByRole("button", { name: /^Download / }).click();
+  await page.getByRole("region", { name: "Text recognition" }).getByRole("button", { name: /^Download / }).click();
   await expect(page.getByText(/aren't on this device yet, and you're offline/)).toBeVisible();
 
   // Back online: the download is offered again; download once.
   await context.setOffline(false);
-  await page.getByRole("button", { name: /^Download / }).click();
+  await page.getByRole("region", { name: "Text recognition" }).getByRole("button", { name: /^Download / }).click();
   await expect(page.getByText(/Text recognition is ready/)).toBeVisible({ timeout: 90_000 });
 
   // Airplane mode: open the app, add a page, read it.

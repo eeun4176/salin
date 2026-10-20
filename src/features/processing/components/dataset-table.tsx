@@ -12,6 +12,7 @@
 import { memo, useState, type KeyboardEvent } from "react";
 import { FileSearch, Plus, X } from "lucide-react";
 
+import { ChoiceMenu } from "@/components/common/choice-menu";
 import { ColumnMenu } from "@/features/processing/components/column-menu";
 import type { DatasetReview } from "@/features/processing/hooks/use-dataset-review";
 import { convertValue } from "@/core/processing/dataset-inference";
@@ -35,6 +36,17 @@ function describeSource(source: SourceReference, fileName: string | undefined) {
   return `${fileName ?? "Deleted document"}${where ? ` · ${where}` : ""}`;
 }
 
+const SUGGESTED_BY = { rule: "a rule", handwriting: "the handwriting reader", ai: "the on-device assistant" } as const;
+
+/** Where a scanned value came from, when it isn't simply what OCR read. */
+function sourceHint(source: SourceReference | null, columnId: string) {
+  const ocr = source?.ocr;
+  if (!ocr) return undefined;
+  const by = ocr.suggested?.[columnId];
+  const read = ocr.original[columnId];
+  return [by && `Suggested by ${SUGGESTED_BY[by]}, approved in review`, read !== undefined && `OCR read “${read}”`].filter(Boolean).join(" — ") || undefined;
+}
+
 interface CellProps {
   column: DatasetColumn;
   value: CellValue | undefined;
@@ -56,18 +68,21 @@ function Cell({ column, value, label, issue, hint, onCommit }: CellProps) {
 
   if (column.type === "boolean") {
     return (
-      <select
-        aria-label={label}
-        aria-invalid={issue ? true : undefined}
-        title={title}
-        value={value === true ? "yes" : value === false ? "no" : ""}
-        onChange={(e) => onCommit(e.target.value === "" ? null : e.target.value === "yes")}
-        className={className}
-      >
-        <option value="">—</option>
-        <option value="yes">Yes</option>
-        <option value="no">No</option>
-      </select>
+      <span title={title} className="block">
+        <ChoiceMenu
+          variant="cell"
+          label={label}
+          heading={column.name}
+          invalid={Boolean(issue)}
+          value={value === true ? "yes" : value === false ? "no" : "empty"}
+          options={[
+            { value: "empty", label: "—" },
+            { value: "yes", label: "Yes" },
+            { value: "no", label: "No" },
+          ]}
+          onChange={(v) => onCommit(v === "empty" ? null : v === "yes")}
+        />
+      </span>
     );
   }
 
@@ -132,7 +147,7 @@ const Row = memo(function Row({ row, index, columns, issues, sourceLabel, onUpda
             value={row.values[column.id]}
             label={`${column.name}, row ${index + 1}`}
             issue={issues?.get(column.id)}
-            hint={row.source?.ocr?.original[column.id] !== undefined ? `Corrected — OCR read “${row.source.ocr.original[column.id]}”` : undefined}
+            hint={sourceHint(row.source, column.id)}
             onCommit={(value) => onUpdateCell(row.id, column.id, value)}
           />
         </td>
@@ -175,11 +190,13 @@ interface DatasetTableProps {
   review: DatasetReview;
   /** Show only rows with at least one issue. */
   issuesOnly: boolean;
+  /** Show only these rows (a filter from Transform or Ask). */
+  onlyRows?: Set<string> | null;
   sourceNames: Map<string, string>;
   onViewSource: (source: SourceReference) => void;
 }
 
-export function DatasetTable({ review, issuesOnly, sourceNames, onViewSource }: DatasetTableProps) {
+export function DatasetTable({ review, issuesOnly, onlyRows, sourceNames, onViewSource }: DatasetTableProps) {
   const { columns, rows } = review.draft;
   const [limit, setLimit] = useState(PAGE_SIZE);
 
@@ -190,7 +207,7 @@ export function DatasetTable({ review, issuesOnly, sourceNames, onViewSource }: 
     issuesByRow.set(issue.row, forRow);
   });
   const indexed = rows.map((row, index) => ({ row, index }));
-  const matching = issuesOnly ? indexed.filter(({ index }) => issuesByRow.has(index)) : indexed;
+  const matching = indexed.filter(({ row, index }) => (!issuesOnly || issuesByRow.has(index)) && (!onlyRows || onlyRows.has(row.id)));
   const visible = matching.slice(0, limit);
 
   const addRow = () => {
@@ -250,7 +267,7 @@ export function DatasetTable({ review, issuesOnly, sourceNames, onViewSource }: 
             {visible.length === 0 && (
               <tr>
                 <td colSpan={columns.length + 2} className="px-4 py-10 text-center text-sm text-salin-muted">
-                  {issuesOnly ? "No rows need attention." : "No rows yet."}
+                  {onlyRows ? "No rows match the filter." : issuesOnly ? "No rows need attention." : "No rows yet."}
                 </td>
               </tr>
             )}

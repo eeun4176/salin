@@ -79,6 +79,9 @@ const extractionSchema = z.object({
   summaries: z.array(z.record(z.string(), z.unknown())),
   unsupported: z.string().nullable(),
   warnings: z.array(z.string()),
+  // Phase 5: the template version used, and suggestions with their accept/reject decisions.
+  templateVersion: z.number().int().positive().optional(),
+  suggestions: z.array(z.record(z.string(), z.unknown())).max(5000).optional(),
 });
 
 const ocrDocumentSchema = z.object({

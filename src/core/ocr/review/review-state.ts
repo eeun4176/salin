@@ -9,7 +9,9 @@
  */
 
 import { fitsType } from "@/core/ocr/templates/text-match";
-import type { ExtractedField, ExtractedValue, Extraction, FieldSpec, ReviewState, ValueFlag } from "@/types/ocr";
+import type { ExtractedField, ExtractedValue, Extraction, FieldSpec, ReviewState, ValueFlag, ValueRef } from "@/types/ocr";
+
+export type { ValueRef };
 
 /** Below this OCR confidence (with text read) a value counts as unreadable until checked. */
 export const UNREADABLE_BELOW = 40;
@@ -23,7 +25,7 @@ export function valueState(value: ExtractedValue, spec: Pick<FieldSpec, "require
     return spec.required ? "missing" : "ready";
   }
   if (resolved) return "ready";
-  if (value.ocrConfidence !== null && value.ocrConfidence < UNREADABLE_BELOW) return "unreadable";
+  if (value.flags.includes("illegible") || (value.ocrConfidence !== null && value.ocrConfidence < UNREADABLE_BELOW)) return "unreadable";
   return value.flags.length ? "needs_review" : "ready";
 }
 
@@ -42,19 +44,11 @@ export const FLAG_TEXT: Record<ValueFlag, string> = {
   "type-mismatch": "Doesn't look like the expected kind of value.",
   "possibly-handwritten": "Possibly handwritten — handwriting recognition is experimental.",
   "count-mismatch": "Doesn't match the number of records read.",
+  illegible: "Handwriting couldn't be read reliably — type what you see in the close-up.",
 };
 
 export function describeFlags(value: ExtractedValue) {
   return value.flags.map((f) => FLAG_TEXT[f]);
-}
-
-export interface ValueRef {
-  /** "form", "table" or "summary". */
-  kind: "form" | "table" | "summary";
-  /** Form/table index (0 for summaries). */
-  group: number;
-  /** Field key or `${rowId}:${columnKey}`. */
-  id: string;
 }
 
 /** A stable string for a value reference (selection, DOM lookups). */
@@ -100,7 +94,7 @@ export function unresolvedCritical(extraction: Extraction) {
    Edits
 ------------------------------------------------------------------- */
 
-function updateValue(extraction: Extraction, ref: ValueRef, change: (value: ExtractedValue, spec: FieldSpec) => ExtractedValue): Extraction {
+export function updateValue(extraction: Extraction, ref: ValueRef, change: (value: ExtractedValue, spec: FieldSpec) => ExtractedValue): Extraction {
   if (ref.kind === "form") {
     return {
       ...extraction,
@@ -131,7 +125,8 @@ export function editValue(extraction: Extraction, ref: ValueRef, text: string): 
   return updateValue(extraction, ref, (value, spec) => {
     const flags: ValueFlag[] = value.flags.filter((f) => f !== "type-mismatch");
     if (text && !fitsType(spec.type, text, spec.options)) flags.push("type-mismatch");
-    return { ...value, text, edited: text !== (value.ocrText ?? ""), confirmed: true, flags };
+    // Typing over an accepted suggestion makes the value the reviewer's own.
+    return { ...value, suggestedBy: undefined, text, edited: text !== (value.ocrText ?? ""), confirmed: true, flags };
   });
 }
 

@@ -20,6 +20,7 @@ import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { primaryButton as primary, secondaryButton as secondary } from "@/components/common/step-footer";
 import { reviewItems } from "@/core/ocr/review/review-state";
 import { ModelStatus } from "@/features/ocr/components/model-status";
+import { TemplateHint } from "@/features/ocr/components/template-hint";
 import { allTemplates, buildExtraction, manualExtraction } from "@/features/ocr/ocr-actions";
 import { cancelReading, isReading, readDocument, type ReadProgress } from "@/features/ocr/ocr-runner";
 import { useOcrStore, useProfileChoice } from "@/stores/ocr-store";
@@ -147,6 +148,9 @@ export function ReadStep({ doc, pages, onDone }: { doc: OcrDocument; pages: OcrP
         <h3 id="template-heading" className="text-sm font-semibold text-salin-text">
           What kind of document is this?
         </h3>
+        <div className="mt-3 empty:hidden">
+          <TemplateHint doc={doc} pages={pages} />
+        </div>
         <div role="radiogroup" aria-labelledby="template-heading" className="mt-3 grid gap-2">
           {options.map((o) => (
             <TemplateOption key={o.id} {...o} checked={chosen === o.id} onChange={setTemplate} />

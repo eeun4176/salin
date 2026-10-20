@@ -4,7 +4,9 @@
  * (cells, rows, column name/type/required), validates every cell, and
  * autosaves shortly after each change — only the edited rows when nothing
  * structural changed. Pending changes are saved when the screen closes, and
- * the browser warns before leaving with unsaved edits.
+ * the browser warns before leaving with unsaved edits. Transformations
+ * (from the Transform tools or the assistant) replace the content in one
+ * step and can be undone.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -17,6 +19,8 @@ import { getDatasetWithRows, saveDatasetEdits, setDatasetStatus } from "@/core/s
 import type { CellValue, ColumnType, Dataset, DatasetColumn, DatasetRow } from "@/types/processing";
 
 const AUTOSAVE_MS = 600;
+/** How many transformations can be undone. */
+const UNDO_LIMIT = 20;
 
 export type SaveState = { status: "saved" } | { status: "pending" } | { status: "saving" } | { status: "error"; message: string };
 
@@ -35,6 +39,9 @@ export function useDatasetReview(datasetId: string) {
   const [dataset, setDataset] = useState<Dataset | null>(null);
   const [draft, setDraft] = useState<Draft>({ name: "", columns: [], rows: [] });
   const [save, setSave] = useState<SaveState>({ status: "saved" });
+  // Content before each transformation, newest last (Undo).
+  const history = useRef<{ draft: Draft; label: string }[]>([]);
+  const [undoLabel, setUndoLabel] = useState<string | null>(null);
 
   // Mutable save bookkeeping (not rendered).
   const latest = useRef(draft);
@@ -201,12 +208,28 @@ export function useDatasetReview(datasetId: string) {
         setDataset((current) => current && { ...current, status });
       },
 
+      /** Replaces columns and rows with a transformation's result (validated again when saved). */
+      applyContent: (label: string, columns: DatasetColumn[], rows: DatasetRow[]) => {
+        history.current = [...history.current.slice(-(UNDO_LIMIT - 1)), { draft: latest.current, label }];
+        setUndoLabel(label);
+        edit((d) => ({ ...d, columns, rows }), { structural: true });
+      },
+
+      /** Puts back the content from before the last transformation. */
+      undo: () => {
+        const last = history.current.pop();
+        if (!last) return null;
+        setUndoLabel(history.current.at(-1)?.label ?? null);
+        edit((d) => ({ ...d, columns: last.draft.columns, rows: last.draft.rows }), { structural: true });
+        return last.label;
+      },
+
       flush: () => flushRef.current(),
     }),
     [datasetId, edit],
   );
 
-  return { datasetId, load, dataset, draft, save, issues, nameError, ...actions };
+  return { datasetId, load, dataset, draft, save, issues, nameError, undoLabel, ...actions };
 }
 
 export type DatasetReview = ReturnType<typeof useDatasetReview>;

@@ -10,7 +10,7 @@
 import { create } from "zustand";
 
 import { detectCapabilities, ocrUnavailableReason, recommendProfile, type DeviceCapabilities, type ProfileChoice } from "@/core/ocr/models/capabilities";
-import { requiredAssets, totalBytes, type ModelAsset } from "@/core/ocr/models/model-assets";
+import { MODEL_ASSETS, requiredAssets, totalBytes, type ModelAsset } from "@/core/ocr/models/model-assets";
 import { checkAssets, downloadAssets, ModelError, removeAssets, storedBytes } from "@/core/ocr/models/model-manager";
 import { ocrRuntime } from "@/core/ocr/engine/ocr-runtime";
 import { errorMessage } from "@/core/storage/errors";
@@ -72,6 +72,9 @@ interface OcrState extends Preferences {
 
 let downloadController: AbortController | null = null;
 
+/** Text-recognition files only (the AI models share the cache and are managed by the AI store). */
+const OCR_ASSETS = Object.values(MODEL_ASSETS);
+
 export const useOcrStore = create<OcrState>()((set, get) => ({
   ...read(),
   caps: null,
@@ -106,7 +109,7 @@ export const useOcrStore = create<OcrState>()((set, get) => ({
       const missing = status.filter((s) => !s.ready).map((s) => s.asset);
       set({
         model: missing.length ? { status: "missing", bytes: totalBytes(missing) } : { status: "ready", bytes: totalBytes(assets) },
-        storedBytes: await storedBytes(),
+        storedBytes: await storedBytes(OCR_ASSETS),
       });
     } catch (error) {
       set({ model: { status: "error", message: errorMessage(error, "The recognition files couldn't be checked."), offline: false } });
@@ -124,7 +127,7 @@ export const useOcrStore = create<OcrState>()((set, get) => ({
         signal: downloadController.signal,
         onProgress: ({ loaded, total, asset }) => set({ model: { status: "downloading", loaded, total, label: asset.label } }),
       });
-      set({ model: { status: "ready", bytes: totalBytes(assets) }, storedBytes: await storedBytes() });
+      set({ model: { status: "ready", bytes: totalBytes(assets) }, storedBytes: await storedBytes(OCR_ASSETS) });
       return true;
     } catch (error) {
       if (downloadController?.signal.aborted) {
@@ -145,7 +148,7 @@ export const useOcrStore = create<OcrState>()((set, get) => ({
   removeModels: async () => {
     // Stop the engine first so no read is using the files being deleted.
     await ocrRuntime.shutdown();
-    await removeAssets();
+    await removeAssets(OCR_ASSETS);
     set({ storedBytes: 0, model: { status: "checking" } });
     await get().refresh();
   },

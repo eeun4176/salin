@@ -7,10 +7,14 @@
  * and Pick-from-page), and the editable table of repeated records.
  */
 
-import { useId } from "react";
+import { useId, type ReactNode } from "react";
 import { Check, CircleAlert, CircleCheck, CircleHelp, CircleX, Crosshair, Plus, SquareDashedMousePointer, Trash2 } from "lucide-react";
 
+import { ChoiceMenu } from "@/components/common/choice-menu";
 import { describeFlags, refKey, STATE_LABEL, valueState, type ValueRef } from "@/core/ocr/review/review-state";
+
+/** Menu value for "not filled in" (menu items can't use an empty value). */
+const NONE = "__none__";
 import { cn } from "@/lib/utils";
 import type { Box, ExtractedValue, FieldSpec, RecordSet, ReviewState } from "@/types/ocr";
 
@@ -59,16 +63,13 @@ function ValueEditor({ id, spec, value, onChange, onFocus, label, invalid }: { i
   if (spec.type === "choice" || spec.type === "boolean") {
     const options = spec.type === "boolean" ? ["Yes", "No"] : (spec.options ?? []);
     const known = options.includes(value.text) || value.text === "";
+    const choices = [
+      { value: NONE, label: "— Not filled in —" },
+      ...(known ? [] : [{ value: value.text, label: `${value.text} (as read)` }]),
+      ...options.map((o) => ({ value: o, label: o })),
+    ];
     return (
-      <select id={id} aria-label={label} aria-invalid={invalid || undefined} value={value.text} onFocus={onFocus} onChange={(e) => onChange(e.target.value)} className={cn(base, tone, "px-2")}>
-        <option value="">— Not filled in —</option>
-        {!known && <option value={value.text}>{value.text} (as read)</option>}
-        {options.map((o) => (
-          <option key={o} value={o}>
-            {o}
-          </option>
-        ))}
-      </select>
+      <ChoiceMenu id={id} variant="field" label={label} heading={label} invalid={invalid} value={value.text || NONE} options={choices} onFocus={onFocus} onChange={(v) => onChange(v === NONE ? "" : v)} />
     );
   }
   return (
@@ -95,13 +96,15 @@ interface FieldRowProps {
   selected: boolean;
   picking: boolean;
   pageImage: { src: string | null; width: number; height: number } | null;
+  /** A pending suggestion for this value, shown under it. */
+  suggestion?: ReactNode;
   onSelect: () => void;
   onChange: (text: string) => void;
   onConfirm: (confirmed: boolean) => void;
   onPick: () => void;
 }
 
-export function FieldRow({ refId, spec, value, selected, picking, pageImage, onSelect, onChange, onConfirm, onPick }: FieldRowProps) {
+export function FieldRow({ refId, spec, value, selected, picking, pageImage, suggestion, onSelect, onChange, onConfirm, onPick }: FieldRowProps) {
   const id = useId();
   const state = valueState(value, spec);
   const flags = describeFlags(value);
@@ -129,6 +132,7 @@ export function FieldRow({ refId, spec, value, selected, picking, pageImage, onS
       <div className="mt-2">
         <ValueEditor id={`${id}-input`} spec={spec} value={value} onChange={onChange} onFocus={onSelect} label={spec.label} invalid={state !== "ready"} />
       </div>
+      {suggestion && <div className="mt-2">{suggestion}</div>}
       {hard && value.box && pageImage && (
         <div className="mt-2">
           <p className="mb-1 text-xs text-salin-muted">Type what you see here:</p>
@@ -146,6 +150,7 @@ export function FieldRow({ refId, spec, value, selected, picking, pageImage, onS
           <span>Not found on the page</span>
         )}
         {value.edited && value.ocrText !== null && <span>OCR read: “{value.ocrText || "(blank)"}”</span>}
+        {value.suggestedBy && <span>From an accepted {value.suggestedBy === "ai" ? "assistant" : value.suggestedBy} suggestion</span>}
       </div>
       {(flags.length > 0 || value.note) && state !== "ready" && (
         <ul className="mt-1.5 space-y-0.5 text-xs text-amber-800 dark:text-amber-300">
@@ -201,6 +206,8 @@ interface RecordTableProps {
   set: RecordSet;
   group: number;
   selectedKey: string | null;
+  /** Pending suggestions by value key (cells with one get a dashed outline). */
+  suggested?: Map<string, { after: string }>;
   attentionOnly: boolean;
   onSelect: (ref: ValueRef) => void;
   onChange: (ref: ValueRef, text: string) => void;
@@ -211,7 +218,7 @@ interface RecordTableProps {
   drawing: boolean;
 }
 
-export function RecordTable({ set, group, selectedKey, attentionOnly, onSelect, onChange, onConfirmRow, onRemoveRow, onAddRow, onRedraw, drawing }: RecordTableProps) {
+export function RecordTable({ set, group, selectedKey, suggested, attentionOnly, onSelect, onChange, onConfirmRow, onRemoveRow, onAddRow, onRedraw, drawing }: RecordTableProps) {
   const rows = attentionOnly ? set.rows.filter((row) => set.columns.some((c) => row.cells[c.key] && valueState(row.cells[c.key], c) !== "ready")) : set.rows;
   return (
     <section aria-label={`${set.label} table`} className="rounded-2xl ring-1 ring-salin-border">
@@ -265,12 +272,13 @@ export function RecordTable({ set, group, selectedKey, attentionOnly, onSelect, 
                     const ref: ValueRef = { kind: "table", group, id: `${row.id}:${c.key}` };
                     const state = valueState(value, c);
                     const flags = describeFlags(value);
+                    const proposal = suggested?.get(refKey(ref));
                     return (
                       <td key={c.key}>
                         <input
                           aria-label={`${c.label}, record ${n}`}
                           aria-invalid={state !== "ready" || undefined}
-                          title={[STATE_LABEL[state], ...flags, value.note].filter(Boolean).join(" · ")}
+                          title={[STATE_LABEL[state], ...flags, value.note, proposal && `Suggestion: “${proposal.after}” — see Suggestions`].filter(Boolean).join(" · ")}
                           data-ref={refKey(ref)}
                           value={value.text}
                           onFocus={() => onSelect(ref)}
@@ -278,6 +286,7 @@ export function RecordTable({ set, group, selectedKey, attentionOnly, onSelect, 
                           className={cn(
                             "h-9 w-full min-w-28 rounded-lg border bg-salin-surface px-2 text-sm text-salin-text outline-none focus:border-salin-primary focus:ring-2 focus:ring-salin-primary/15",
                             CELL_TONE[state],
+                            proposal && "border-dashed border-violet-400",
                             selectedKey === refKey(ref) && "ring-2 ring-sky-400",
                           )}
                         />

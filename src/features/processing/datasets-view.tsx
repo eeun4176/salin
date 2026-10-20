@@ -12,6 +12,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router";
 import { ChevronRight, CircleCheck, House, Plus, ScanText, Table2, TriangleAlert } from "lucide-react";
 
+import { ChoiceMenu } from "@/components/common/choice-menu";
 import { DatasetActions } from "@/features/processing/components/dataset-actions";
 import { DocumentPickerDialog } from "@/features/processing/components/document-picker-dialog";
 import { useDatasets } from "@/features/processing/hooks/use-datasets";
@@ -34,6 +35,7 @@ const SORTS: Record<SortKey, { label: string; compare: (a: Dataset, b: Dataset) 
 };
 
 const STAGE_LABEL: Record<OcrDocument["stage"], string> = { prepare: "Preparing pages", read: "Reading", review: "Ready to review", done: "Saved" };
+const STEP_NUMBER: Record<OcrDocument["stage"], number> = { prepare: 1, read: 2, review: 3, done: 4 };
 
 function StatusBadge({ reviewed }: { reviewed: boolean }) {
   return (
@@ -85,19 +87,19 @@ function ScansInProgress({ scans }: { scans: OcrDocument[] }) {
       <h3 id="scans-heading" className="text-sm font-semibold text-salin-text">
         Scans in progress <span className="font-normal text-salin-muted">({scans.length})</span>
       </h3>
-      <ul className="mt-2 grid gap-2 sm:grid-cols-2">
+      <ul className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
         {scans.map((scan) => (
-          <li key={scan.id}>
+          <li key={scan.id} className="min-w-0">
             <Link to={scanUrl(scan.id)} className="press flex items-center gap-3 rounded-2xl bg-salin-tile px-3 py-2.5 hover:bg-salin-tile-hover">
               <ScanText aria-hidden="true" className="size-5 shrink-0 text-salin-primary" />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-semibold text-salin-text">{scan.name}</span>
                 <span className="block truncate text-xs text-salin-muted">
-                  {STAGE_LABEL[scan.stage]} · {scan.fileIds.length} file{scan.fileIds.length === 1 ? "" : "s"} · {formatDate(scan.updatedAt)}
+                  Step {STEP_NUMBER[scan.stage]} of 4 · {STAGE_LABEL[scan.stage]} · {scan.fileIds.length} file{scan.fileIds.length === 1 ? "" : "s"} · {formatDate(scan.updatedAt)}
                 </span>
               </span>
               <span className="inline-flex shrink-0 items-center gap-0.5 text-xs font-semibold text-salin-primary">
-                Continue <ChevronRight className="size-4" />
+                <span className="sr-only min-[400px]:not-sr-only">Continue</span> <ChevronRight aria-hidden="true" className="size-4" />
               </span>
             </Link>
           </li>
@@ -175,16 +177,7 @@ export function DatasetsView() {
               </button>
             ))}
           </div>
-          <label className="inline-flex items-center gap-2 text-[13px] text-salin-muted">
-            Sort
-            <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)} className="h-8 rounded-lg border border-salin-border bg-salin-surface px-2 text-[13px] text-salin-text outline-none focus:border-salin-primary">
-              {(Object.keys(SORTS) as SortKey[]).map((key) => (
-                <option key={key} value={key}>
-                  {SORTS[key].label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <ChoiceMenu heading="Sort by" label="Sort" prefix="Sort:" value={sort} options={(Object.keys(SORTS) as SortKey[]).map((key) => ({ value: key, label: SORTS[key].label }))} onChange={setSort} />
         </div>
       )}
 

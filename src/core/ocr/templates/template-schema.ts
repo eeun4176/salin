@@ -9,6 +9,8 @@
 
 import { z } from "zod";
 
+import { NORMALIZE_RULES, type NormalizeRule } from "@/core/processing/value-normalizers";
+
 const key = z
   .string()
   .min(1)
@@ -32,6 +34,8 @@ export const templateFieldSchema = z.object({
   options: z.array(text).max(20).optional(),
   /** Where the value sits on the page (0–1), learned from a corrected scan. */
   region: regionSchema.optional(),
+  /** A standard form to suggest for read values ("M" → "Male"); suggested, never applied silently. */
+  normalize: z.enum(Object.keys(NORMALIZE_RULES) as [NormalizeRule, ...NormalizeRule[]]).optional(),
 });
 
 export const templateColumnSchema = templateFieldSchema.omit({ region: true });

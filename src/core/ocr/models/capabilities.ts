@@ -22,6 +22,8 @@ export interface DeviceCapabilities {
   /** Needs cross-origin isolation, which Salin doesn't use — reported for completeness. */
   wasmThreads: boolean;
   webGpu: WebGpuSupport;
+  /** The GPU can run 16-bit float shaders (needed by the smaller, faster assistant model build). */
+  webGpuF16: boolean;
   workers: boolean;
   offscreenCanvas: boolean;
   /** Approximate RAM in GB (Chromium only; capped at 8 by the browser). */
@@ -53,13 +55,14 @@ export const OCR_PROFILES: Record<OcrProfileId, OcrProfile> = {
   },
 };
 
-async function detectWebGpu(): Promise<WebGpuSupport> {
-  const gpu = (navigator as Navigator & { gpu?: { requestAdapter(): Promise<unknown> } }).gpu;
-  if (!gpu) return "unsupported";
+async function detectWebGpu(): Promise<{ support: WebGpuSupport; f16: boolean }> {
+  const gpu = (navigator as Navigator & { gpu?: { requestAdapter(): Promise<{ features: { has(name: string): boolean } } | null> } }).gpu;
+  if (!gpu) return { support: "unsupported", f16: false };
   try {
-    return (await gpu.requestAdapter()) ? "available" : "no-adapter";
+    const adapter = await gpu.requestAdapter();
+    return adapter ? { support: "available", f16: adapter.features.has("shader-f16") } : { support: "no-adapter", f16: false };
   } catch {
-    return "no-adapter";
+    return { support: "no-adapter", f16: false };
   }
 }
 
@@ -85,7 +88,8 @@ export async function detectCapabilities(): Promise<DeviceCapabilities> {
     wasmSimd,
     wasmRelaxedSimd,
     wasmThreads: wasmThreads && typeof SharedArrayBuffer !== "undefined" && globalThis.crossOriginIsolated === true,
-    webGpu,
+    webGpu: webGpu.support,
+    webGpuF16: webGpu.f16,
     workers: typeof Worker !== "undefined",
     offscreenCanvas: typeof OffscreenCanvas !== "undefined",
     deviceMemoryGb: typeof nav.deviceMemory === "number" ? nav.deviceMemory : null,

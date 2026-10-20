@@ -27,3 +27,6 @@ dist-ssr
 test-results
 playwright-report
 blob-report
+
+# Model files the AI e2e tests serve locally (downloaded once)
+e2e/.models

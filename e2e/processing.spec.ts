@@ -36,7 +36,7 @@ test("a CSV becomes a typed, editable dataset that survives a reload and exports
   // Types were detected and values converted.
   await expect(page.getByRole("button", { name: "Visits column (Number)" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Last visit column (Date)" })).toBeVisible();
-  await expect(page.getByRole("combobox", { name: "Vaccinated, row 1" })).toHaveValue("yes");
+  await expect(page.getByRole("button", { name: "Vaccinated, row 1: Yes" })).toBeVisible();
   await expect(page.getByRole("textbox", { name: "Last visit, row 1" })).toHaveValue("2026-10-18");
 
   // A wrong value is flagged and blocks "Mark as reviewed" until fixed.

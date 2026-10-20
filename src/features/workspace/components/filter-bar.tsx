@@ -9,16 +9,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 import { ChevronDown, FileUp, FolderPlus, FolderUp, LayoutGrid, List, Trash } from "lucide-react";
 
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { ChoiceMenu, type Choice } from "@/components/common/choice-menu";
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { NameDialog } from "@/components/common/name-dialog";
 import { useFilePicker, useUploadToFolder } from "@/features/import/use-file-picker";
@@ -37,76 +29,24 @@ const SECTION_TITLES: Record<WorkspaceSection, string> = {
   trash: "Trash",
 };
 
-const TYPE_OPTIONS: { value: TypeFilter; label: string }[] = [
-  { value: "any", label: "Any type" },
+const TYPE_OPTIONS: Choice<TypeFilter>[] = [
+  { value: "any", label: "Any type", short: "Type" },
   { value: "folders", label: "Folders" },
   { value: "pdf", label: "PDFs" },
-  { value: "spreadsheets", label: "Spreadsheets (XLSX, CSV)" },
-  { value: "images", label: "Images (PNG, JPG, WebP)" },
+  { value: "spreadsheets", label: "Spreadsheets (XLSX, CSV)", short: "Spreadsheets" },
+  { value: "images", label: "Images (PNG, JPG, WebP)", short: "Images" },
 ];
 
-const MODIFIED_OPTIONS: { value: ModifiedFilter; label: string }[] = [
-  { value: "any", label: "Any time" },
+const MODIFIED_OPTIONS: Choice<ModifiedFilter>[] = [
+  { value: "any", label: "Any time", short: "Modified" },
   { value: "today", label: "Today" },
   { value: "7d", label: "Last 7 days" },
   { value: "30d", label: "Last 30 days" },
-  { value: "year", label: `This year (${new Date().getFullYear()})` },
-  { value: "lastYear", label: `Last year (${new Date().getFullYear() - 1})` },
+  { value: "year", label: `This year (${new Date().getFullYear()})`, short: "This year" },
+  { value: "lastYear", label: `Last year (${new Date().getFullYear() - 1})`, short: "Last year" },
 ];
 
-const SHORT_LABELS: Partial<Record<TypeFilter | ModifiedFilter, string>> = {
-  spreadsheets: "Spreadsheets",
-  images: "Images",
-  year: "This year",
-  lastYear: "Last year",
-};
 
-function chipLabel<T extends TypeFilter | ModifiedFilter>(value: T, options: { value: T; label: string }[], fallback: string) {
-  if (value === "any") return fallback;
-  return SHORT_LABELS[value] ?? options.find((o) => o.value === value)?.label ?? fallback;
-}
-
-function FilterChip<T extends string>({
-  label,
-  active,
-  value,
-  options,
-  onChange,
-  heading,
-}: {
-  label: string;
-  active: boolean;
-  value: T;
-  options: { value: T; label: string }[];
-  onChange: (value: T) => void;
-  heading: string;
-}) {
-  return (
-    <DropdownMenu modal={false}>
-      <DropdownMenuTrigger
-        className={cn(
-          "press inline-flex h-8 shrink-0 items-center gap-1 rounded-lg border px-2.5 text-[13px] font-medium outline-none",
-          active
-            ? "border-salin-primary bg-salin-primary-soft text-salin-primary-ink"
-            : "border-salin-border-strong bg-salin-surface text-salin-text hover:bg-salin-tile",
-        )}
-      >
-        {label}
-        <ChevronDown className="size-3.5" strokeWidth={2.4} />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-60 rounded-xl p-1.5">
-        <DropdownMenuLabel>{heading}</DropdownMenuLabel>
-        <DropdownMenuRadioGroup value={value} onValueChange={(v) => onChange(v as T)}>
-          {options.map((o) => (
-            <DropdownMenuRadioItem key={o.value} value={o.value} className="py-2">
-              {o.label}
-            </DropdownMenuRadioItem>
-          ))}
-        </DropdownMenuRadioGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
 
 /** "Workspace ˅" (or folder name) title menu: new folder / upload files / upload a folder — or empty trash. */
 function SectionMenu({ section, folderId }: { section: WorkspaceSection; folderId: string | null }) {
@@ -221,22 +161,8 @@ export function FilterBar({ section, folderId }: { section: WorkspaceSection; fo
       <SectionMenu section={section} folderId={folderId} />
       <span aria-hidden="true" className="hidden h-5 w-px bg-salin-border-strong sm:block" />
       <div className="order-last flex w-full gap-2 sm:order-none sm:w-auto">
-        <FilterChip
-          heading="Type"
-          label={chipLabel(type, TYPE_OPTIONS, "Type")}
-          active={type !== "any"}
-          value={type}
-          options={TYPE_OPTIONS}
-          onChange={setType}
-        />
-        <FilterChip
-          heading="Modified"
-          label={chipLabel(modified, MODIFIED_OPTIONS, "Modified")}
-          active={modified !== "any"}
-          value={modified}
-          options={MODIFIED_OPTIONS}
-          onChange={setModified}
-        />
+        <ChoiceMenu heading="Type" label="Type" active={type !== "any"} value={type} options={TYPE_OPTIONS} onChange={setType} />
+        <ChoiceMenu heading="Modified" label="Modified" active={modified !== "any"} value={modified} options={MODIFIED_OPTIONS} onChange={setModified} />
       </div>
       <div className="ml-auto">
         <ViewToggle />

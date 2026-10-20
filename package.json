@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@fontsource/inter": "^5.3.0",
+    "@huggingface/transformers": "^4.3.1",
     "@tailwindcss/vite": "^4.3.3",
     "@tesseract.js-data/eng": "^1.0.0",
     "@tesseract.js-data/tgl": "^1.0.0",

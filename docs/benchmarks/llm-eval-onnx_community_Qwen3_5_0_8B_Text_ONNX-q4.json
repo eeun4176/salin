@@ -1,0 +1,350 @@
+{
+  "summary": {
+    "model": "onnx-community/Qwen3.5-0.8B-Text-ONNX",
+    "dtype": "q4",
+    "loadMs": 2792,
+    "commandAccuracy": 0.7916666666666666,
+    "heldOutAccuracy": 0.3333333333333333,
+    "validReplies": 0.9444444444444444,
+    "meanCommandMs": 20680,
+    "fieldAccuracy": 1,
+    "inventedFields": [],
+    "fieldMs": 14023,
+    "files": []
+  },
+  "commands": [
+    {
+      "set": "dev",
+      "request": "Show only dogs",
+      "reply": "{\"action\":\"filter\",\"where\":[{\"column\":\"Species\",\"op\":\"equals\",\"value\":\"Dog\"}],\"match\":\"all\"}",
+      "valid": true,
+      "correct": true,
+      "ms": 21376
+    },
+    {
+      "set": "dev",
+      "request": "Show unvaccinated dogs in Barangay Muzon",
+      "reply": "{\"action\":\"filter\",\"where\":[{\"column\":\"Species\",\"op\":\"equals\",\"value\":\"Dog\"},{\"column\":\"Barangay\",\"op\":\"equals\",\"value\":\"Muzon\"},{\"column\":\"Vaccinated\",\"op\":\"equals\",\"value\":false}],\"match\":\"all\"}",
+      "valid": true,
+      "correct": true,
+      "ms": 27953
+    },
+    {
+      "set": "dev",
+      "request": "sort by owner name",
+      "reply": "{\"action\":\"sort\",\"by\":[{\"column\":\"Owner\",\"direction\":\"asc\"}]}",
+      "valid": true,
+      "correct": true,
+      "ms": 20078
+    },
+    {
+      "set": "dev",
+      "request": "oldest pets first",
+      "reply": "{\"action\":\"sort\",\"by\":[{\"column\":\"Age\",\"direction\":\"asc\"}]}",
+      "valid": true,
+      "correct": false,
+      "ms": 21272
+    },
+    {
+      "set": "dev",
+      "request": "rename Pet name to Name of pet",
+      "reply": "{\"action\":\"rename_column\",\"column\":\"Pet name\",\"to\":\"Name of pet\"}",
+      "valid": true,
+      "correct": true,
+      "ms": 15847
+    },
+    {
+      "set": "dev",
+      "request": "make Age a number column",
+      "reply": "{\"action\":\"change_type\",\"column\":\"Age\",\"to\":\"number\"}",
+      "valid": true,
+      "correct": true,
+      "ms": 13107
+    },
+    {
+      "set": "dev",
+      "request": "how many pets per barangay",
+      "reply": "{\"action\":\"summarize\",\"group_by\":[\"Barangay\"],\"aggregate\":\"count\",\"column\":\"Pet name\"}",
+      "valid": true,
+      "correct": true,
+      "ms": 14235
+    },
+    {
+      "set": "dev",
+      "request": "count dogs and cats",
+      "reply": "{\"action\":\"summarize\",\"group_by\":[\"Species\"],\"aggregate\":\"count\",\"column\":\"Pet name\"}",
+      "valid": true,
+      "correct": true,
+      "ms": 14006
+    },
+    {
+      "set": "dev",
+      "request": "average age by species",
+      "reply": "{\"action\":\"summarize\",\"group_by\":[\"Species\"],\"aggregate\":\"average\",\"column\":\"Age\"}",
+      "valid": true,
+      "correct": true,
+      "ms": 14344
+    },
+    {
+      "set": "dev",
+      "request": "standardize the sex column",
+      "reply": "{\"action\":\"normalize\",\"column\":\"Sex\",\"rule\":\"sex\"}",
+      "valid": true,
+      "correct": true,
+      "ms": 16419
+    },
+    {
+      "set": "dev",
+      "request": "capitalize the owner names properly",
+      "reply": "{\"action\":\"rename_column\",\"column\":\"Owner\",\"to\":\"Owner\"}",
+      "valid": true,
+      "correct": false,
+      "ms": 15333
+    },
+    {
+      "set": "dev",
+      "request": "find duplicate pets",
+      "reply": "{\"action\":\"find_duplicates\",\"columns\":[\"Pet name\"]}",
+      "valid": true,
+      "correct": true,
+      "ms": 22558
+    },
+    {
+      "set": "dev",
+      "request": "mark all cats in Tungkong Mangga as vaccinated",
+      "reply": "{\"action\":\"set_value\",\"column\":\"Vaccinated\",\"value\":true,\"where\":[{\"column\":\"Species\",\"op\":\"equals\",\"value\":\"Cat\"},{\"column\":\"Barangay\",\"op\":\"equals\",\"value\":\"Tungkong Mangga\"}]}",
+      "valid": true,
+      "correct": true,
+      "ms": 30318
+    },
+    {
+      "set": "dev",
+      "request": "delete rows with no owner",
+      "reply": "{\"action\":\"delete_rows\",\"where\":[{\"column\":\"Owner\",\"op\":\"is_empty\"}]}",
+      "valid": true,
+      "correct": true,
+      "ms": 17241
+    },
+    {
+      "set": "dev",
+      "request": "show pets registered after June 30, 2026",
+      "reply": "{\"action\":\"filter\",\"where\":[{\"column\":\"Date registered\",\"op\":\"greater_than\",\"value\":\"2026-06-30\"},{\"column\":\"Species\",\"op\":\"equals\",\"value\":\"Dog\"},{\"column\":\"Sex\",\"op\":\"equals\",\"value\":\"Male\"}],\"match\":\"all\"}",
+      "valid": true,
+      "correct": false,
+      "ms": 41267
+    },
+    {
+      "set": "dev",
+      "request": "Ipakita ang mga aso sa Muzon",
+      "reply": "{\"action\":\"filter\",\"where\":[{\"column\":\"Barangay\",\"op\":\"equals\",\"value\":\"Muzon\"},{\"column\":\"Species\",\"op\":\"equals\",\"value\":\"Dog\"},{\"column\":\"Sex\",\"op\":\"equals\",\"value\":\"Male\"},{\"column\":\"Age\",\"op\":\"greater_than\",\"value\":2},{\"column\":\"Vaccinated\",\"op\":\"equals\",\"value\":\"false\"},{\"column\":\"Date registered\",\"op\":\"greater_than\",\"value\":\"2026-03-14\"}],\"match\":\"all\"}",
+      "valid": true,
+      "correct": false,
+      "ms": 33293
+    },
+    {
+      "set": "dev",
+      "request": "Ilan ang alagang hayop bawat barangay?",
+      "reply": "{\"action\":\"summarize\",\"group_by\":[\"Barangay\"],\"aggregate\":\"count\"}",
+      "valid": true,
+      "correct": true,
+      "ms": 21254
+    },
+    {
+      "set": "dev",
+      "request": "show pets without a contact number",
+      "reply": "{\"action\":\"filter\",\"where\":[{\"column\":\"Contact no.\",\"op\":\"is_empty\"}],\"match\":\"all\"}",
+      "valid": true,
+      "correct": true,
+      "ms": 13999
+    },
+    {
+      "set": "dev",
+      "request": "show female dogs older than 3",
+      "reply": "{\"action\":\"filter\",\"where\":[{\"column\":\"Species\",\"op\":\"equals\",\"value\":\"Dog\"},{\"column\":\"Sex\",\"op\":\"equals\",\"value\":\"Female\"},{\"column\":\"Age\",\"op\":\"greater_than\",\"value\":3}],\"match\":\"all\"}",
+      "valid": true,
+      "correct": true,
+      "ms": 23874
+    },
+    {
+      "set": "dev",
+      "request": "summarize this dataset",
+      "reply": "{\"action\":\"summarize\",\"group_by\":[],\"aggregate\":\"count\"}",
+      "valid": true,
+      "correct": true,
+      "ms": 22731
+    },
+    {
+      "set": "dev",
+      "request": "send this list to my email",
+      "reply": "{\"action\":\"unsupported\",\"reason\":\"Salin can only change or summarize the table on this device.\"}",
+      "valid": true,
+      "correct": true,
+      "ms": 16409
+    },
+    {
+      "set": "dev",
+      "request": "print a bar chart of the species",
+      "reply": "{\"action\":\"unsupported\",\"reason\":\"The request asks for a bar chart, which is a chart type, but the allowed actions are filter, sort, rename_column, change_type, summarize, normalize, set_value, find_duplicates, delete_rows, and unsupported. There is no action for chart generation.\"}",
+      "valid": true,
+      "correct": true,
+      "ms": 27749
+    },
+    {
+      "set": "dev",
+      "request": "Pagsunod-sunurin ayon sa edad",
+      "reply": "{\"action\":\"sort\",\"by\":[{\"column\":\"Age\",\"direction\":\"asc\"}]}",
+      "valid": true,
+      "correct": true,
+      "ms": 16178
+    },
+    {
+      "set": "dev",
+      "request": "change Bantay's species to Cat",
+      "reply": "{\"action\":\"change_type\",\"column\":\"Pet name\",\"to\":\"text\"}",
+      "valid": true,
+      "correct": false,
+      "ms": 21834
+    },
+    {
+      "set": "held-out",
+      "request": "only cats please",
+      "reply": "{\"action\":\"filter\",\"where\":[{\"column\":\"Species\",\"op\":\"equals\",\"value\":\"Cat\"},{\"column\":\"Sex\",\"op\":\"equals\",\"value\":\"Female\"}],\"match\":\"all\"}",
+      "valid": true,
+      "correct": false,
+      "ms": 20824
+    },
+    {
+      "set": "held-out",
+      "request": "list pets from Gaya-gaya that are not vaccinated",
+      "reply": "{\"action\":\"filter\",\"where\":[{\"column\":\"Species\",\"op\":\"equals\",\"value\":\"Cat\"},{\"column\":\"Vaccinated\",\"op\":\"equals\",\"value\":false}],\"match\":\"all\"}",
+      "valid": true,
+      "correct": false,
+      "ms": 24280
+    },
+    {
+      "set": "held-out",
+      "request": "youngest first",
+      "reply": "{\"action\":\"sort\",\"by\":[{\"column\":\"Age\",\"direction\":\"asc\"}]}",
+      "valid": true,
+      "correct": true,
+      "ms": 14978
+    },
+    {
+      "set": "held-out",
+      "request": "how many are vaccinated?",
+      "reply": "{\"action\":\"summarize\",\"group_by\":[],\"aggregate\":\"count\",\"column\":\"Vaccinated\"}",
+      "valid": true,
+      "correct": false,
+      "ms": 19350
+    },
+    {
+      "set": "held-out",
+      "request": "total number of pets per species",
+      "reply": "{\"action\":\"summarize\",\"group_by\":[\"Species\"],\"aggregate\":\"sum\",\"column\":\"Pet name\"}",
+      "valid": false,
+      "correct": false,
+      "ms": 24937
+    },
+    {
+      "set": "held-out",
+      "request": "rename Contact no. to Phone",
+      "reply": "{\"action\":\"rename_column\",\"column\":\"Contact no.\",\"to\":\"Phone\"}",
+      "valid": true,
+      "correct": true,
+      "ms": 15783
+    },
+    {
+      "set": "held-out",
+      "request": "fix the species values",
+      "reply": "{\"action\":\"change_type\",\"column\":\"Species\",\"to\":\"text\"}",
+      "valid": true,
+      "correct": false,
+      "ms": 14836
+    },
+    {
+      "set": "held-out",
+      "request": "remove pets older than 10",
+      "reply": "{\"action\":\"delete_rows\",\"where\":[{\"column\":\"Date registered\",\"op\":\"greater_than\",\"value\":\"2026-08-21\"}]}",
+      "valid": true,
+      "correct": false,
+      "ms": 21421
+    },
+    {
+      "set": "held-out",
+      "request": "set Barangay to Muzon for Juan Dela Cruz",
+      "reply": "{\"action\":\"set_value\",\"column\":\"Barangay\",\"value\":\"Muzon\",\"where\":[{\"column\":\"Owner\",\"op\":\"equals\",\"value\":\"Juan Dela Cruz\"}]}",
+      "valid": true,
+      "correct": true,
+      "ms": 20815
+    },
+    {
+      "set": "held-out",
+      "request": "Ilan ang aso at pusa?",
+      "reply": "{\"action\":\"find_duplicates\",\"columns\":[\"Owner\",\"Pet name\",\"Species\",\"Sex\",\"Date registered\",\"Contact no.\"]}",
+      "valid": true,
+      "correct": false,
+      "ms": 21405
+    },
+    {
+      "set": "held-out",
+      "request": "show dogs registered in 2026",
+      "reply": "{\"action\":\"filter\",\"where\":[{\"column\":\"Species\",\"op\":\"equals\",\"value\":\"Dog\"},{\"column\":\"Date registered\",\"op\":\"greater_than_or_equal\",\"value\":\"2026-03-14\"},{\"column\":\"Date registered\",\"op\":\"greater_than_or_equal\",\"value\":\"2026-07-02\"},{\"column\":\"Date registered\",\"op\":\"greater_than_or_equal\",\"value\":\"2026-08-21\"}],\"match\":\"all\"}",
+      "valid": false,
+      "correct": false,
+      "ms": 27921
+    },
+    {
+      "set": "held-out",
+      "request": "translate this table to Japanese",
+      "reply": "{\"action\":\"unsupported\",\"reason\":\"Unsupported action for this request\"}",
+      "valid": true,
+      "correct": true,
+      "ms": 15265
+    }
+  ],
+  "fieldScores": [
+    {
+      "key": "owner_name",
+      "want": "Juan Dela Cruz",
+      "got": "Juan Dela Cruz",
+      "correct": true
+    },
+    {
+      "key": "address",
+      "want": "Purok 2, Brgy. Muzon",
+      "got": "Purok 2, Brgy. Muzon",
+      "correct": true
+    },
+    {
+      "key": "contact",
+      "want": "0917 555 0142",
+      "got": "0917 555 0142",
+      "correct": true
+    },
+    {
+      "key": "pet_name",
+      "want": "Bantay",
+      "got": "Bantay",
+      "correct": true
+    },
+    {
+      "key": "color",
+      "want": "Brown and white",
+      "got": "Brown and white",
+      "correct": true
+    },
+    {
+      "key": "breed",
+      "want": null,
+      "got": null,
+      "correct": true
+    },
+    {
+      "key": "email",
+      "want": null,
+      "got": null,
+      "correct": true
+    }
+  ],
+  "fieldReply": "{\n  \"owner_name\": \"Juan Dela Cruz\",\n  \"address\": \"Purok 2, Brgy. Muzon\",\n  \"contact\": \"0917 555 0142\",\n  \"pet_name\": \"Bantay\",\n  \"color\": \"Brown and white\",\n  \"breed\": \"\",\n  \"email\": \"\"\n}\n"
+}

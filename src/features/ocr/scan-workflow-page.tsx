@@ -114,13 +114,16 @@ export function ScanWorkflowPage() {
         {current === 2 && (
           <>
             <ReadStep doc={doc} pages={pages} onDone={toReview} />
-            <StepFooter>
+            <StepFooter message={doc.extraction ? undefined : <span className="text-salin-muted">Pick the kind of document, then press <strong className="font-semibold text-salin-text">Read</strong> — or type the values yourself.</span>}>
               <button type="button" onClick={() => go(1)} className="press inline-flex h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold text-salin-text ring-1 ring-salin-border hover:bg-salin-tile">
                 Back
               </button>
-              <button type="button" onClick={toReview} disabled={!doc.extraction} className={primaryButton}>
-                Next: review <ArrowRight className="size-4" />
-              </button>
+              {/* Until something is read, the step's own Read button is the way forward. */}
+              {doc.extraction && (
+                <button type="button" onClick={toReview} className={primaryButton}>
+                  Next: review <ArrowRight className="size-4" />
+                </button>
+              )}
             </StepFooter>
           </>
         )}

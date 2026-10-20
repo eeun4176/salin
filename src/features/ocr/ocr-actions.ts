@@ -9,12 +9,14 @@
  * the datasets.
  */
 
+import { ruleSuggestions, templateRules } from "@/core/ai/suggestions";
 import { errorMessage } from "@/core/storage/errors";
 import { getFileWithBlob, importFiles } from "@/core/storage/repositories/file-repository";
 import { createOcrDocument, findOcrDocumentsForFile, getOcrDocumentOrThrow, getOcrPages, listSavedTemplates, saveOcrDatasets, saveTemplate, updateOcrDocument, type NewPage } from "@/core/storage/repositories/ocr.repository";
 import { splitExtension } from "@/core/storage/names";
 import { BUILTIN_TEMPLATES, GENERIC_TEMPLATE_ID } from "@/core/ocr/templates/builtin-templates";
 import { extractDocument, makeValue } from "@/core/ocr/templates/field-mapping";
+import { suggestTemplates, type TemplateMatch } from "@/core/ocr/templates/template-suggest";
 import { keyFromLabel, type DocumentTemplateDef } from "@/core/ocr/templates/template-schema";
 import { normalize } from "@/core/ocr/layout/geometry";
 import { extractionToDatasets } from "@/core/ocr/review/to-dataset";
@@ -101,10 +103,31 @@ export async function startScanFromIntake(intake: IntakeFile[], folderId: string
 
 const pageNumbers = (pages: OcrPage[]) => pages.map((p, i) => ({ page: i + 1, width: p.width || 1, height: p.height || 1, layout: p.layout, result: p.result }));
 
-/** Maps the read pages onto the scan's template. */
+/** Maps the read pages onto the scan's template, with rule-based suggestions (standard forms, OCR slips) for review. */
 export async function buildExtraction(doc: OcrDocument, pages: OcrPage[]): Promise<Extraction> {
   const template = await templateById(doc.templateId);
-  return extractDocument(template, pageNumbers(pages));
+  const extraction = extractDocument(template, pageNumbers(pages));
+  return { ...extraction, templateVersion: template?.version, suggestions: ruleSuggestions(extraction, templateRules(template, extraction)) };
+}
+
+/** The template that best fits the read pages, when it isn't the one in use (deterministic: labels and headings found). */
+export async function templateSuggestion(doc: OcrDocument, pages: OcrPage[]): Promise<TemplateMatch | null> {
+  if (!pages.some((p) => p.result)) return null;
+  const matches = suggestTemplates(await allTemplates(), pageNumbers(pages));
+  const current = matches.find((m) => m.template.id === doc.templateId);
+  const [best] = matches;
+  // Only when it clearly fits better than the template in use.
+  return best && best.template.id !== doc.templateId && (!current || best.score > current.score + 0.15) ? best : null;
+}
+
+/** Switches a scan to another template and maps the read pages again (corrections made in review are replaced). */
+export async function switchTemplate(doc: OcrDocument, pages: OcrPage[], templateId: string) {
+  try {
+    const extraction = pages.some((p) => p.state === "done") ? await buildExtraction({ ...doc, templateId }, pages) : null;
+    await updateOcrDocument(doc.id, { templateId, extraction });
+  } catch (error) {
+    toast(errorMessage(error, "The template couldn't be changed."));
+  }
 }
 
 /** An empty extraction for typing values from the page by hand (OCR unavailable, or skipped). */
@@ -160,8 +183,12 @@ export async function saveTemplateFromScan(doc: OcrDocument, pages: OcrPage[], n
   }
 }
 
-/** Creates the datasets from a reviewed scan. Resolves to their ids (empty after a reported failure). */
-export async function createScanDatasets(documentId: string, names?: Record<string, string>): Promise<string[]> {
+/**
+ * Creates the datasets from a reviewed scan, with the reviewer's dataset
+ * names and names for unnamed columns (by dataset and column position).
+ * Resolves to their ids (empty after a reported failure).
+ */
+export async function createScanDatasets(documentId: string, names?: Record<string, string>, columnNames?: Record<number, Record<number, string>>): Promise<string[]> {
   try {
     const doc = await getOcrDocumentOrThrow(documentId);
     if (!doc.extraction) throw new Error("Nothing has been read from this scan yet.");
@@ -171,7 +198,11 @@ export async function createScanDatasets(documentId: string, names?: Record<stri
       doc.id,
       doc.name,
       pages.map((p, i) => ({ page: i + 1, fileId: p.fileId, pdfPage: p.pdfPage, width: p.width || 1, height: p.height || 1 })),
-    ).map((d, i) => ({ ...d, name: names?.[i] ?? d.name }));
+    ).map((d, i) => ({
+      ...d,
+      name: names?.[i] ?? d.name,
+      content: { ...d.content, columns: d.content.columns.map((c, j) => (columnNames?.[i]?.[j]?.trim() ? { ...c, name: columnNames[i][j].trim() } : c)) },
+    }));
     const created = await saveOcrDatasets(documentId, drafts);
     return created.map((d) => d.id);
   } catch (error) {

@@ -12,6 +12,7 @@
 import { prepareImage } from "@/core/ocr/imaging/imaging-client";
 import type { PreparedImage } from "@/core/ocr/imaging/imaging-ops";
 import { UnreadableImageError } from "@/core/ocr/imaging/image-io";
+import { aiRuntime } from "@/core/ai/ai-runtime";
 import { ocrRuntime } from "@/core/ocr/engine/ocr-runtime";
 import type { EngineConfig } from "@/core/ocr/engine/ocr-engine";
 import { analyzeLayout } from "@/core/ocr/layout/layout-analysis";
@@ -158,6 +159,8 @@ export function readDocument(documentId: string, options: ReadOptions): Promise<
       if (!options.force && (await upToDate(page, options.config))) continue;
       pages.push(page);
     }
+    // OCR and the AI models never sit in memory together (phones).
+    if (pages.length) await aiRuntime.unload();
     for (const [index, page] of pages.entries()) {
       const report = (stage: ReadStage, fraction: number, detail?: string) =>
         options.onProgress?.({ index, count: pages.length, pageId: page.id, stage, fraction: (index + Math.min(1, fraction)) / pages.length, detail });

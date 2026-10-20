@@ -15,7 +15,7 @@ import { MAX_COLUMN_NAME_LENGTH } from "@/core/processing/dataset-validator";
 import { normalize, union } from "@/core/ocr/layout/geometry";
 import { parseFormBoolean, parseFormDate } from "@/core/ocr/templates/text-match";
 import type { Box, ExtractedValue, Extraction, FieldSpec, FieldType } from "@/types/ocr";
-import type { CellValue, ColumnType, DatasetColumn, DatasetContent, DatasetRowDraft, SourceReference } from "@/types/processing";
+import type { CellValue, ColumnType, DatasetColumn, DatasetContent, DatasetRowDraft, OcrSourceReference, SourceReference } from "@/types/processing";
 
 export interface PageRef {
   /** 1-based page within the OCR document. */
@@ -58,11 +58,13 @@ function sourceFor(documentId: string, pageRef: PageRef | undefined, page: numbe
   if (!pageRef) return null;
   const cells: Record<string, Box> = {};
   const original: Record<string, string> = {};
+  const suggested: NonNullable<OcrSourceReference["suggested"]> = {};
   specs.forEach((_, i) => {
     const value = values[i];
     if (!value) return;
     if (value.box) cells[columns[i].id] = normalize(value.box, pageRef.width, pageRef.height);
     if (value.edited && value.ocrText !== null && value.ocrText !== value.text) original[columns[i].id] = value.ocrText;
+    if (value.suggestedBy) suggested[columns[i].id] = value.suggestedBy;
   });
   const boxes = values.map((v) => v?.box).filter((b): b is Box => Boolean(b));
   const region = rowBox ?? (boxes.length ? union(boxes) : null);
@@ -72,7 +74,7 @@ function sourceFor(documentId: string, pageRef: PageRef | undefined, page: numbe
     sheet: null,
     row: rowNumber,
     range: null,
-    ocr: { documentId, page, region: region ? normalize(region, pageRef.width, pageRef.height) : null, cells, original },
+    ocr: { documentId, page, region: region ? normalize(region, pageRef.width, pageRef.height) : null, cells, original, ...(Object.keys(suggested).length ? { suggested } : {}) },
   };
 }
 
@@ -88,18 +90,32 @@ function build(specs: FieldSpec[], records: { page: number; box: Box | null; val
   return generic ? inferColumnTypes({ columns, rows }) : { columns, rows };
 }
 
+/** Share of fields two pages have in common (Jaccard). */
+function sharedShare(a: Set<string>, b: Set<string>) {
+  const common = [...a].filter((k) => b.has(k)).length;
+  return common / Math.max(1, new Set([...a, ...b]).size);
+}
+
 /** One dataset per kind of output. Names: the document name, plus the table's label when there are several. */
 export function extractionToDatasets(extraction: Extraction, documentId: string, name: string, pages: PageRef[]): DatasetDraft[] {
   const generic = extraction.templateId === "generic";
   const drafts: { label: string; content: DatasetContent; pages: number[] }[] = [];
 
-  if (extraction.forms.length) {
-    // Union of fields across pages, in first-seen order (generic pages can differ).
-    const specs: FieldSpec[] = [];
-    for (const form of extraction.forms) for (const f of form.fields) if (!specs.some((s) => s.key === f.key)) specs.push(f);
-    const records = extraction.forms.map((form) => ({ page: form.page, box: null, values: specs.map((s) => form.fields.find((f) => f.key === s.key)?.value) }));
-    drafts.push({ label: "Forms", content: build(specs, records, documentId, pages, generic), pages: extraction.forms.map((f) => f.page) });
+  // Form pages with mostly different fields (different layouts in generic mode) become separate datasets, not one merged table.
+  const formGroups: Extraction["forms"][] = [];
+  for (const form of extraction.forms) {
+    const keys = new Set(form.fields.map((f) => f.key));
+    const group = formGroups.find((g) => sharedShare(keys, new Set(g.flatMap((x) => x.fields.map((f) => f.key)))) >= 0.5);
+    if (group) group.push(form);
+    else formGroups.push([form]);
   }
+  formGroups.forEach((forms, i) => {
+    // Union of fields across the group's pages, in first-seen order.
+    const specs: FieldSpec[] = [];
+    for (const form of forms) for (const f of form.fields) if (!specs.some((s) => s.key === f.key)) specs.push(f);
+    const records = forms.map((form) => ({ page: form.page, box: null, values: specs.map((s) => form.fields.find((f) => f.key === s.key)?.value) }));
+    drafts.push({ label: formGroups.length > 1 ? `Forms ${i + 1}` : "Forms", content: build(specs, records, documentId, pages, generic), pages: forms.map((f) => f.page) });
+  });
   for (const set of extraction.tables) {
     if (set.rows.length === 0) continue;
     const records = set.rows.map((row) => ({ page: row.page, box: row.box, values: set.columns.map((c) => row.cells[c.key]) }));

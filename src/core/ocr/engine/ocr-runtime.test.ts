@@ -110,6 +110,7 @@ describe("profile choice", () => {
     wasmRelaxedSimd: false,
     wasmThreads: false,
     webGpu: "unsupported",
+    webGpuF16: false,
     workers: true,
     offscreenCanvas: true,
     deviceMemoryGb: 8,
@@ -146,7 +147,8 @@ class FakeCache {
     return r?.clone();
   }
   async put(key: string, response: Response) {
-    this.store.set(key, response);
+    // Like the real Cache API: the body is read completely (a failing stream rejects the put).
+    this.store.set(key, new Response(await response.arrayBuffer(), { headers: response.headers }));
   }
   async delete(key: string | Request) {
     return this.store.delete(typeof key === "string" ? key : key.url);

@@ -4,7 +4,9 @@
  * request), workspace backup & restore, privacy controls (delete all data
  * on this device), appearance (light / dark / match device theme,
  * comfortable / compact density), and text recognition (OCR files, profile,
- * languages, device check and benchmark).
+ * languages, device check and benchmark), and on-device AI (mode, optional
+ * handwriting and assistant models, integrity checks, AI benchmark), and
+ * document templates (copy, edit, version, delete).
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -25,6 +27,8 @@ import {
 } from "lucide-react";
 
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
+import { AiSettingsCard } from "@/features/settings/ai-settings-card";
+import { TemplatesCard } from "@/features/settings/templates-card";
 import { OcrSettingsCard } from "@/features/settings/ocr-settings-card";
 import { SectionCard } from "@/features/settings/section-card";
 import { PageFrame } from "@/components/layout/page-frame";
@@ -246,6 +250,8 @@ export function SettingsPage() {
       <div className="space-y-5">
         <StorageCard />
         <OcrSettingsCard />
+        <AiSettingsCard />
+        <TemplatesCard />
         <BackupCard />
         <PrivacyCard />
         <AppearanceCard />

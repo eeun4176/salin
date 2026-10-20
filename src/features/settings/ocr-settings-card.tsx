@@ -64,7 +64,7 @@ function Benchmark() {
 
   useEffect(() => {
     void listBenchmarks().then((rows) => {
-      const list = rows.map((r) => r.report as BenchmarkReport).filter((r) => r?.version === 1);
+      const list = rows.map((r) => r.report as BenchmarkReport).filter((r) => r?.version === 1 && "profile" in r);
       setReports(list);
       const standard = list.find((r) => r.profile === "standard");
       if (standard) setBenchmarkSeconds(standard.readMs[1] / 1000);

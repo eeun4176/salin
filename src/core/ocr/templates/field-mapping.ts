@@ -297,9 +297,16 @@ function genericExtraction(pages: MappingPage[], warnings: string[]): Pick<Extra
   for (const page of pages) {
     const layout = page.layout;
     if (!layout) continue;
-    if (layout.keyValues.length) {
+    // Repeated records on one page (the first label comes back: another owner block) become separate records.
+    const blocks: KeyValue[][] = [];
+    const firstKey = layout.keyValues[0] ? keyFromLabel(layout.keyValues[0].label) : "";
+    for (const kv of layout.keyValues) {
+      if (!blocks.length || (keyFromLabel(kv.label) === firstKey && blocks.at(-1)!.length > 1)) blocks.push([]);
+      blocks.at(-1)!.push(kv);
+    }
+    for (const block of blocks) {
       const seen = new Map<string, number>();
-      const fields = layout.keyValues.map((kv): ExtractedField => {
+      const fields = block.map((kv): ExtractedField => {
         let key = keyFromLabel(kv.label);
         const n = (seen.get(key) ?? 0) + 1;
         seen.set(key, n);
@@ -339,7 +346,7 @@ function genericExtraction(pages: MappingPage[], warnings: string[]): Pick<Extra
   }
   if (textRows.rows.length) tables.push(textRows);
   if (forms.length > 1 && new Set(forms.map((f) => f.fields.map((x) => x.key).join("|"))).size > 1) {
-    warnings.push("The pages have different fields; each page becomes one record and missing fields stay empty.");
+    warnings.push("The pages have different fields. Pages with mostly the same fields are saved together (missing fields stay empty); pages laid out differently become separate datasets.");
   }
   return { forms, tables };
 }

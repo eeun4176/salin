@@ -48,6 +48,8 @@ export const sourceReferenceSchema = z.object({
       region: normalizedBox.nullable(),
       cells: z.record(z.string(), normalizedBox),
       original: z.record(z.string(), z.string()),
+      // Phase 5: values accepted from rule, handwriting or assistant suggestions.
+      suggested: z.record(z.string(), z.enum(["rule", "handwriting", "ai"])).optional(),
     })
     .optional(),
 });

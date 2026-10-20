@@ -21,9 +21,9 @@ export { workerScriptUrl };
 export type AssetId = "core-relaxed-simd" | "core-simd" | "core-basic" | "lang-eng" | "lang-tgl";
 
 export interface ModelAsset {
-  id: AssetId;
+  id: AssetId | string;
   label: string;
-  kind: "engine" | "language";
+  kind: "engine" | "language" | "ai";
   url: string;
   /** Download size in bytes. */
   bytes: number;
