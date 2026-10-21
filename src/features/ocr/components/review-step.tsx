@@ -1,12 +1,16 @@
 /**
  * Review Step
- * Step 3 of reading a scan: the page beside the extracted values. Selecting
+ * Step 2 of reading a scan ("Check & save"): first, "What do you need?" —
+ * name the columns (or tap labels found on the page, or a set used before)
+ * and only those are kept, found by label, then by the on-device assistant
+ * when it's set up. Then the page beside the extracted values. Selecting
  * a value highlights where it came from on the page; every value shows its
  * review state (Ready, Needs review, Unreadable, Missing), OCR confidence
  * and mapping confidence separately, and why it needs a look. Values can be
- * typed, checked, or re-assigned by tapping text on the page; table records
- * can be added, removed, or rebuilt by drawing the table's area. Required
- * values must be resolved before continuing. Suggestions (rules, the
+ * typed, checked, or re-assigned by tapping text on the page (a list fills
+ * cell after cell); table records can be added, removed, or rebuilt by
+ * drawing the table's area. Required values must be resolved before
+ * saving, which creates the datasets and opens them. Suggestions (rules, the
  * handwriting reader, the on-device assistant) are listed with Use / Edit /
  * Dismiss and shown beside their values; the optional AI tools add more.
  * Corrections are saved as you go, and what OCR originally read is kept for
@@ -14,24 +18,32 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, ArrowRight, BookmarkPlus, Info, TriangleAlert } from "lucide-react";
+import { Link, useNavigate } from "react-router";
+import { ArrowLeft, BookmarkPlus, Crop, Info, LoaderCircle, Save, TriangleAlert } from "lucide-react";
 
+import { ColumnsBar, type ColumnSet } from "@/components/common/columns-bar";
 import { primaryButton, secondaryButton, StepFooter } from "@/components/common/step-footer";
 import { NameDialog } from "@/components/common/name-dialog";
 import { phrases, tableFromRegion } from "@/core/ocr/layout/layout-analysis";
-import { addRow, confirmValue, editValue, reassignValue, refKey, removeRow, reviewItems, stateCounts, unresolvedCritical, valueState, type ValueRef } from "@/core/ocr/review/review-state";
+import { extractionToDatasets } from "@/core/ocr/review/to-dataset";
+import { addRow, confirmValue, editValue, reassignValue, refKey, removeRow, reviewItems, splitCellId, stateCounts, unresolvedCritical, valueState, type ValueRef } from "@/core/ocr/review/review-state";
 import { builtinTemplate } from "@/core/ocr/templates/builtin-templates";
 import { recordsFromTable } from "@/core/ocr/templates/field-mapping";
+import { REQUESTED_PREFIX, type RecordShape } from "@/core/ocr/templates/requested-columns";
 import { errorMessage } from "@/core/storage/errors";
 import { updateOcrDocument } from "@/core/storage/repositories/ocr.repository";
 import { PageViewer, type Overlay, type OverlayTone, type PickableWord } from "@/features/ocr/components/page-viewer";
 import { FieldRow, RecordTable, StateChip } from "@/features/ocr/components/review-parts";
+import { findFields } from "@/features/ai/ai-actions";
 import { AiTools, SuggestionCard, SuggestionsPanel } from "@/features/ai/components/review-assist";
+import { useAiRun } from "@/features/ai/use-ai-run";
 import { TemplateHint } from "@/features/ocr/components/template-hint";
 import { acceptSuggestion, pendingSuggestions, refLabel, rejectSuggestion } from "@/core/ai/suggestions";
 import { useObjectUrls } from "@/features/ocr/hooks/use-scan";
-import { saveTemplateFromScan, templateById } from "@/features/ocr/ocr-actions";
+import { createScanDatasets, extractColumns, pageHints, recentColumnSets, saveTemplateFromScan, templateById } from "@/features/ocr/ocr-actions";
 import { ensureProcessed } from "@/features/ocr/ocr-runner";
+import { datasetUrl } from "@/features/processing/hooks/use-document-processing";
+import { useAiFeature } from "@/stores/ai-store";
 import { toast } from "@/stores/toast-store";
 import { cn } from "@/lib/utils";
 import type { Box, Extraction, OcrDocument, OcrPage, ReviewState } from "@/types/ocr";
@@ -43,18 +55,28 @@ interface ReviewStepProps {
   doc: OcrDocument;
   pages: OcrPage[];
   onBack: () => void;
-  onNext: () => void;
+  onFixPages: () => void;
 }
 
-export function ReviewStep({ doc, pages, onBack, onNext }: ReviewStepProps) {
+/** The columns of an extraction made from requested columns (to show them in the bar again). */
+function askedColumns(extraction: Extraction): string[] {
+  if (!extraction.templateId.startsWith(REQUESTED_PREFIX)) return [];
+  return (extraction.forms[0]?.fields ?? extraction.tables[0]?.columns ?? []).map((c) => c.label);
+}
+
+export function ReviewStep({ doc, pages, onBack, onFixPages }: ReviewStepProps) {
   const [extraction, setExtraction] = useState<Extraction>(() => doc.extraction!);
   const [selected, setSelected] = useState<string | null>(null);
   const [pageIndex, setPageIndex] = useState(0);
   const [picking, setPicking] = useState<ValueRef | null>(null);
   const [drawing, setDrawing] = useState<number | null>(null);
+  const [filling, setFilling] = useState<number | null>(null);
+  const [cell, setCell] = useState<ValueRef | null>(null);
   const [attentionOnly, setAttentionOnly] = useState(false);
   const [showProblems, setShowProblems] = useState(false);
   const [naming, setNaming] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const navigate = useNavigate();
 
   // Save corrections shortly after each change (and right away when leaving).
   const pending = useRef<Extraction | null>(null);
@@ -111,16 +133,74 @@ export function ReviewStep({ doc, pages, onBack, onNext }: ReviewStepProps) {
   const select = (ref: ValueRef) => {
     const key = refKey(ref);
     setSelected(key);
+    if (ref.kind === "table") setCell(ref);
     const item = items.find((i) => refKey(i.ref) === key);
     if (item?.value.page) setPageIndex(item.value.page - 1);
   };
 
-  const onPick = (word: PickableWord) => {
-    if (!picking) return;
-    change((x) => reassignValue(x, picking, { text: word.text, confidence: word.confidence, page: pageIndex + 1, box: word.box }));
-    setSelected(refKey(picking));
-    setPicking(null);
+  /** The cell after this one in its table (next column, then the next record's first column). */
+  const nextCell = (ref: ValueRef): ValueRef | null => {
+    const set = extraction.tables[ref.group];
+    const [rowId, key] = splitCellId(ref.id);
+    const r = set.rows.findIndex((row) => row.id === rowId);
+    const c = set.columns.findIndex((col) => col.key === key);
+    const [row, col] = c + 1 < set.columns.length ? [set.rows[r], set.columns[c + 1]] : [set.rows[r + 1], set.columns[0]];
+    return row && col ? { kind: "table", group: ref.group, id: `${row.id}:${col.key}` } : null;
   };
+  const fillTarget = filling !== null && cell?.group === filling ? cell : null;
+
+  const onPick = (word: PickableWord) => {
+    const target = picking ?? fillTarget;
+    if (!target) return;
+    change((x) => reassignValue(x, target, { text: word.text, confidence: word.confidence, page: pageIndex + 1, box: word.box }));
+    if (picking) {
+      setSelected(refKey(picking));
+      setPicking(null);
+      return;
+    }
+    const next = nextCell(target);
+    setCell(next);
+    setSelected(next && refKey(next));
+    if (!next) toast("That was the last cell. Add a row to fill in more.");
+  };
+
+  // "What do you need?": only the columns asked for; the assistant then looks for values that have no printed label.
+  const assistant = useAiFeature("assistant");
+  const ai = useAiRun(change);
+  const hints = useMemo(() => pageHints(pages), [pages]);
+  const [shape, setShape] = useState<RecordShape>(() => (askedColumns(extraction).length ? (extraction.forms.length ? "form" : "table") : hints.shape));
+  const [recent, setRecent] = useState<ColumnSet[]>([]);
+  const [extracting, setExtracting] = useState(false);
+  const [needsAssistant, setNeedsAssistant] = useState(false);
+  useEffect(() => {
+    let active = true;
+    void recentColumnSets().then((sets) => active && setRecent(sets));
+    return () => {
+      active = false;
+    };
+  }, [extraction.templateId]);
+
+  async function extract(labels: string[], as: RecordShape = shape) {
+    setExtracting(true);
+    await flush();
+    const next = await extractColumns(doc, pages, labels, as);
+    setExtracting(false);
+    if (!next) return;
+    // Same id: the review stays open with the new columns (and saves them).
+    change((current) => ({ ...next, id: current.id }));
+    setPicking(null);
+    setFilling(null);
+    setCell(null);
+    setSelected(null);
+    const empty = as === "form" && pages.some((p) => p.result) && next.forms.some((f) => f.fields.some((x) => !x.value.text.trim()));
+    setNeedsAssistant(empty && !assistant.ready);
+    if (empty && assistant.ready) void ai.run("Looking for the other values", (o) => findFields(next, pages, null, assistant.variant, o));
+  }
+
+  const drafts = useMemo(
+    () => extractionToDatasets(extraction, doc.id, doc.name, pages.map((p, i) => ({ page: i + 1, fileId: p.fileId, pdfPage: p.pdfPage, width: p.width || 1, height: p.height || 1 }))).length,
+    [extraction, doc.id, doc.name, pages],
+  );
 
   const onDraw = async (box: Box) => {
     if (drawing === null || !page?.result) return;
@@ -148,7 +228,7 @@ export function ReviewStep({ doc, pages, onBack, onNext }: ReviewStepProps) {
     }
   }
 
-  const next = () => {
+  async function save() {
     if (critical.length) {
       setShowProblems(true);
       setAttentionOnly(true);
@@ -156,8 +236,16 @@ export function ReviewStep({ doc, pages, onBack, onNext }: ReviewStepProps) {
       document.querySelector(`[data-ref="${refKey(critical[0].ref)}"]`)?.scrollIntoView({ block: "center", behavior: "smooth" });
       return;
     }
-    void flush().then(onNext);
-  };
+    setSaving(true);
+    await flush();
+    const ids = await createScanDatasets(doc.id);
+    setSaving(false);
+    if (ids.length === 1) navigate(datasetUrl(ids[0]));
+    else if (ids.length > 1) {
+      toast(`Created ${ids.length} datasets from “${doc.name}”.`);
+      navigate("/datasets");
+    }
+  }
   const back = () => void flush().then(onBack);
 
   const pageImage = (n: number | null) => (n && pages[n - 1] ? { src: urls[n - 1], width: pages[n - 1].width, height: pages[n - 1].height } : null);
@@ -243,7 +331,7 @@ export function ReviewStep({ doc, pages, onBack, onNext }: ReviewStepProps) {
               label={`Page ${pageIndex + 1} of ${pages.length}`}
               overlays={overlays}
               selectedId={selected}
-              mode={picking ? "pick" : drawing !== null ? "draw" : "view"}
+              mode={picking || fillTarget ? "pick" : drawing !== null ? "draw" : "view"}
               words={words}
               onPick={onPick}
               onDraw={(box) => void onDraw(box)}
@@ -254,17 +342,43 @@ export function ReviewStep({ doc, pages, onBack, onNext }: ReviewStepProps) {
               className="h-[min(48vh,30rem)] lg:h-[calc(100vh-8rem)]"
             />
           )}
-          {(picking || drawing !== null) && (
+          {(picking || drawing !== null || filling !== null) && (
             <p className="mt-2 text-sm text-salin-muted" aria-live="polite">
-              {picking ? "Tap the words on the page that belong to this field." : "Drag a box around the whole table, including its headings."}{" "}
-              <button type="button" onClick={() => (setPicking(null), setDrawing(null))} className="font-semibold text-salin-primary hover:underline">
-                Cancel
+              {picking ? "Tap the words on the page that belong to this field." : drawing !== null ? "Drag a box around the whole table, including its headings." : fillTarget ? `Tap the words for ${refLabel(extraction, fillTarget)}.` : "Pick a cell in the table, then tap its words on the page."}{" "}
+              <button type="button" onClick={() => (setPicking(null), setDrawing(null), setFilling(null))} className="font-semibold text-salin-primary hover:underline">
+                {filling !== null ? "Done" : "Cancel"}
               </button>
             </p>
           )}
+          <button type="button" onClick={() => void flush().then(onFixPages)} className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-salin-primary hover:underline">
+            <Crop className="size-4" /> Fix pages (crop, rotate)
+          </button>
         </div>
 
         <div className="min-w-0 space-y-5">
+          <ColumnsBar
+            key={extraction.templateId}
+            title={`What do you need from ${pages.length === 1 ? "this page" : "these pages"}?`}
+            description="Name the columns you want — only those are kept. Or leave this and keep everything that was found."
+            initial={askedColumns(extraction)}
+            found={hints.labels}
+            recent={recent}
+            shape={shape}
+            onShape={setShape}
+            busy={extracting || ai.busy}
+            onSubmit={(labels, as) => void extract(labels, as)}
+          >
+            {ai.status}
+            {needsAssistant && !ai.busy && (
+              <p className="text-xs text-salin-muted">
+                Values without a printed label stay empty — type them or tap them on the page. The on-device assistant can look for them:{" "}
+                <Link to="/settings#ai-heading" className="font-semibold text-salin-primary hover:underline">
+                  set it up in Settings
+                </Link>
+                .
+              </p>
+            )}
+          </ColumnsBar>
           <AiTools extraction={extraction} pages={pages} generic={extraction.templateId === "generic"} onResult={change} />
           <SuggestionsPanel extraction={extraction} pageImage={pageImage} onChange={change} onSelect={(key) => setSelected(key)} />
           {extraction.forms.map((form, g) => {
@@ -313,6 +427,17 @@ export function ReviewStep({ doc, pages, onBack, onNext }: ReviewStepProps) {
               suggested={suggestions}
               attentionOnly={attentionOnly}
               drawing={drawing === g}
+              filling={filling === g}
+              onFill={() => {
+                setPicking(null);
+                setDrawing(null);
+                setFilling(filling === g ? null : g);
+                if (filling !== g && cell?.group !== g && set.rows[0]) {
+                  const first: ValueRef = { kind: "table", group: g, id: `${set.rows[0].id}:${set.columns[0].key}` };
+                  setCell(first);
+                  setSelected(refKey(first));
+                }
+              }}
               onSelect={select}
               onChange={(ref, text) => change((x) => editValue(x, ref, text))}
               onConfirmRow={(rowId) => change((x) => set.columns.reduce((acc, c) => confirmValue(acc, { kind: "table", group: g, id: `${rowId}:${c.key}` }), x))}
@@ -320,6 +445,7 @@ export function ReviewStep({ doc, pages, onBack, onNext }: ReviewStepProps) {
               onAddRow={() => change((x) => addRow(x, g, pageIndex + 1))}
               onRedraw={() => {
                 setPicking(null);
+                setFilling(null);
                 setDrawing(drawing === g ? null : g);
               }}
             />
@@ -373,15 +499,15 @@ export function ReviewStep({ doc, pages, onBack, onNext }: ReviewStepProps) {
               {counts.needs_review + counts.unreadable} optional value{counts.needs_review + counts.unreadable === 1 ? "" : "s"} still unchecked — you can fix them later in the dataset.
             </span>
           ) : (
-            <span className="text-salin-muted">Everything has been checked.</span>
+            <span className="text-salin-muted">{drafts === 0 ? "Nothing to save yet — fill in what's on the page." : "Everything has been checked."}</span>
           )
         }
       >
         <button type="button" onClick={back} className={secondaryButton}>
           <ArrowLeft className="size-4" /> Back
         </button>
-        <button type="button" onClick={next} className={primaryButton}>
-          Next: save <ArrowRight className="size-4" />
+        <button type="button" onClick={() => void save()} disabled={saving || drafts === 0} className={primaryButton}>
+          {saving ? <LoaderCircle className="size-4 animate-spin" /> : <Save className="size-4" />} {drafts > 1 ? `Save ${drafts} datasets` : "Save dataset"}
         </button>
       </StepFooter>
 

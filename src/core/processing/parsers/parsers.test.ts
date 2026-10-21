@@ -59,13 +59,14 @@ describe("text parser", () => {
 });
 
 describe("Excel parser", () => {
-  it("reads every non-empty sheet as displayed text", async () => {
-    const bytes = workbook({ Records: [["Name", "Count"], ["林", 3]], Empty: [], Later: [["Name"], ["Ben"]] });
+  it("reads the main table as displayed text, with same-shaped tables from other sheets; differently shaped ones are left out", async () => {
+    const bytes = workbook({ Records: [["Name", "Count"], ["林", 3], ["Ana", 2]], Empty: [], More: [["Name", "Count"], ["Ben", 1]], Later: [["Name"], ["Ben"]] });
     const result = await parseXlsx(input("records.xlsx", bytes), context());
     expect(result.tables.map((t) => [t.sheet, t.rows])).toEqual([
-      ["Records", [["Name", "Count"], ["林", "3"]]],
-      ["Later", [["Name"], ["Ben"]]],
+      ["Records", [["Name", "Count"], ["林", "3"], ["Ana", "2"]]],
+      ["More", [["Name", "Count"], ["Ben", "1"]]],
     ]);
+    expect(result.warnings.join(" ")).toMatch(/different shapes.*Extract data/);
   });
 
   it("rejects damaged or mislabeled workbooks", async () => {

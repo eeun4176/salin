@@ -29,6 +29,7 @@ capture / upload ─► Prepare (worker) ─► Read (Tesseract worker) ─► L
                          speckle removal               (blank/unreadable)     headings, issues   regions          pick, redraw table
 ```
 
+- **Two screens for the user.** *Read* starts by itself once the recognition files are on the device: page edges are found on photos, every page is read, and a template that clearly fits (score ≥ 0.6) is picked. Prepare is optional, behind "Fix pages". *Check & save* starts with "What do you need?". The user names columns or taps labels found on the page, says whether each page is one record or a list, and gets only those columns (`core/ocr/templates/requested-columns.ts`). The columns are saved as an `asked-*` template, which is offered again under "Used before". If a list's headings don't match, it is filled by column position, with a warning. With the assistant set up, form values that have no printed label are looked for and offered as suggestions. "Save dataset" creates the datasets directly. Unnamed columns are named from their values where possible.
 - **Originals are never changed.** Captured photos are saved to the workspace first. Each scan page stores its edits and a separate *processed* image; PDF pages store their rendering.
 - **Nothing is re-done unnecessarily.** A page is only re-prepared when its edits change, and only re-read when its image or the engine settings change. The engine starts once and is reused, shared by concurrent callers, restarted after a cancel or a change of languages, and shut down after a minute idle. A scan can't be read twice at once.
 - **Orientation.** EXIF orientation is applied on decode. A page whose text seems to run sideways, or that reads poorly, is also read turned (90°/270°, or 180°), and the better reading is kept.
@@ -45,7 +46,7 @@ capture / upload ─► Prepare (worker) ─► Read (Tesseract worker) ─► L
 | `src/core/ocr/models/` | Capabilities & profiles, model assets, model manager (Cache Storage) |
 | `src/core/ocr/engine/` | Engine interface, Tesseract engine, runtime (start-once, queue, idle shutdown) |
 | `src/core/ocr/layout/` | Layout analysis (ruled/aligned tables, fields, checkboxes, headings, columns) |
-| `src/core/ocr/templates/` | Template schema (zod), built-in vet templates, label matching, field mapping |
+| `src/core/ocr/templates/` | Template schema (zod), built-in vet templates, label matching, field mapping, requested columns |
 | `src/core/ocr/review/` | Review states and edits; conversion to Phase 3 datasets |
 | `src/core/ocr/benchmark/` | CER / WER / field accuracy |
 | `src/core/storage/repositories/ocr.repository.ts` | Scans, pages, templates, benchmarks; saving datasets |

@@ -1,0 +1,11 @@
+{
+  "environment": "Chrome on development laptop",
+  "source": "contact-form.png",
+  "engine": "real Tesseract.js through the scan workflow",
+  "offlineAnswer": true,
+  "question": "What is the contact number?",
+  "expected": "09171234567",
+  "exactMatch": true,
+  "citationCorrect": true,
+  "latencyMs": 175.93990000000122
+}

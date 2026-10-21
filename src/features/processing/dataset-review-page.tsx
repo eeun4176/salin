@@ -5,7 +5,8 @@
  * "Mark as reviewed", a note when cells need attention (with a filter to just
  * those rows), any notes from reading the files, and the editable table.
  * Datasets read from a scan link back to it, and their rows' "view source"
- * shows the scanned page with the row's region highlighted. Transform
+ * shows the scanned page with the row's region highlighted. "What do you
+ * need?" keeps only the columns named or tapped. Transform
  * (manual) and Ask (the on-device assistant, in plain words) both produce a
  * validated command shown in a preview; applied changes can be undone, and
  * filters show a view of matching rows without changing anything.
@@ -15,6 +16,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router";
 import { Check, ChevronDown, CircleAlert, Download, Filter, LoaderCircle, RotateCcw, Undo2, Wand2, X } from "lucide-react";
 
+import { ColumnsBar } from "@/components/common/columns-bar";
 import { PageFrame } from "@/components/layout/page-frame";
 import {
   DropdownMenu,
@@ -306,6 +308,20 @@ export function DatasetReviewPage() {
           </button>
         </div>
       ) : null}
+
+      {review.draft.columns.length > 1 && (
+        <div className="mt-4">
+          <ColumnsBar
+            key={review.draft.columns.map((c) => c.id).join("|")}
+            title="What do you need from this data?"
+            description="Name or tap the columns to keep — the others are removed (you'll see a preview, and can undo it)."
+            initial={[]}
+            found={review.draft.columns.map((c) => c.name)}
+            busy={false}
+            onSubmit={(labels) => previewCommand({ action: "keep_columns", columns: labels }, false)}
+          />
+        </div>
+      )}
 
       <div className="mt-4 grid gap-2 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-start">
         <div className="flex gap-2">

@@ -1,18 +1,25 @@
 /**
  * Import Page (/import)
  * Drag-and-drop or browse for files and whole folders, review the queue,
- * then save everything into a chosen workspace folder (folder structure is
- * kept) or hand the files to Ask Salin AI.
+ * then Extract data (the files are saved to the workspace and read: photos
+ * and PDFs with text recognition, spreadsheets and text as data), save
+ * everything into a chosen workspace folder (folder structure is kept), or
+ * hand the files to Ask Salin AI.
  */
 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
-import { CheckCircle2, CloudUpload, FileUp, FolderInput, FolderUp, ShieldCheck, Sparkles, X } from "lucide-react";
+import { CheckCircle2, CloudUpload, FileUp, FolderInput, FolderUp, LoaderCircle, ShieldCheck, Sparkles, Table2, X } from "lucide-react";
 
 import { PageFrame } from "@/components/layout/page-frame";
 import { FILE_KIND_META } from "@/components/brand/file-kinds";
 import { FileTypeIcon } from "@/components/brand/file-type-icon";
+import { errorMessage } from "@/core/storage/errors";
+import { importFiles } from "@/core/storage/repositories/file-repository";
 import { useFilePicker, useQueueFiles } from "@/features/import/use-file-picker";
+import { OCR_KINDS, scanUrl, startScanFromIntake } from "@/features/ocr/ocr-actions";
+import { chooseTablesUrl, datasetUrl } from "@/features/processing/hooks/use-document-processing";
+import { extractData } from "@/features/processing/processing-actions";
 import { FolderPickerDialog } from "@/features/workspace/components/folder-picker-dialog";
 import { formatBytes } from "@/features/workspace/query";
 import type { FileKind } from "@/features/workspace/types";
@@ -74,6 +81,41 @@ export function ImportPage() {
   const navigate = useNavigate();
   const [dragging, setDragging] = useState(false);
   const [choosingFolder, setChoosingFolder] = useState(false);
+
+  const [extracting, setExtracting] = useState(false);
+
+  /** Saves the files to the workspace, then reads them: photos and PDFs with text recognition, the rest as data. */
+  async function extract() {
+    const intake = useIntakeStore.getState().queue;
+    const scannable = intake.filter((f) => OCR_KINDS.has(f.kind)).length;
+    if (scannable && scannable < intake.length) {
+      toast("Extract photos and PDFs separately from spreadsheets and text files — remove one kind from the list.");
+      return;
+    }
+    setExtracting(true);
+    try {
+      if (scannable) {
+        const id = await startScanFromIntake(intake, null);
+        if (id) {
+          clearQueue();
+          navigate(scanUrl(id));
+        }
+        return;
+      }
+      const { files } = await importFiles(
+        intake.map((f) => ({ blob: f.file, name: f.name, kind: f.kind, mimeType: f.file.type, dirPath: f.folderPath, source: f.source })),
+        null,
+      );
+      clearQueue();
+      // Decided here: the workspace list may not show the new files yet.
+      if (files.length === 1 && files[0].kind === "xlsx") navigate(chooseTablesUrl(files[0].id));
+      else void extractData(files.map((f) => f.id), (id) => navigate(datasetUrl(id)));
+    } catch (error) {
+      toast(errorMessage(error, "The files couldn't be saved. Please try again."));
+    } finally {
+      setExtracting(false);
+    }
+  }
 
   async function saveTo(folderId: string | null) {
     const files = useIntakeStore.getState().queue;
@@ -227,9 +269,17 @@ export function ImportPage() {
                 queueToAttachments();
                 navigate("/ai-studio");
               }}
-              className="press inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-salin-primary px-6 text-sm font-semibold text-white shadow-[0_6px_16px_-6px_rgb(1_168_90/0.6)] hover:bg-salin-primary-strong"
+              className="press inline-flex h-12 items-center justify-center gap-2 rounded-xl px-5 text-sm font-semibold text-salin-text ring-1 ring-salin-border hover:bg-salin-tile"
             >
               <Sparkles className="size-[18px]" /> Ask Salin AI
+            </button>
+            <button
+              type="button"
+              onClick={() => void extract()}
+              disabled={extracting}
+              className="press inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-salin-primary px-6 text-sm font-semibold text-white shadow-[0_6px_16px_-6px_rgb(1_168_90/0.6)] hover:bg-salin-primary-strong disabled:opacity-50"
+            >
+              {extracting ? <LoaderCircle className="size-[18px] animate-spin" /> : <Table2 className="size-[18px]" />} Extract data
             </button>
           </div>
         </section>

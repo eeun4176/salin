@@ -1,17 +1,16 @@
 /**
  * AI Runtime
  * The app's single entry point to on-device AI, behind one provider
- * interface (`LocalAiProvider`) so another local runtime — e.g. WebLLM for
- * WebGPU devices — can be added later without touching the screens. This
- * provider runs the models in the AI worker (Transformers.js and ONNX
- * Runtime Web): one request at a time, with progress, cancellation (the
+ * interface (`LocalAiProvider`). This provider runs the models in the AI
+ * worker (Transformers.js and ONNX Runtime Web; WebLLM for the laptop build
+ * of the assistant): one request at a time, with progress, cancellation (the
  * worker is stopped, freeing its memory) and a clear error when model files
  * are missing. Before the assistant loads, the OCR engine is shut down so
  * text recognition, handwriting and the language model never sit in memory
  * together; after a minute idle the worker is stopped too.
  */
 
-import { AI_MODEL_HOST, AI_MODELS, type AiModelVariant } from "@/core/ai/ai-models";
+import { AI_MODEL_HOST, AI_MODELS, variantSource, type AiModelVariant } from "@/core/ai/ai-models";
 import type { LineReading } from "@/core/ai/handwriting";
 import type { ChatMessage } from "@/core/ai/llm-tasks";
 import type { AiWorkerMessage, AiWorkerRequest, LineCrop } from "@/core/ai/ai.worker";
@@ -156,14 +155,20 @@ export function createAiRuntime(makeWorker: () => WorkerLike = defaultWorker, be
       call({ type: "read-lines", cacheName: MODEL_CACHE, runtimeKey: runtimeKeyOf(handwriting), modelKey: keyOf(handwriting.assets.find((a) => a.id !== "ai-runtime")!), crops }, options),
     generate: async (messages, variant, options = {}) => {
       await beforeAssistant();
+      if (variant.webllm) {
+        const { repo, revision } = variantSource(AI_MODELS.assistant, variant);
+        const files = variant.assets.map((a) => ({ cache: a.cache ?? MODEL_CACHE, key: keyOf(a) }));
+        const modelLib = files.find((f) => f.cache === "webllm/wasm")!.key;
+        const engine = { cache: MODEL_CACHE, key: keyOf(variant.assets.find((a) => a.id === "assistant-laptop:engine")!) };
+        return call({ type: "generate-webllm", engine, model: `${AI_MODEL_HOST}/${repo}/resolve/${revision}/`, modelId: variant.webllm, modelLib, files, messages, maxNewTokens: options.maxNewTokens ?? 200 }, options);
+      }
       return call(
         {
           type: "generate",
           cacheName: MODEL_CACHE,
           runtimeKey: runtimeKeyOf(variant),
           host: AI_MODEL_HOST,
-          repo: AI_MODELS.assistant.repo,
-          revision: AI_MODELS.assistant.revision,
+          ...variantSource(AI_MODELS.assistant, variant),
           dtype: variant.dtype ?? "q4",
           device: variant.device,
           messages,

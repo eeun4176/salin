@@ -1,0 +1,338 @@
+{
+  "summary": {
+    "heldOutAccuracy": 0.9787234042553191,
+    "confidentAnswers": 46,
+    "confidentCorrect": 46
+  },
+  "results": [
+    {
+      "question": "give me the phone number of Marcus",
+      "understood": "First Name is “Marcus” · show Phone 1",
+      "confident": true,
+      "unknown": [],
+      "correct": true
+    },
+    {
+      "question": "how many customers are in the Philippines?",
+      "understood": "Country is “Philippines” · count the rows",
+      "confident": true,
+      "unknown": [],
+      "correct": true
+    },
+    {
+      "question": "customers who work at Baxter Group",
+      "understood": "Company is “Baxter Group” · show every column",
+      "confident": true,
+      "unknown": [],
+      "correct": true
+    },
+    {
+      "question": "anong company ni Maria",
+      "understood": "First Name is “Maria” · show Company",
+      "confident": true,
+      "unknown": [],
+      "correct": true
+    },
+    {
+      "question": "who joined before 2021",
+      "understood": "Subscription Date is less than “2021-01-01” · show every column",
+      "confident": true,
+      "unknown": [],
+      "correct": true
+    },
+    {
+      "question": "show customers with no phone",
+      "understood": "Phone 1 is empty · show every column",
+      "confident": true,
+      "unknown": [],
+      "correct": true
+    },
+    {
+      "question": "number of customers per company",
+      "understood": "count per Company",
+      "confident": true,
+      "unknown": [],
+      "correct": true
+    },
+    {
+      "question": "Hectors email address",
+      "understood": "First Name is “Hector” · show Email",
+      "confident": true,
+      "unknown": [],
+      "correct": true
+    },
+    {
+      "question": "list all customers from spain or finland",
+      "understood": "(Country is “Spain” or Country is “Finland”) · show every column",
+      "confident": true,
+      "unknown": [],
+      "correct": true
+    },
+    {
+      "question": "pinakabagong subscriber",
+      "understood": "show every column sorted by Subscription Date, highest / latest first, first 1",
+      "confident": true,
+      "unknown": [],
+      "correct": true
+    },
+    {
+      "question": "how much did Juan Dela Cruz spend in total",
+      "understood": "Customer is “Juan Dela Cruz” · total Total",
+      "confident": true,
+      "unknown": [],
+      "correct": true
+    },
+    {
+      "question": "orders in Visayas that are not paid",
+      "understood": "Paid is “No” and Region is “Visayas” · show every column",
+      "confident": true,
+      "unknown": [],
+      "correct": true
+    },
+    {
+      "question": "which product sold the most",
+      "understood": "count per Product, sorted by count, highest / latest first, top 1",
+      "confident": true,
+      "unknown": [],
+      "correct": true
+    },
+    {
+      "question": "average order total",
+      "understood": "average Total",
+      "confident": true,
+      "unknown": [],
+      "correct": true
+    },
+    {
+      "question": "ilang order ang galing sa Luzon",
+      "understood": "Region is “Luzon” · count the rows",
+      "confident": true,
+      "unknown": [],
+      "correct": true
+    },
+    {
+      "question": "orders with quantity of 5 or more",
+      "understood": "Quantity is at least “5” · show every column",
+      "confident": true,
+      "unknown": [],
+      "correct": true
+    },
+    {
+      "question": "orders from January 2026",
+      "understood": "Date is at least “2026-01-01” and Date is at most “2026-01-31” · show every column",
+      "confident": true,
+      "unknown": [],
+      "correct": true
+    },
+    {
+      "question": "rice orders",
+      "understood": "(Product is “Rice 25kg” or Product is “Rice Cooker”) · show every column",
+      "confident": true,
+      "unknown": [],
+      "correct": true
+    },
+    {
+      "question": "highest unit price",
+      "understood": "highest Unit Price",
+      "confident": true,
+      "unknown": [],
+      "correct": true
+    },
+    {
+      "question": "total quantity sold per product",
+      "understood": "total Quantity per Product",
+      "confident": true,
+      "unknown": [],
+      "correct": true
+    },
+    {
+      "question": "what is the price of the stapler",
+      "understood": "Item is “Stapler” · show Price",
+      "confident": true,
+      "unknown": [],
+      "correct": true
+    },
+    {
+      "question": "items with low stock below 20",
+      "understood": "Stock is less than “20” · show every column",
+      "confident": true,
+      "unknown": [],
+      "correct": true
+    },
+    {
+      "question": "cheapest item",
+      "understood": "show every column sorted by Price, lowest / earliest first, first 1",
+      "confident": true,
+      "unknown": [],
+      "correct": true
+    },
+    {
+      "question": "how many items does Mabuhay Supplies have",
+      "understood": "Supplier is “Mabuhay Supplies” · count the rows",
+      "confident": true,
+      "unknown": [],
+      "correct": true
+    },
+    {
+      "question": "items restocked in 2026",
+      "understood": "Last Restocked is at least “2026-01-01” and Last Restocked is at most “2026-12-31” · show every column",
+      "confident": true,
+      "unknown": [],
+      "correct": true
+    },
+    {
+      "question": "total stock per category",
+      "understood": "total Stock per Category",
+      "confident": true,
+      "unknown": [],
+      "correct": true
+    },
+    {
+      "question": "magkano ang bleach",
+      "understood": "Item is “Bleach” · show Price",
+      "confident": true,
+      "unknown": [],
+      "correct": true
+    },
+    {
+      "question": "students who passed in Math",
+      "understood": "Passed is “Yes” and Subject is “Math” · show every column",
+      "confident": true,
+      "unknown": [],
+      "correct": true
+    },
+    {
+      "question": "grade of Melchora Aquino",
+      "understood": "Student is “Melchora Aquino” · show Grade",
+      "confident": true,
+      "unknown": [],
+      "correct": true
+    },
+    {
+      "question": "top 2 students",
+      "understood": "show every column sorted by Grade, highest / latest first, first 2",
+      "confident": true,
+      "unknown": [],
+      "correct": true
+    },
+    {
+      "question": "how many boys",
+      "understood": "Sex is “Male” · count the rows",
+      "confident": true,
+      "unknown": [],
+      "correct": true
+    },
+    {
+      "question": "average grade of section Mabini",
+      "understood": "Section is “Mabini” · average Grade",
+      "confident": true,
+      "unknown": [],
+      "correct": true
+    },
+    {
+      "question": "sino ang mga bumagsak",
+      "understood": "Passed is “No” · show every column",
+      "confident": true,
+      "unknown": [],
+      "correct": true
+    },
+    {
+      "question": "lowest grade in science",
+      "understood": "Subject is “Science” · lowest Grade",
+      "confident": true,
+      "unknown": [],
+      "correct": true
+    },
+    {
+      "question": "how many employees work in Quezon City",
+      "understood": "City is “Quezon City” · count the rows",
+      "confident": true,
+      "unknown": [],
+      "correct": true
+    },
+    {
+      "question": "salary of Dino Cruz",
+      "understood": "Employee is “Dino Cruz” · show Salary",
+      "confident": true,
+      "unknown": [],
+      "correct": true
+    },
+    {
+      "question": "employees earning more than 40000",
+      "understood": "Salary is more than “40000” · show every column",
+      "confident": true,
+      "unknown": [],
+      "correct": true
+    },
+    {
+      "question": "who was hired first",
+      "understood": "show every column sorted by Hire Date, lowest / earliest first, first 1",
+      "confident": true,
+      "unknown": [],
+      "correct": true
+    },
+    {
+      "question": "list departments",
+      "understood": "count per Department",
+      "confident": true,
+      "unknown": [],
+      "correct": true
+    },
+    {
+      "question": "total salary of the IT department",
+      "understood": "Department is “IT” · total Salary",
+      "confident": true,
+      "unknown": [],
+      "correct": true
+    },
+    {
+      "question": "mga empleyado sa Finance",
+      "understood": "Department is “Finance” · show every column",
+      "confident": true,
+      "unknown": [],
+      "correct": true
+    },
+    {
+      "question": "which households have no contact number",
+      "understood": "Contact No. is empty · show every column",
+      "confident": true,
+      "unknown": [],
+      "correct": true
+    },
+    {
+      "question": "average income per barangay",
+      "understood": "average Monthly Income per Barangay",
+      "confident": true,
+      "unknown": [],
+      "correct": true
+    },
+    {
+      "question": "families with more than 4 members",
+      "understood": "Members is more than “4” · show every column",
+      "confident": true,
+      "unknown": [],
+      "correct": true
+    },
+    {
+      "question": "ilan ang may kuryente",
+      "understood": "Has Electricity is “Yes” · count the rows",
+      "confident": true,
+      "unknown": [],
+      "correct": true
+    },
+    {
+      "question": "biggest household",
+      "understood": "show every column",
+      "confident": false,
+      "unknown": [],
+      "correct": false
+    },
+    {
+      "question": "households in Malanday or San Isidro",
+      "understood": "(Barangay is “Malanday” or Barangay is “San Isidro”) · show every column",
+      "confident": true,
+      "unknown": [],
+      "correct": true
+    }
+  ]
+}

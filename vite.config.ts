@@ -7,7 +7,8 @@
  * small OCR engine worker script) for offline use. The OCR engine builds
  * (~4 MB each, one per kind of device) and language files are emitted as
  * assets but NOT precached: Salin downloads only the ones a device needs,
- * on demand, into its own Cache Storage (see model-manager.ts).
+ * on demand, into its own Cache Storage (see model-manager.ts). So is the
+ * WebLLM engine (6.6 MB), which only the laptop build of the assistant uses.
  * User documents are never put in these caches — they live in IndexedDB.
  */
 
@@ -46,7 +47,7 @@ export default defineConfig({
         // mjs: the pdf.js worker, so PDFs can be read offline.
         globPatterns: ["**/*.{js,mjs,css,html,svg,png,woff2,webmanifest}"],
         // OCR engine builds: downloaded on demand by the model manager, not by every visitor.
-        globIgnores: ["**/tesseract-core-*"],
+        globIgnores: ["**/tesseract-core-*", "**/web-llm-*"],
         // Any in-app URL (e.g. /folders/…) opens from the cached app shell when offline.
         navigateFallback: "/index.html",
         cleanupOutdatedCaches: true,
@@ -54,6 +55,12 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    rollupOptions: {
+      // A recognisable name for the WebLLM engine, so it can be left out of the precache above.
+      output: { assetFileNames: (asset) => (asset.originalFileNames.some((name) => name.includes("@mlc-ai/web-llm")) ? "assets/web-llm-[hash][extname]" : "assets/[name]-[hash][extname]") },
+    },
+  },
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "./src"),

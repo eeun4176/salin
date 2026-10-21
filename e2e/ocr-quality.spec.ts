@@ -118,12 +118,13 @@ test("printed forms stay readable under blur, shadows, skew, faint print, noise 
   await expect(page).toHaveURL(/\/scans\/[\w-]+$/);
   const scanId = page.url().split("/").pop()!;
   // Add the other conditions as pages of the same scan.
+  await page.getByRole("button", { name: "Fix pages" }).click();
   const chooser = page.waitForEvent("filechooser");
   await page.getByRole("button", { name: "Add pages" }).click();
   await (await chooser).setFiles(VARIANTS.slice(1).map((v, i) => ({ name: `${String(i + 2).padStart(2, "0")}-${v}.png`, mimeType: "image/png", buffer: Buffer.from(images[v], "base64") })));
   await expect(page.getByRole("button", { name: /^Page 8/ })).toBeVisible({ timeout: 30_000 });
 
-  await page.getByRole("button", { name: "Next: read text" }).click();
+  await page.getByRole("button", { name: "Done" }).click();
   await page.getByRole("button", { name: "Read 8 pages" }).click();
   await expect(page.getByRole("checkbox", { name: "Only show what needs a look" })).toBeVisible({ timeout: 280_000 });
 

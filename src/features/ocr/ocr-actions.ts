@@ -3,24 +3,28 @@
  * What the scan screens do, with user-facing error handling: start a scan
  * from workspace files (images and PDFs — a PDF adds one page per page) or
  * from freshly captured photos (saved to the workspace first, so the
- * originals are kept), resume an unfinished scan of the same files, build
- * the extraction for review (or an empty one for typing values by hand when
- * OCR isn't available), save a template from a corrected scan, and create
- * the datasets.
+ * originals are kept), resume an unfinished scan of the same files, find
+ * photo page edges before reading, build the extraction for review (or an
+ * empty one for typing values by hand when OCR isn't available), switch to
+ * a template that clearly fits, extract just the columns the user asks for,
+ * save a template from a corrected scan, and create the datasets.
  */
 
 import { ruleSuggestions, templateRules } from "@/core/ai/suggestions";
 import { errorMessage } from "@/core/storage/errors";
 import { getFileWithBlob, importFiles } from "@/core/storage/repositories/file-repository";
-import { createOcrDocument, findOcrDocumentsForFile, getOcrDocumentOrThrow, getOcrPages, listSavedTemplates, saveOcrDatasets, saveTemplate, updateOcrDocument, type NewPage } from "@/core/storage/repositories/ocr.repository";
+import { createOcrDocument, findOcrDocumentsForFile, getOcrDocumentOrThrow, getOcrPages, listSavedTemplates, saveOcrDatasets, saveTemplate, updateOcrDocument, updateOcrPage, type NewPage } from "@/core/storage/repositories/ocr.repository";
 import { splitExtension } from "@/core/storage/names";
 import { BUILTIN_TEMPLATES, GENERIC_TEMPLATE_ID } from "@/core/ocr/templates/builtin-templates";
 import { extractDocument, makeValue } from "@/core/ocr/templates/field-mapping";
 import { suggestTemplates, type TemplateMatch } from "@/core/ocr/templates/template-suggest";
 import { keyFromLabel, type DocumentTemplateDef } from "@/core/ocr/templates/template-schema";
 import { normalize } from "@/core/ocr/layout/geometry";
+import { detectPageEdges } from "@/core/ocr/imaging/imaging-client";
+import { extractRequested, foundLabels, guessShape, isRequested, REQUESTED_PREFIX, requestedColumns, requestedTemplate, type RecordShape } from "@/core/ocr/templates/requested-columns";
 import { extractionToDatasets } from "@/core/ocr/review/to-dataset";
-import { pdfPageCount } from "@/features/ocr/page-sources";
+import { nameColumns } from "@/core/processing/column-naming";
+import { pageSource, pdfPageCount } from "@/features/ocr/page-sources";
 import { toast } from "@/stores/toast-store";
 import type { IntakeFile } from "@/stores/intake-store";
 import type { WorkspaceFile } from "@/types/domain";
@@ -106,8 +110,61 @@ const pageNumbers = (pages: OcrPage[]) => pages.map((p, i) => ({ page: i + 1, wi
 /** Maps the read pages onto the scan's template, with rule-based suggestions (standard forms, OCR slips) for review. */
 export async function buildExtraction(doc: OcrDocument, pages: OcrPage[]): Promise<Extraction> {
   const template = await templateById(doc.templateId);
-  const extraction = extractDocument(template, pageNumbers(pages));
+  const extraction = template && isRequested(template) ? extractRequested(template, pageNumbers(pages)) : extractDocument(template, pageNumbers(pages));
   return { ...extraction, templateVersion: template?.version, suggestions: ruleSuggestions(extraction, templateRules(template, extraction)) };
+}
+
+/** Photos without a crop yet: finds the page edges first, so most photos need no manual cropping. */
+export async function autoCropPhotos(pages: OcrPage[]) {
+  for (const page of pages) {
+    if (page.pdfPage !== null || page.edits.crop || page.state !== "pending") continue;
+    const quad = await pageSource(page)
+      .then((blob) => detectPageEdges(blob, page.edits.rotation))
+      .catch(() => null);
+    if (quad) await updateOcrPage(page.id, { edits: { ...page.edits, crop: quad } }).catch(() => undefined);
+  }
+}
+
+/** After a first read in generic mode: switches to a template that clearly fits (a saved one, or a built-in form). */
+export async function applyClearMatch(doc: OcrDocument, pages: OcrPage[]) {
+  if (doc.templateId !== GENERIC_TEMPLATE_ID) return;
+  const match = await templateSuggestion(doc, pages);
+  if (match && match.score >= 0.6) await switchTemplate(doc, pages, match.template.id);
+}
+
+/**
+ * "What do you need?": makes (or reuses) a template with just the columns
+ * asked for, sets it on the scan, and maps the pages onto it — or, when
+ * nothing has been read, gives empty records to type into. Resolves to the
+ * new extraction (for the caller to save), or `null` after telling the
+ * user what went wrong.
+ */
+export async function extractColumns(doc: OcrDocument, pages: OcrPage[], labels: string[], shape: RecordShape): Promise<Extraction | null> {
+  try {
+    const same = (await listSavedTemplates()).find((t) => isRequested(t) && t.kind === shape && requestedColumns(t).join("|") === labels.join("|"));
+    const template = await saveTemplate(requestedTemplate(same?.id ?? `${REQUESTED_PREFIX}${doc.id}`, labels, shape));
+    const next = { ...doc, templateId: template.id };
+    const extraction = pages.some((p) => p.state === "done") ? await buildExtraction(next, pages) : await manualExtraction(next, pages);
+    // The review screen keeps and saves the extraction itself (so it stays open with the new columns).
+    await updateOcrDocument(doc.id, { templateId: template.id });
+    return extraction;
+  } catch (error) {
+    toast(errorMessage(error, "Those columns couldn't be used. Please try again."));
+    return null;
+  }
+}
+
+/** What generic reading finds on the read pages: labels to tap instead of typing, and whether pages hold lists. */
+export function pageHints(pages: OcrPage[]): { labels: string[]; shape: RecordShape } {
+  if (!pages.some((p) => p.result)) return { labels: [], shape: "form" };
+  const generic = extractDocument(null, pageNumbers(pages));
+  return { labels: foundLabels(generic), shape: guessShape(generic) };
+}
+
+/** Column sets asked for before (newest first), to pick again with one tap. */
+export async function recentColumnSets(limit = 3): Promise<{ labels: string[]; shape: RecordShape }[]> {
+  const asked = (await listSavedTemplates().catch(() => [])).filter(isRequested);
+  return asked.slice(0, limit).map((t) => ({ labels: requestedColumns(t), shape: t.kind }));
 }
 
 /** The template that best fits the read pages, when it isn't the one in use (deterministic: labels and headings found). */
@@ -185,7 +242,8 @@ export async function saveTemplateFromScan(doc: OcrDocument, pages: OcrPage[], n
 
 /**
  * Creates the datasets from a reviewed scan, with the reviewer's dataset
- * names and names for unnamed columns (by dataset and column position).
+ * names and names for unnamed columns (by dataset and column position;
+ * otherwise suggested from their values).
  * Resolves to their ids (empty after a reported failure).
  */
 export async function createScanDatasets(documentId: string, names?: Record<string, string>, columnNames?: Record<number, Record<number, string>>): Promise<string[]> {
@@ -201,7 +259,7 @@ export async function createScanDatasets(documentId: string, names?: Record<stri
     ).map((d, i) => ({
       ...d,
       name: names?.[i] ?? d.name,
-      content: { ...d.content, columns: d.content.columns.map((c, j) => (columnNames?.[i]?.[j]?.trim() ? { ...c, name: columnNames[i][j].trim() } : c)) },
+      content: { ...d.content, columns: nameColumns(d.content, columnNames?.[i]) },
     }));
     const created = await saveOcrDatasets(documentId, drafts);
     return created.map((d) => d.id);

@@ -57,13 +57,73 @@ The held-out score is the honest one. The model's main failure was adding condit
 
 Speed: in Node on this PC's CPU it takes about 21 s per request. In the browser without WebGPU it runs on one CPU thread, which is much slower; see §2.4.
 
+#### Round 2 (October 2026): AI Studio questions, a laptop build and a new phone model
+
+AI Studio now answers questions about a dataset ("how many…", "what is the email of…", "extract only the…"). The model writes a read-only query plan; Salin runs it over every row. The benchmark gained **20 questions** (12 dev, **8 held-out**), scored like commands: the plan must have the right action, only the conditions the question states (after the same request check the app applies), and, for "extract", exactly the named columns.
+
+Fixes found with it, before comparing models:
+- A filter on a text column is now kept only if its **value** is in the question. Naming the column was enough before, so "What is the email of Hector?" became `Email = <an example email>` and showed someone else's row. (Re-scoring the stored round-1 replies with the stricter check changes no result.)
+- For questions, conditions the question doesn't state are dropped instead of failing the whole answer; with none left, Salin asks for a rewording. "How many…"/"ilan…" always counts. Duplicate or blank output columns are ignored.
+- The question prompt now gives one example per shape on a described sample table, like the command prompt. With the 0.8B model: questions 25% → 67% (dev), 12.5% → 37.5% (held-out).
+
+All on the new prompts, q4 weights, Node on this PC's CPU (raw results in `docs/benchmarks/`):
+
+| Model | GPU / CPU download | Commands dev | Commands held-out | Questions dev | Questions held-out | **All held-out** | s per answer (CPU) |
+|---|---|---|---|---|---|---|---|
+| Qwen3.5-0.8B (round 1 choice) | 470 / 551 MB | 75% | 42% | 67% | 37.5% | 8/20 | 21 |
+| **Qwen3-0.6B** | **570 / 919 MB** | 58% | **75%** | 75% | 62.5% | **14/20** | 37 |
+| **Qwen3-1.7B** | **1.43 GB** / — (ONNX) | 79% | 50% | 75% | **87.5%** | **13/20** | 88 |
+| Qwen3.5-2B (text parts) | 1.40 GB / — | 79% | 67% | 100% | 62.5% | 13/20 | 91 |
+
+All four copied 7/7 form fields and invented none.
+
+**In the browser** (Chrome, this laptop's Intel UHD integrated graphics, WebGPU, AI Studio questions on a 100-row CSV):
+
+| Build | Runtime | Per question | Result |
+|---|---|---|---|
+| Qwen3-1.7B, ONNX (single 1.4 GB `.onnx`) | Transformers.js / ONNX Runtime Web | — | **doesn't load**: `std::bad_alloc` creating the session |
+| Qwen3.5-2B, ONNX | Transformers.js / ONNX Runtime Web | 6–10 min | right answers, far too slow |
+| Qwen3-0.6B, ONNX | Transformers.js / ONNX Runtime Web | 75–95 s | works |
+| **Qwen3-1.7B q4f16_1 (MLC)** | **WebLLM 0.2.85** | **23–31 s** (7.5 s to load from cache) | right plans |
+
+**Chosen:** **Qwen3-0.6B** (ONNX, Transformers.js) for phones and other devices (Apache-2.0) — the best held-out score of the small models, though its CPU build is larger and about 2× slower on the CPU than the 0.8B. **Qwen3-1.7B** for laptops and desktops (Apache-2.0), run with **WebLLM** (MLC's model compiled to WebGPU code): non-mobile, WebGPU with f16, and 8 GB reported memory (`variantFor`). On integrated graphics WebLLM is several times faster than ONNX Runtime Web, and its weights come in 30 small shards, so the browser's memory limit that stops the ONNX build doesn't apply.
+
+How the WebLLM build keeps Salin's rules:
+- **Pinned and size-checked.** `mlc-ai/Qwen3-1.7B-q4f16_1-MLC` at a pinned revision: `mlc-chat-config.json`, `tensor-cache.json`, `tokenizer.json` and 30 weight shards (968 MB), each with its exact size. The compiled model library (`Qwen3-1.7B-q4f16_1_cs1k-webgpu.wasm`, 5.6 MB, from `binary-mlc-llm-libs` @ `025bcaf`) is in the repo and served by Salin, so the only hosts are still Salin and the model host.
+- **Downloaded by Salin, read by WebLLM.** The model manager stores each file in the cache WebLLM reads it from (`webllm/model`, `webllm/config`, `webllm/wasm`; `ModelAsset.cache`). WebLLM fetches only what's missing from those caches, so the worker first checks every file is there and stops with "missing files" otherwise — it never downloads.
+- **Not in the app shell.** The WebLLM engine is one self-contained 6.6 MB module. It's served by Salin as `web-llm-*.js`, left out of the precache (like the OCR engines), downloaded with the laptop build into Salin's cache, and imported by the worker from there. Phones never download it. `@mlc-ai/web-llm` is pinned exactly, since its size is in the catalogue and its model library must match.
+- **GPU resets.** Once, while the GPU code was still compiling, the integrated GPU hung and WebGPU reported the device lost. The worker then drops the engine, the user sees "stopped unexpectedly, try again", and the next question loads it afresh.
+
+Notes:
+- The Node benchmark can't run WebLLM, so the 1.7B's accuracy figures come from its ONNX q4 weights; the MLC build is a different q4 quantization of the same model.
+- 20 held-out items is a small set: one or two answers apart is noise.
+- The uncommitted change to `describeColumn` (up to 12 values per column) moved the 0.8B's command dev score from 79% to 75% with the same held-out score; the request check accounts for none of it.
+- Both Qwen3 models still turn "send this to my boss" into a table of every row instead of refusing; commands are always previewed, and questions are read-only.
+- Phone speed is not measured on a real Android phone yet; see §5.
+
+#### Round 3 (October 2026): questions about any dataset, without a model
+
+Round 2's questions only worked well on the datasets they were tuned on. The model had to work out which column and which cell value a question meant, from at most 12 sample values per column, and small models fail at that on unfamiliar data. So Salin now reads the question itself first:
+
+- **Linking** (`src/core/ai/question-linking.ts`): which columns the question names (whole header, its field noun, English/Filipino synonyms, abbreviated sub-headings such as "Sex F"), which cell values it mentions (any case, no accents, plural, part of a value, small typos including swapped letters; email addresses and links only in full), and its numbers.
+- **Reading** (`src/core/ai/question-parser.ts`): turns those links and the action words (how many / ilan, per / bawat, average, total, highest, top 5, latest, without / walang, not, more than, between, in 2024, last month…) into a read-only query, and lists the words it couldn't place.
+- **Running** (`src/core/ai/data-query.ts`): the query runs over every row with the Transform tools' matching; nothing changes.
+
+AI Studio answers from the reader when it understood every word: instantly, with no model and on every device. Names that aren't in the data ("Chile") are reported as missing. Only other questions go to the model; if it fails or isn't set up, the reader's partial reading is shown with the words it didn't use. Every answer shows "I read this as: …".
+
+Results, rules only, no model (`SALIN_RULES_EVAL=1 npx vitest run src/core/ai/question-eval.test.ts`, `docs/benchmarks/rules-eval.json`): **46 / 47 held-out questions** right across six unrelated datasets (customers, orders, inventory, grades, employees, barangay households), in English, Filipino and Taglish. All 46 answers it was sure of were right; the miss ("biggest household") goes to the model. One rule was adjusted after a held-out run (sex words such as "boys"), so the figure is slightly optimistic. Real users' questions should be added to the held-out set.
+
+**Spreadsheet forms.** The CVO census workbook showed why files weren't recognised: table detection took the form's title rows as the header. Detection now skips stacked title and fill-in lines ("BARANGAY: ____"), reads two- and three-row headers whose sub-labels repeat ("Type of Pet" → Dog / Cat), and leaves out sign-off lines ("Prepared By:", "______ Paravet"). Tick marks (✓, x, /) are yes/no, so "how many dogs", "female dogs" and "dogs that are not confined" count the ticked boxes; blank numbered form lines aren't records. Asked about in one step (AI Studio), a workbook gives its main table plus same-shaped tables; other shapes are left out with a pointer to Extract data.
+
+Known limits: a form split by a completely unused column reads as two side-by-side tables (Salin keeps genuinely side-by-side tables apart and can't yet tell the two apart; adjust the selection in Extract data); a blank workbook with several different forms (like the census template) has no main table to pick; label/value forms (the dog registration sheet) aren't tables and need the document questions of the plan's step 6; the summary sheet's third header row (D / C under each Sex column) shares a row with the first record number.
+
 ## 2. How it works
 
 ```
  photo / PDF ─► Prepare ─► OCR (Tesseract) ─► layout ─► template mapping ─► rule suggestions ─┐
                                                                                             ▼
                     optional: handwriting reader (PP-OCRv5, per value box) ───────► Review: suggestions (Use / Edit / Dismiss),
-                    optional: assistant (Qwen3.5) — OCR fixes, label mapping,        grounded or "Not found on page",
+                    optional: assistant (Qwen3) ─── OCR fixes, label mapping,         grounded or "Not found on page",
                               requested fields                                       close-up of the page region
                                                                                             ▼
                                                            Save: preview of each dataset, column names / types
@@ -73,12 +133,12 @@ Speed: in Node on this PC's CPU it takes about 21 s per request. In the browser 
 
 ### 2.1 Modes and device support
 
-*Standard* uses no models. *AI Lite* adds the handwriting reader (35 MB including the engine). *AI Advanced* adds the assistant (≈520 MB).
+*Standard* uses no models. *AI Lite* adds the handwriting reader (35 MB including the engine). *AI Advanced* adds the assistant (≈600 MB; ≈1 GB on WebGPU laptops and desktops with 8 GB of memory).
 
 *Auto* recommends a mode from the device:
 - WebAssembly, workers and Cache Storage are required.
 - The memory the browser reports decides how far it goes.
-- WebGPU with 16-bit support gets the smaller GPU build of the assistant.
+- WebGPU with 16-bit support gets the smaller GPU build of the assistant; on a non-mobile device that also reports 8 GB, the larger laptop build (Qwen3-1.7B, run with WebLLM).
 - Once the AI benchmark has been run, the assistant's measured speed counts too: ≤ 15 s per answer allows Advanced.
 
 Missing capabilities degrade gracefully: the AI buttons explain why they're unavailable and link to Settings.
@@ -259,7 +319,7 @@ The Ask Salin AI page hands its commands to the dataset editor, so they are prev
 ## 5. Known limits and what to do on the phone
 
 - **Handwriting:** the 18% CER on real CVO crops comes from one low-resolution photo. Photograph forms at full camera resolution, flat, filling the frame. To measure properly, run Settings → On-device AI → AI benchmark on the phone, and test 10–20 filled forms written by different people.
-- **Assistant:** a 0.8B model is fast enough only with WebGPU. On the CPU it takes tens of seconds per answer, and it still misreads some requests. That's why every answer is shown as "The assistant understood your request as: …" before anything happens. Use Transform when it gets one wrong.
+- **Assistant:** a 0.6B model is fast enough only with WebGPU, and the 1.7B laptop build (WebLLM) needs it. On the CPU it takes tens of seconds per answer, and it still misreads some requests. That's why every answer is shown as "The assistant understood your request as: …" before anything happens. Use Transform when it gets one wrong.
 - **Tick-mark columns** on the census working sheet still rely on Phase 4 checkbox detection. Exact per-form templates for the CVO census sheets (column geometry) remain future work.
 - **Android checks still to do:**
   - Settings → On-device AI → download both models, then run *AI benchmark* and *Copy results* into §6.

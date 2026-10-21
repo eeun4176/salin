@@ -6,14 +6,19 @@
  * working aren't lost: read handwriting in the
  * regions the template mapping located, suggest fixes for recognition slips,
  * find requested or missing fields in a page's text (grounded in the words
- * read), name unnamed table columns, and turn a plain-language request into
+ * read), and turn a plain-language request into
  * a validated dataset command. Models run in the AI worker; when they're
  * missing or the device can't run them, a clear error says what to do.
  */
 
 import { aiRuntime, type AiCallOptions } from "@/core/ai/ai-runtime";
+import { runQuery } from "@/core/ai/data-query";
+import { parseQuestion, type ParsedQuestion } from "@/core/ai/question-parser";
 import type { AiModelVariant } from "@/core/ai/ai-models";
-import { columnNameMessages, commandMessages, correctionMessages, fieldMessages, mappingMessages, parseColumnNameReply, parseCommandReply, parseCorrectionReply, parseFieldReply, parseMappingReply, type CommandReply } from "@/core/ai/llm-tasks";
+import { commandMessages, correctionMessages, dataQuestionMessages, fieldMessages, mappingMessages, mentionsColumn, parseCommandReply, parseCorrectionReply, parseDataQuestionPlan, parseFieldReply, parseMappingReply, type ChatMessage, type CommandReply, type DataQuestionPlan } from "@/core/ai/llm-tasks";
+import { findColumn, resolveCommand, runCommand, type CommandOutcome } from "@/core/processing/dataset-commands";
+import { normalizeLabel } from "@/core/ocr/templates/text-match";
+import { normalizeValue, ruleForLabel } from "@/core/processing/value-normalizers";
 import { correctionSuggestions, fieldSuggestion, mergeSuggestions, withHandwritingReadings, type HandwritingReading } from "@/core/ai/suggestions";
 import { refKey, reviewItems } from "@/core/ocr/review/review-state";
 import { makeValue } from "@/core/ocr/templates/field-mapping";
@@ -22,6 +27,163 @@ import { cropLines } from "@/features/ai/line-crops";
 import { ensureProcessed } from "@/features/ocr/ocr-runner";
 import type { Extraction, ExtractedField, FieldSpec, OcrPage, Suggestion, ValueRef } from "@/types/ocr";
 import type { DatasetColumn, DatasetRow } from "@/types/processing";
+
+export type DataQuestionAnswer =
+  | { kind: "text"; text: string; understood?: string }
+  | { kind: "unsupported"; text: string; fallbackToCommand?: boolean }
+  | { kind: "table"; text: string; headers: string[]; rows: (string | number | boolean | null)[][]; totalRows: number; understood?: string };
+
+/** Question words that also turn up inside cell values ("Boyd and Sons"), so they never count as naming one. */
+const QUESTION_WORDS = new Set(["and", "the", "for", "with", "who", "how", "are", "what", "many", "only", "there", "from", "all", "get", "show", "list", "extract", "give", "ang", "mga", "ilan", "sino", "ano"]);
+
+/** True when the question names a value from the data: a word of any cell, plural or not ("dogs" → Dog, "Pedro" → Pedro Reyes). */
+function questionNamesDataValue(request: string, columns: DatasetColumn[], rows: DatasetRow[]) {
+  const stem = (word: string) => word.replace(/(es|s)$/, "");
+  const columnWords = new Set(columns.flatMap((column) => normalizeLabel(column.name).split(" ")).map(stem));
+  const asked = new Set(normalizeLabel(request).split(" ").filter((w) => w.length > 2 && !QUESTION_WORDS.has(w)).map(stem).filter((w) => !columnWords.has(w)));
+  if (!asked.size) return false;
+  for (const column of columns) {
+    const rule = ruleForLabel(column.name);
+    for (const row of rows) {
+      const value = row.values[column.id];
+      if (value === null || value === undefined || value === "") continue;
+      const labels = [String(value)];
+      if (rule) labels.push(String(normalizeValue(rule, value, column.type)));
+      if (labels.some((label) => normalizeLabel(label).split(" ").some((w) => w.length > 2 && asked.has(stem(w))))) return true;
+    }
+  }
+  return false;
+}
+
+function queryRows(where: Extract<DataQuestionPlan, { action: "count" | "table" | "group" }>["where"], request: string, history: ChatMessage[], columns: DatasetColumn[], rows: DatasetRow[], match: "all" | "any" = "all") {
+  if (!where?.length) return rows;
+  const groundingText = [...history.map((m) => m.content), request].join("\n");
+  const checked = parseCommandReply(JSON.stringify({ action: "filter", where, match }), columns, groundingText);
+  // Conditions the question doesn't state are dropped (small models copy example values in); if none is left, it asks for a rewording.
+  if (!checked.ok) {
+    // Unless the question names no value from the data at all: then it asked about every row ("extract only the names and emails").
+    const valid = parseCommandReply(JSON.stringify({ action: "filter", where, match }), columns);
+    if (valid.ok && !questionNamesDataValue(request, columns, rows)) return rows;
+    throw new Error(checked.message);
+  }
+  const conditions = checked.command.action === "filter" ? checked.command.where : [];
+  const normalizedRows = rows.map((row) => {
+    const values = { ...row.values };
+    for (const condition of conditions) {
+      const column = columns.find((candidate) => candidate.id === condition.column);
+      const rule = column ? ruleForLabel(column.name) : null;
+      const value = values[condition.column];
+      if (column && rule && typeof value === "string") values[condition.column] = normalizeValue(rule, value, column.type);
+    }
+    return { ...row, values };
+  });
+  const outcome = runCommand(checked.command, { columns, rows: normalizedRows });
+  if (outcome.kind !== "view") throw new Error("The assistant couldn't make a valid data filter. Try rewording the question.");
+  const selected = new Set(outcome.rowIds);
+  return rows.filter((row) => selected.has(row.id));
+}
+
+const LOOKUP_COLUMN_ALIASES: Record<string, string[]> = {
+  email: ["email", "e mail", "email address", "e mail address"],
+  phone: ["phone", "telephone", "mobile", "mobile number", "phone number", "contact number"],
+  address: ["address", "home address", "location"],
+  name: ["name", "full name", "person name"],
+};
+
+function includesPhrase(text: string, phrase: string) {
+  return ` ${normalizeLabel(text)} `.includes(` ${normalizeLabel(phrase)} `);
+}
+
+function outputColumnWasRequested(request: string, column: DatasetColumn) {
+  if (mentionsColumn(column, request)) return true;
+  return Object.entries(LOOKUP_COLUMN_ALIASES).some(([alias, synonyms]) => synonyms.includes(normalizeLabel(column.name)) && includesPhrase(request, alias));
+}
+
+function tableAnswer(title: string, headers: string[], values: (string | number | boolean | null)[][], totalRows: number): DataQuestionAnswer {
+  const shown = values.slice(0, 100);
+  const suffix = totalRows > shown.length ? ` Showing the first ${shown.length.toLocaleString()}.` : "";
+  return { kind: "table", text: `${title} ${totalRows.toLocaleString()} ${totalRows === 1 ? "row" : "rows"}.${suffix}`, headers, rows: shown, totalRows };
+}
+
+/** The answer to a question as the reader understood it, worked out over every row. */
+function readAnswer(parsed: ParsedQuestion, columns: DatasetColumn[], rows: DatasetRow[]): DataQuestionAnswer {
+  const result = runQuery(parsed.query, columns, rows);
+  // Words it couldn't place are said, so a partial reading is never passed off as the whole question.
+  const unread = parsed.confident ? "" : ` ${parsed.note ?? `I didn't use: “${parsed.unknown.join("”, “")}”.`}`;
+  if (parsed.query.give === "count") return { kind: "text", text: `${result.text}${unread}`, understood: parsed.understood };
+  return { kind: "table", text: `${result.text}${unread}`, headers: result.headers, rows: result.rows as (string | number | boolean | null)[][], totalRows: result.total, understood: parsed.understood };
+}
+
+/**
+ * Answers a read-only question about a dataset. The rule-based reader goes first: when it understands every word, that's the answer — at once,
+ * with no model. Names that aren't in the data are said to be missing. Otherwise the local model plans the query; when it can't (or isn't set
+ * up), the reader's partial reading is given, with the words it didn't use.
+ */
+export async function answerDataQuestion(
+  request: string,
+  columns: DatasetColumn[],
+  rows: DatasetRow[],
+  variant: AiModelVariant | null,
+  history: ChatMessage[] = [],
+  options: AiCallOptions = {},
+): Promise<DataQuestionAnswer> {
+  const parsed = parseQuestion(request, columns, rows);
+  if (parsed?.notFound.length) {
+    const names = parsed.notFound.map((name) => `“${name}”`).join(", ");
+    return { kind: "text", text: `I couldn't find ${names} in this dataset, so no rows match. Check the spelling, or ask about a value that's in the data.`, understood: parsed.understood };
+  }
+  if (parsed?.confident) return readAnswer(parsed, columns, rows);
+  if (!variant) return parsed ? readAnswer(parsed, columns, rows) : { kind: "unsupported", text: "I couldn't tell what to look up. Name a column or a value from the data, or set up the on-device assistant in AI settings for freer questions." };
+  try {
+    return await answerWithModel(request, columns, rows, variant, history, options);
+  } catch (error) {
+    if (parsed && !options.signal?.aborted) return readAnswer(parsed, columns, rows);
+    throw error;
+  }
+}
+
+/** Plans a read-only data question with the local model, then computes it over the complete dataset in Salin. */
+async function answerWithModel(request: string, columns: DatasetColumn[], rows: DatasetRow[], variant: AiModelVariant, history: ChatMessage[], options: AiCallOptions): Promise<DataQuestionAnswer> {
+  const reply = await aiRuntime.generate(dataQuestionMessages(request, columns, rows, history), variant, { ...options, maxNewTokens: 240 });
+  let plan = parseDataQuestionPlan(reply, request);
+  // "How many … in each country?": small models plan one count; the question asks for a count per group.
+  const per = /\b(?:each|per|every|bawat)\s+([^?.!]+)/i.exec(request)?.[1];
+  const perColumn = per ? columns.find((column) => mentionsColumn(column, per)) : undefined;
+  if (plan.action === "count" && perColumn) plan = { action: "group", group_by: [perColumn.name], aggregate: "count", where: plan.where?.filter((w) => findColumn(columns, w.column)?.id !== perColumn.id) };
+
+  if (plan.action === "unsupported") return { kind: "unsupported", text: plan.reason ?? "I couldn't tell which data operation you want. Could you rephrase the question?" };
+  if (plan.action === "count") {
+    if (!plan.where?.length && questionNamesDataValue(request, columns, rows)) return { kind: "unsupported", fallbackToCommand: false, text: "I noticed a value from the dataset in your question, but couldn't tell which column to count. Please name the column or rephrase the filter." };
+    const matches = queryRows(plan.where, request, history, columns, rows);
+    return { kind: "text", text: `${matches.length.toLocaleString()} ${matches.length === 1 ? "row" : "rows"} match${matches.length === 1 ? "es" : ""} in this dataset.` };
+  }
+  if (plan.action === "table") {
+    if (!plan.where?.length && questionNamesDataValue(request, columns, rows)) return { kind: "unsupported", fallbackToCommand: false, text: "I noticed a value from the dataset in your question, but couldn't tell which column to show. Please name the column or rephrase the filter." };
+    const matches = queryRows(plan.where, request, history, columns, rows, plan.match ?? "all");
+    const selectedColumns = plan.columns?.map((name) => findColumn(columns, name));
+    if (selectedColumns?.some((column) => !column)) throw new Error("The requested table includes a column that isn't in this dataset.");
+    // The rows are already checked against the question; if the model picked columns nobody named, show whole rows rather than its guess.
+    const requested = selectedColumns?.length && selectedColumns.every((column) => column && outputColumnWasRequested(request, column));
+    const outputColumns: DatasetColumn[] = requested ? selectedColumns.filter((column): column is DatasetColumn => column !== null) : columns;
+    const limit = Math.min(plan.limit ?? 50, 100);
+    const outputRows = matches.slice(0, limit).map((row) => outputColumns.map((column) => row.values[column.id] ?? null));
+    const answer = tableAnswer(`${matches.length.toLocaleString()} matching`, outputColumns.map((column) => column.name), outputRows, matches.length);
+    return { ...answer, text: `${matches.length.toLocaleString()} matching ${matches.length === 1 ? "row" : "rows"}.${matches.length > outputRows.length ? ` Showing ${outputRows.length.toLocaleString()}.` : ""}` };
+  }
+
+  const resolved = resolveCommand(
+    plan.action === "overview"
+      ? { action: "summarize", group_by: [], aggregate: "count" }
+      : { action: "summarize", group_by: plan.group_by, aggregate: plan.aggregate, column: plan.column },
+    columns,
+  );
+  if (!resolved.ok) throw new Error(resolved.message);
+  const filteredRows = plan.action === "group" ? queryRows(plan.where, request, history, columns, rows) : rows;
+  const command = resolved.command.action === "summarize" ? { ...resolved.command, where: undefined } : resolved.command;
+  const outcome: CommandOutcome = runCommand(command, { columns, rows: filteredRows });
+  if (outcome.kind !== "table") throw new Error("The assistant couldn't create that summary. Try rewording the question.");
+  return tableAnswer(outcome.title, outcome.headers, outcome.rows as (string | number | boolean | null)[][], outcome.rows.length);
+}
 
 /* ------------------------------------------------------------------
    Handwriting
@@ -182,12 +344,7 @@ export async function suggestMappings(extraction: Extraction, pages: OcrPage[], 
 /** Asks the assistant to turn a request into a command, validated against the dataset. */
 export async function commandFromRequest(request: string, columns: DatasetColumn[], rows: DatasetRow[], variant: AiModelVariant, options: AiCallOptions = {}): Promise<CommandReply> {
   const reply = await aiRuntime.generate(commandMessages(request, columns, rows), variant, { ...options, maxNewTokens: 200 });
-  return parseCommandReply(reply, columns, request);
-}
-
-/** Suggested names for columns with placeholder names ("Column 3"), from a few of their values. */
-export async function suggestColumnNames(columns: { index: number; samples: string[] }[], variant: AiModelVariant, options: AiCallOptions = {}) {
-  if (columns.length === 0) return new Map<number, string>();
-  const reply = await aiRuntime.generate(columnNameMessages(columns), variant, { ...options, maxNewTokens: 120 });
-  return parseColumnNameReply(reply, columns.map((c) => c.index));
+  const checked = parseCommandReply(reply, columns, request);
+  // Removing one condition can broaden a destructive operation, even if the remaining condition is valid.
+  return checked.ok && checked.dropped ? { ok: false, message: "The assistant added conditions that weren't in your request. Rephrase it, or use Transform to preview the exact change." } : checked;
 }

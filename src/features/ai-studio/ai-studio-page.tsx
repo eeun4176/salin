@@ -1,7 +1,7 @@
 /**
  * Ask Salin AI Page (/ai-studio)
- * Plain-language requests about a dataset ("show unvaccinated dogs in
- * Muzon", "ilan ang aso bawat barangay?") answered by the on-device
+ * Plain-language requests about a dataset ("how many customers per
+ * city?", "ilan ang walang email?") answered by the on-device
  * assistant as a dataset command: the reply says what it understood, shows
  * summaries right away, and opens changes and filters in the dataset
  * editor, where they are previewed, confirmed and can be undone. Attached
@@ -23,6 +23,9 @@ import { errorMessage } from "@/core/storage/errors";
 import { importFiles } from "@/core/storage/repositories/file-repository";
 import { getDatasetWithRows } from "@/core/storage/repositories/dataset.repository";
 import { commandFromRequest } from "@/features/ai/ai-actions";
+import { answerGroundedQuestion, routeQuestion, type GroundedAnswer } from "@/features/ai/grounded-answers";
+import { listAskSources, loadAskSource, type AskSource } from "@/features/ai/document-sources";
+import { downloadBlob } from "@/lib/download";
 import { scanUrl, startScanFromIntake } from "@/features/ocr/ocr-actions";
 import { useDatasets } from "@/features/processing/hooks/use-datasets";
 import { datasetUrl } from "@/features/processing/hooks/use-document-processing";
@@ -37,12 +40,13 @@ import { toast } from "@/stores/toast-store";
 
 type Reply =
   | { kind: "text"; text: string; actions?: ("settings" | "transform")[]; datasetId?: string }
-  | { kind: "files"; files: IntakeFile[] }
+  | { kind: "files"; files: IntakeFile[]; request?: string }
+  | { kind: "analysis"; datasetId?: string; datasetName: string; answer: GroundedAnswer }
   | { kind: "command"; datasetId: string; datasetName: string; title: string; command: DatasetCommand; outcome: CommandOutcome };
 
-type ChatMessage = { id: string; role: "user"; text: string; attachments: IntakeFile[] } | ({ id: string; role: "assistant" } & Reply);
+type ChatMessage = { id: string; role: "user"; text: string; attachments: IntakeFile[]; sourceId: string | null } | ({ id: string; role: "assistant" } & Reply);
 
-const SUGGESTIONS = ["Show unvaccinated dogs in Muzon", "How many pets per barangay?", "Standardize the sex column", "Find duplicate owners", "Ilan ang aso at pusa?"];
+const SUGGESTIONS = ["Give me an overview", "How many rows per city?", "Show the rows with no email", "Find duplicate names", "Ilan ang bawat kategorya?"];
 
 const SCANNABLE = new Set(["png", "jpg", "webp", "pdf"]);
 
@@ -146,7 +150,7 @@ function AssistantMessage({ message }: { message: Extract<ChatMessage, { role: "
         )}
         {message.kind === "files" && (
           <>
-            <p className="text-[15px] text-salin-text">What should I do with {message.files.length === 1 ? "this file" : `these ${message.files.length} files`}? They'll be saved to your workspace first, unchanged.</p>
+            <p className="text-[15px] text-salin-text">{message.request ? `I received your question: “${message.request}”. Review this file into a dataset first, then ask me again.` : `What should I do with ${message.files.length === 1 ? "this file" : `these ${message.files.length} files`}? They'll be saved to your workspace first, unchanged.`}</p>
             <div className="mt-2 flex flex-wrap gap-2">
               {message.files.some((f) => SCANNABLE.has(f.kind)) && (
                 <button type="button" disabled={busy} onClick={() => void readText(message.files.filter((f) => SCANNABLE.has(f.kind)))} className={action}>
@@ -159,6 +163,33 @@ function AssistantMessage({ message }: { message: Extract<ChatMessage, { role: "
                 </button>
               )}
             </div>
+          </>
+        )}
+        {message.kind === "analysis" && (
+          <>
+            <p className="text-[15px] whitespace-pre-wrap text-salin-text">{message.answer.text}</p>
+            {message.answer.kind === "table" && (
+              <ResultTable outcome={{ kind: "table", title: message.datasetName, headers: message.answer.headers ?? [], rows: message.answer.rows ?? [], message: message.answer.text }} />
+            )}
+            {message.answer.kind !== "unsupported" && message.answer.understood && <p className="mt-2 text-xs text-salin-muted">I read this as: {message.answer.understood}</p>}
+            {message.answer.citations.length > 0 && <details className="mt-2 text-xs text-salin-muted">
+              <summary className="cursor-pointer font-semibold">Sources ({message.answer.citations.length})</summary>
+              <ul className="mt-2 space-y-2">{message.answer.citations.slice(0, 100).map((source, i) => <li key={source.id}>
+                <p className="font-medium">[{i + 1}] {source.label}{source.confidence !== null ? ` · OCR ${Math.round(source.confidence)}%` : ""}</p>
+                <p className="whitespace-pre-wrap">{source.text}</p>
+              </li>)}</ul>
+              {message.answer.citations.length > 100 && <p className="mt-2">Showing the first 100 source records. Calculations use all matching records.</p>}
+            </details>}
+            {message.answer.warnings.map((warning) => <p key={warning} className="mt-2 text-xs text-amber-800 dark:text-amber-300">{warning}</p>)}
+            {message.answer.export && message.answer.kind === "table" && <button type="button" className={cn(action, "mt-2")} onClick={() => {
+              const headers = message.answer.headers ?? [];
+              const columns = headers.map((name, i) => ({ id: String(i), name, type: "text" as const, required: false, sourceHeader: null }));
+              const rows = (message.answer.rows ?? []).map((values) => ({ values: Object.fromEntries(values.map((v, i) => [String(i), v])), source: null }));
+              void import("@/core/processing/dataset-export").then(({ exportDataset }) => downloadBlob(exportDataset({ name: message.datasetName, content: { columns, rows } }, "csv"), `${message.datasetName}-answer.csv`)).catch(() => toast("The answer could not be exported. Please try again."));
+            }}>Download displayed table (CSV)</button>}
+            {message.datasetId && <button type="button" onClick={() => navigate(datasetUrl(message.datasetId!))} className={cn(action, "mt-2")}>
+              <Table2 className="size-4" /> Open dataset
+            </button>}
           </>
         )}
         {message.kind === "command" && (
@@ -235,15 +266,23 @@ export function AiStudioPage() {
   const [draft, setDraft] = useState("");
   const [status, setStatus] = useState<string | null>(null);
   const [chosen, setChosen] = useState<string | null>(null);
+  const [documents, setDocuments] = useState<AskSource[]>([]);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const controller = useRef<AbortController | null>(null);
 
   const list = datasets.status === "ready" ? datasets.datasets : [];
-  const datasetId = chosen && list.some((d) => d.id === chosen) ? chosen : (list[0]?.id ?? null);
+  const sourceOptions = [...list.map((d) => ({ value: d.id, label: d.name, hint: `${d.rowCount.toLocaleString()} rows · ${d.columns.length} columns` })), ...documents.map((d) => ({ value: d.id, label: d.name, hint: d.kind === "scan" ? "Scanned document" : "Imported document" }))];
+  const datasetId = chosen && sourceOptions.some((d) => d.value === chosen) ? chosen : (sourceOptions[0]?.value ?? null);
 
   useEffect(() => {
-    if (messages.length || status) scrollToY(document.documentElement.scrollHeight);
+    let active = true;
+    void listAskSources().then((sources) => { if (active) setDocuments(sources); }).catch(() => toast("Document sources could not be loaded."));
+    return () => { active = false; };
+  }, [datasets.status, chosen]);
+
+  useEffect(() => {
+    if (messages.length || status) scrollToY(document.documentElement.scrollHeight, { immediate: true });
   }, [messages, status]);
   useEffect(() => () => controller.current?.abort(), []);
 
@@ -257,24 +296,57 @@ export function AiStudioPage() {
     el.style.height = `${Math.min(el.scrollHeight, 168)}px`;
   }
 
-  async function answer(text: string) {
-    const dataset = list.find((d) => d.id === datasetId);
-    if (!dataset) return reply({ kind: "text", text: "There are no datasets yet. Extract a table from a file or read a scan first, then ask about it here." });
-    if (!assistant.ready) {
-      return reply({ kind: "text", text: `The on-device assistant isn't ready: ${assistant.reason} You can do the same with the Transform tools in the dataset — filter, sort, count by group, standardize values and more.`, actions: ["transform", "settings"], datasetId: dataset.id });
-    }
+  async function answerQuestion(text: string, previous: ChatMessage[], targetId = datasetId) {
+    if (!targetId) return reply({ kind: "text", text: "Choose a document, scan, or dataset first, then ask a question about it." });
+    const savedDatasetId = /^(file|scan):/.test(targetId) ? undefined : targetId;
     controller.current = new AbortController();
-    setStatus("Starting the assistant…");
+    setStatus("Starting the assistant");
     try {
-      const { rows } = await getDatasetWithRows(dataset.id);
-      const result = await commandFromRequest(text, dataset.columns, rows, assistant.variant, {
+      const current = await loadAskSource(targetId, controller.current.signal);
+      const options = {
         signal: controller.current.signal,
-        onProgress: (p) => setStatus(p.stage === "loading" ? `Loading the assistant${p.fraction !== null ? ` ${Math.round(p.fraction * 100)}%` : ""}…` : "Thinking…"),
-      });
-      if (!result.ok) return reply({ kind: "text", text: result.message, actions: ["transform"], datasetId: dataset.id });
-      reply({ kind: "command", datasetId: dataset.id, datasetName: dataset.name, title: describeCommand(result.command, dataset.columns), command: result.command, outcome: runCommand(result.command, { columns: dataset.columns, rows }) });
+        onProgress: (p: { stage: "loading" | "running"; fraction: number | null }) => setStatus(p.stage === "loading" ? `Loading the assistant${p.fraction !== null ? ` ${Math.round(p.fraction * 100)}%` : ""}…` : "Thinking…"),
+      };
+      if (routeQuestion(text) === "command") {
+        if (!savedDatasetId) return reply({ kind: "text", text: "Save this document as a dataset first to preview and confirm changes." });
+        if (!assistant.ready) return reply({ kind: "text", text: `The on-device assistant isn't ready: ${assistant.reason}`, actions: ["settings"], datasetId: targetId });
+        // Keep the existing transform workflow available for non-question requests.
+        const command = await commandFromRequest(text, current.columns, current.rows, assistant.variant, options);
+        if (command.ok) {
+          reply({ kind: "command", datasetId: savedDatasetId, datasetName: current.name, title: describeCommand(command.command, current.columns), command: command.command, outcome: runCommand(command.command, { columns: current.columns, rows: current.rows }) });
+          return;
+        }
+        return reply({ kind: "text", text: command.message, actions: ["transform"], datasetId: savedDatasetId });
+      }
+      const last = [...previous].reverse().find((m) => m.role === "user" && m.sourceId === targetId);
+      const result = await answerGroundedQuestion(text, current, assistant.ready ? assistant.variant : null, options, last?.role === "user" ? last.text : undefined);
+      if (controller.current.signal.aborted) return;
+      reply({ kind: "analysis", datasetId: savedDatasetId, datasetName: current.name, answer: result });
     } catch (error) {
-      if (!controller.current?.signal.aborted) reply({ kind: "text", text: error instanceof AiError ? error.message : "The assistant couldn't answer. Try again, or use the Transform tools.", actions: ["transform"], datasetId: dataset.id });
+      if (!controller.current?.signal.aborted) reply({ kind: "text", text: error instanceof AiError ? error.message : errorMessage(error, "The assistant couldn't answer. Please rephrase the question or check the selected source."), actions: ["transform"], datasetId: savedDatasetId });
+    } finally {
+      setStatus(null);
+      controller.current = null;
+    }
+  }
+
+  async function answerWithFiles(files: IntakeFile[], text: string) {
+    setStatus("Reading the attached file on this device…");
+    try {
+      const { files: saved } = await importFiles(files.map((f) => ({ blob: f.file, name: f.name, kind: f.kind, mimeType: f.file.type, dirPath: "", source: f.source })), null);
+      const createdId = await extractData(saved.map((file) => file.id), setChosen);
+      if (!createdId) {
+        reply({ kind: "text", text: "I couldn't find a readable table in that file. For scanned pages or photos, use Read text, review the extraction, save it as a dataset, then ask about it." });
+        return;
+      }
+      setChosen(createdId);
+      if (text) await answerQuestion(text, [], createdId);
+      else {
+        const { dataset } = await getDatasetWithRows(createdId);
+        reply({ kind: "text", text: `I read ${dataset.name} into a dataset on this device. It has ${dataset.rowCount.toLocaleString()} rows and ${dataset.columns.length} columns. What would you like to know?`, datasetId: createdId });
+      }
+    } catch (error) {
+      reply({ kind: "text", text: errorMessage(error, "The file couldn't be read. Please try a CSV or Excel spreadsheet.") });
     } finally {
       setStatus(null);
       controller.current = null;
@@ -286,11 +358,14 @@ export function AiStudioPage() {
     if (!canSend) return;
     const files = takeAttachments();
     const text = draft.trim();
-    setMessages((m) => [...m, { id: crypto.randomUUID(), role: "user", text, attachments: files }]);
+    const previous = messages;
+    setMessages((m) => [...m, { id: crypto.randomUUID(), role: "user", text, attachments: files, sourceId: datasetId }]);
     setDraft("");
     requestAnimationFrame(resize);
-    if (files.length) reply({ kind: "files", files });
-    else void answer(text);
+    const dataFileKinds = new Set(["xlsx", "csv", "txt", "pdf"]);
+    if (files.length && files.every((file) => dataFileKinds.has(file.kind))) void answerWithFiles(files, text);
+    else if (files.length) reply({ kind: "files", files, request: text || undefined });
+    else void answerQuestion(text, previous);
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
@@ -308,18 +383,18 @@ export function AiStudioPage() {
   }
 
   return (
-    <PageFrame title="Ask Salin AI" description="Ask about your datasets in plain words — on this device, checked by you." className="flex min-h-[70vh] flex-col">
+    <PageFrame title="Ask Salin AI" description="Ask about your selected document, scan, or dataset — with sources, on this device." className="flex min-h-[70vh] flex-col">
       <div className="flex flex-wrap items-end gap-3">
         <label className="grid min-w-0 flex-1 basis-60 gap-1 text-xs font-medium text-salin-muted">
-          Dataset
-          {list.length ? (
-            <ChoiceMenu variant="field" label="Dataset" heading="Ask about" value={datasetId ?? ""} options={list.map((d) => ({ value: d.id, label: d.name, hint: `${d.rowCount.toLocaleString()} rows · ${d.columns.length} columns` }))} onChange={setChosen} />
+          Source
+          {sourceOptions.length ? (
+            <ChoiceMenu variant="field" label="Source" heading="Ask about" value={datasetId ?? ""} options={sourceOptions} onChange={setChosen} disabled={status !== null} />
           ) : (
-            <span className="text-sm font-normal text-salin-muted">{datasets.status === "loading" ? "Loading…" : "No datasets yet."}</span>
+            <span className="text-sm font-normal text-salin-muted">{datasets.status === "loading" ? "Loading…" : "No documents or datasets yet."}</span>
           )}
         </label>
         <p className={cn("flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold", assistant.ready ? "bg-salin-primary-soft text-salin-primary-ink" : "bg-salin-tile text-salin-muted")}>
-          <Bot className="size-3.5" /> {assistant.ready ? "Assistant ready (on this device)" : "Assistant not set up"}
+          <Bot className="size-3.5" /> {assistant.ready ? "Assistant ready (on this device)" : "Local document search ready"}
         </p>
       </div>
 
@@ -349,7 +424,7 @@ export function AiStudioPage() {
               <Bot className="size-7" />
             </span>
             <p className="mt-3 font-semibold text-salin-text">What should we do with your data?</p>
-            <p className="mt-1 max-w-sm text-sm text-salin-muted">Pick a dataset and ask — or attach photos, PDFs or spreadsheets to turn them into data. Nothing changes without your OK.</p>
+            <p className="mt-1 max-w-sm text-sm text-salin-muted">Choose a document, scan, or dataset and ask in English, Filipino, or Taglish. Answers include sources and calculations run on this device.</p>
           </div>
         )}
         {messages.map((m) => (m.role === "user" ? <UserMessage key={m.id} message={m} /> : <AssistantMessage key={m.id} message={m} />))}
@@ -385,7 +460,7 @@ export function AiStudioPage() {
               }}
               onKeyDown={onKeyDown}
               maxLength={500}
-              placeholder="Ask about this dataset…"
+              placeholder="Ask about the selected source or attach a file…"
               data-lenis-prevent=""
               className="max-h-42 min-h-11 flex-1 resize-none bg-transparent px-1 py-[11px] text-[15px] text-salin-text outline-none placeholder:text-salin-subtle"
             />

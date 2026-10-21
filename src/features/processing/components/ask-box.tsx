@@ -1,7 +1,7 @@
 /**
  * Ask Box
- * Plain-language requests about a dataset ("show unvaccinated dogs in
- * Muzon", "ilan ang aso bawat barangay?"), answered by the on-device
+ * Plain-language requests about a dataset ("show the rows with no email",
+ * "ilan ang bawat lungsod?"), answered by the on-device
  * assistant as a dataset command — validated against the dataset and then
  * previewed, never applied directly. Shows progress with Stop, explains
  * requests it can't do, and points to the Transform tools when the
@@ -78,7 +78,7 @@ export function AskBox({ columns, rows, onCommand, onOpenTransform }: AskBoxProp
           id="ask-dataset"
           value={request}
           onChange={(e) => setRequest(e.target.value)}
-          placeholder="Ask: “show unvaccinated dogs in Muzon”"
+          placeholder="Ask: “show the rows with no email”"
           maxLength={500}
           disabled={status !== null}
           className="h-9 min-w-0 flex-1 bg-transparent text-sm text-salin-text outline-none placeholder:text-salin-subtle"

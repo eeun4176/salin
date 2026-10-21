@@ -10,19 +10,18 @@
  * without the reviewer's choice.
  */
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router";
-import { Bot, Check, LoaderCircle, PenLine, Search, Sparkles, Square, X } from "lucide-react";
+import { Bot, Check, PenLine, Search, Sparkles, X } from "lucide-react";
 
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { NameDialog } from "@/components/common/name-dialog";
-import { AiError } from "@/core/ai/ai-runtime";
 import { acceptSuggestion, pendingSuggestions, refLabel, rejectSuggestion } from "@/core/ai/suggestions";
 import { reviewItems, refKey } from "@/core/ocr/review/review-state";
-import { findFields, handwritingTargets, readHandwriting, suggestCorrections, suggestMappings, type AiResult } from "@/features/ai/ai-actions";
+import { findFields, handwritingTargets, readHandwriting, suggestCorrections, suggestMappings } from "@/features/ai/ai-actions";
 import { RegionCrop } from "@/features/ocr/components/review-parts";
+import { useAiRun } from "@/features/ai/use-ai-run";
 import { useAiFeature, useAiMode } from "@/stores/ai-store";
-import { toast } from "@/stores/toast-store";
 import { cn } from "@/lib/utils";
 import type { Box, Extraction, OcrPage, Suggestion, SuggestionSource } from "@/types/ocr";
 
@@ -226,45 +225,8 @@ export function AiTools({ extraction, pages, generic, onResult }: AiToolsProps) 
   const { mode } = useAiMode();
   const handwriting = useAiFeature("handwriting");
   const assistant = useAiFeature("assistant");
-  const [running, setRunning] = useState<{
-    label: string;
-    progress: string;
-  } | null>(null);
-  const [asking, setAsking] = useState(false);
-  const controller = useRef<AbortController | null>(null);
+  const { busy, run, status } = useAiRun(onResult);
   const targets = handwritingTargets(extraction).length;
-
-  async function run(
-    label: string,
-    task: (options: { signal: AbortSignal; onProgress: (p: { stage: string; fraction: number | null; tokens?: number }) => void }) => Promise<AiResult & { notFound?: string[] }>,
-  ) {
-    controller.current = new AbortController();
-    setRunning({ label, progress: "Starting…" });
-    try {
-      const result = await task({
-        signal: controller.current.signal,
-        onProgress: (p) =>
-          setRunning({
-            label,
-            progress:
-              p.stage === "loading"
-                ? `Loading the model${p.fraction !== null ? ` ${Math.round(p.fraction * 100)}%` : ""}…`
-                : p.tokens
-                  ? `Writing (${p.tokens} words)…`
-                  : `Working${p.fraction !== null ? ` ${Math.round(p.fraction * 100)}%` : ""}…`,
-          }),
-      });
-      onResult(result.apply);
-      const missing = result.notFound?.length ? ` Not on the page: ${result.notFound.join(", ")}.` : "";
-      toast(result.offered ? `${result.offered} suggestion${result.offered === 1 ? "" : "s"} to review.${missing}` : `No suggestions — nothing to change.${missing}`);
-    } catch (error) {
-      if (controller.current?.signal.aborted) toast("Stopped. Nothing was changed.");
-      else toast(error instanceof AiError ? error.message : "The AI couldn't finish. Nothing was changed — try again.");
-    } finally {
-      setRunning(null);
-      controller.current = null;
-    }
-  }
 
   if (mode === "standard") {
     return (
@@ -280,7 +242,6 @@ export function AiTools({ extraction, pages, generic, onResult }: AiToolsProps) 
     );
   }
 
-  const busy = running !== null;
   return (
     <div aria-label="AI tools" role="group" className="space-y-2">
       <div className="flex flex-wrap gap-2">
@@ -314,56 +275,30 @@ export function AiTools({ extraction, pages, generic, onResult }: AiToolsProps) 
             >
               <Bot className="size-4" /> Check with assistant
             </button>
-            <button
-              type="button"
-              disabled={busy || !assistant.ready || extraction.forms.length === 0}
-              title={assistant.reason ?? (extraction.forms.length === 0 ? "Finding fields works on form pages." : undefined)}
-              onClick={() => (generic ? setAsking(true) : void run("Finding missing fields", (o) => findFields(extraction, pages, null, assistant.variant, o)))}
-              className={toolButton}
-            >
-              <Search className="size-4" /> {generic ? "Find fields…" : "Find missing fields"}
-            </button>
+            {/* Generic scans ask for their columns in the "What do you need?" bar instead. */}
+            {!generic && (
+              <button
+                type="button"
+                disabled={busy || !assistant.ready || extraction.forms.length === 0}
+                title={assistant.reason ?? (extraction.forms.length === 0 ? "Finding fields works on form pages." : undefined)}
+                onClick={() => void run("Finding missing fields", (o) => findFields(extraction, pages, null, assistant.variant, o))}
+                className={toolButton}
+              >
+                <Search className="size-4" /> Find missing fields
+              </button>
+            )}
           </>
         )}
       </div>
-      {running ? (
-        <p role="status" className="flex flex-wrap items-center gap-2 text-sm text-salin-muted">
-          <LoaderCircle className="size-4 animate-spin text-salin-primary motion-reduce:animate-none" /> {running.label} — {running.progress}
-          <button type="button" onClick={() => controller.current?.abort()} className="inline-flex items-center gap-1 font-semibold text-salin-primary hover:underline">
-            <Square className="size-3.5" /> Stop
-          </button>
-        </p>
-      ) : (
-        (!handwriting.ready || (mode === "advanced" && !assistant.ready)) && (
+      {status ||
+        ((!handwriting.ready || (mode === "advanced" && !assistant.ready)) && (
           <p className="text-xs text-salin-muted">
             {(!handwriting.ready ? handwriting.reason : assistant.reason) ?? ""}{" "}
             <Link to="/settings#ai-heading" className="font-semibold text-salin-primary hover:underline">
               Open Settings
             </Link>
           </p>
-        )
-      )}
-      <NameDialog
-        open={asking}
-        onOpenChange={setAsking}
-        title="Find fields on the page"
-        description="List the fields to look for, separated by commas. The assistant only copies values it finds in the text read from the page."
-        initialValue="Owner's name, Pet's name, Species, Barangay"
-        confirmLabel="Find"
-        validate={(text) => (text.split(",").some((f) => f.trim()) ? null : "Name at least one field.")}
-        onSubmit={(text) => {
-          setAsking(false);
-          const labels = [
-            ...new Set(
-              text
-                .split(",")
-                .map((f) => f.trim())
-                .filter(Boolean),
-            ),
-          ].slice(0, 12);
-          void run("Finding fields", (o) => findFields(extraction, pages, labels, assistant.variant, o));
-        }}
-      />
+        ))}
     </div>
   );
 }

@@ -222,6 +222,42 @@ describe("Excel parser", () => {
     expect(content.rows[0].source).toEqual({ fileId: "f1", page: null, sheet: "B", row: 2, range: "A2:B2" });
   });
 
+  it("reads a government form's checkbox grid: titles and form lines skipped, two header rows, ticks as yes/no, blank numbered lines left out", async () => {
+    // The layout of the CVO "Dog & Cat Census Form": three title lines, a fill-in line, group labels over sub-columns, then numbered lines.
+    const form = workbookBytes([
+      {
+        name: "Census",
+        rows: [
+          ["City of San Jose del Monte"],
+          ["CITY VETERINARY OFFICE"],
+          ["DOG & CAT CENSUS FORM"],
+          ["BARANGAY: ________________", "", "", "", "", "DATE OF CENSUS:__________"],
+          ["No.", "Name of Owner", "Type of Pet", "", "Sex", "", "Classification", "", "Remarks"],
+          ["", "", "Dog", "Cat", "M", "F", "Confined", "Free Roam", ""],
+          [1, "Juan Dela Cruz", "✓", "", "✓", "", "✓", "", ""],
+          [2, "Maria Santos", "", "✓", "", "✓", "", "✓", "spayed"],
+          [3, "Pedro Reyes", "✓", "", "", "✓", "", "✓", ""],
+          [4, "", "", "", "", "", "", "", ""],
+          [5, "", "", "", "", "", "", "", ""],
+          ["Prepared By:", "", "", "", "", "Noted By:"],
+          [],
+          ["_______________________"],
+          ["Paravet"],
+        ],
+        merges: ["A1:I1", "A2:I2", "A3:I3", "C5:D5", "E5:F5", "G5:H5", "A5:A6", "B5:B6", "I5:I6"],
+      },
+    ]);
+    const result = await parseXlsx(input(form), context);
+    // The signature line under the form isn't a table.
+    expect(result.tables).toHaveLength(1);
+    expect(result.tables[0].range).toBe("A5:I11");
+    const content = buildDatasetContent([{ file: { id: "f1", name: "census.xlsx" }, extraction: result }]);
+    expect(content.columns.map((c) => c.name)).toEqual(["No.", "Name of Owner", "Type of Pet Dog", "Type of Pet Cat", "Sex M", "Sex F", "Classification Confined", "Classification Free Roam", "Remarks"]);
+    expect(content.columns.filter((c) => c.type === "boolean").map((c) => c.name)).toEqual(["Type of Pet Dog", "Type of Pet Cat", "Sex M", "Sex F", "Classification Confined", "Classification Free Roam"]);
+    // Lines 4 and 5 only have their number: a blank form line, not a record.
+    expect(content.rows.map((r) => r.source?.row)).toEqual([7, 8, 9]);
+  });
+
   it("rejects an invalid confirmed range clearly", async () => {
     await expect(parseXlsx(input(book, [{ sheet: "A", range: "nope", headerRows: 1 }]), context)).rejects.toThrow(/A nope: Enter a range like A2:G11/);
   });

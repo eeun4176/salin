@@ -1,10 +1,12 @@
 /**
  * OCR E2E Tests
  * Real on-device text recognition in Chrome, end to end: a printed pet
- * registration form photo goes through prepare → read (model downloaded
- * from Salin's own site, with progress) → review (values checked against
- * the page, a missing required value blocks saving until typed) → dataset
- * (source region shown) → CSV export; a census sheet becomes table
+ * registration form photo goes through read (model downloaded from
+ * Salin's own site, with progress; Fix pages on the side) → check & save
+ * (values checked against the page, a missing required value blocks saving
+ * until typed) → dataset (source region shown) → CSV export; a photo
+ * imported with Extract data keeps only the columns asked for (tapped or
+ * typed), and the rest are typed by hand; a census sheet becomes table
  * records; the model works offline once downloaded and explains what to do
  * when it's missing offline; damaged and blank images fail safely; and no
  * request ever leaves Salin's origin (no third-party inference).
@@ -51,13 +53,15 @@ async function openRead(page: Page, fileName: string) {
   await expect(page.getByRole("heading", { name: "Read text", level: 1 })).toBeVisible();
 }
 
-/** Step 2 with a template chosen: read and wait for Review. */
+/** Before the recognition files are on the device: pick the kind of document under Options, read, and wait for Check & save. */
 async function readWith(page: Page, template: RegExp) {
-  await page.getByRole("button", { name: "Next: read text" }).click();
+  await page.getByText("Options", { exact: false }).first().click();
   await page.getByRole("radio", { name: template }).check();
   await page.getByRole("button", { name: /^Read (page|\d+ pages)$/ }).click();
-  await expect(page.getByRole("checkbox", { name: "Only show what needs a look" })).toBeVisible({ timeout: 150_000 });
+  await waitForCheck(page);
 }
+
+const waitForCheck = (page: Page) => expect(page.getByRole("checkbox", { name: "Only show what needs a look" })).toBeVisible({ timeout: 150_000 });
 
 test("a printed registration form is read on the device, reviewed against the page, saved and exported", async ({ page, browser }) => {
   const origin = new URL(page.url() || "http://localhost:4173").origin;
@@ -73,11 +77,13 @@ test("a printed registration form is read on the device, reviewed against the pa
   await uploadFiles(page, [await registrationForm(browser)]);
   await openRead(page, "Registration.png");
 
-  // Prepare: the page and its clean-up options; the original stays as it is.
+  // Fix pages (optional): the page and its clean-up options; the original stays as it is.
+  await page.getByRole("button", { name: "Fix pages" }).click();
   await expect(page.getByRole("tab", { name: "Crop & rotate" })).toBeVisible();
   await expect(page.getByRole("switch", { name: /Straighten text/ })).toBeChecked();
   await page.getByRole("tab", { name: "Preview for reading" }).click();
   await expect(page.getByRole("img", { name: "Page 1 as it will be read" })).toBeVisible({ timeout: 30_000 });
+  await page.getByRole("button", { name: "Done" }).click();
 
   // Read: the model downloads from Salin's own site, then the page is read.
   await readWith(page, /Pet registration form/);
@@ -87,14 +93,12 @@ test("a printed registration form is read on the device, reviewed against the pa
   await expect(page.getByRole("textbox", { name: "Pet's name" })).toHaveValue("Bantay");
   await expect(page.getByRole("button", { name: "Species: Dog" })).toBeVisible();
   await expect(page.getByRole("textbox", { name: "Address" })).toHaveValue("");
-  await page.getByRole("button", { name: "Next: save" }).click();
+  await page.getByRole("button", { name: "Save dataset" }).click();
   await expect(page.getByText(/1 required value needs attention/)).toBeVisible();
   await page.getByRole("textbox", { name: "Address" }).fill("Purok 2, Poblacion");
-  await page.getByRole("button", { name: "Next: save" }).click();
 
-  // Save: one dataset, then the dataset editor with the source region.
-  await expect(page.getByRole("heading", { name: "1 dataset will be created" })).toBeVisible();
-  await page.getByRole("button", { name: "Create dataset" }).click();
+  // Save: straight to the dataset editor, with the source region.
+  await page.getByRole("button", { name: "Save dataset" }).click();
   await expect(page).toHaveURL(/\/datasets\/[\w-]+$/, { timeout: 30_000 });
   await expect(page.getByRole("textbox", { name: "Owner's name, row 1" })).toHaveValue("Juan Dela Cruz");
   await expect(page.getByRole("textbox", { name: "Address, row 1" })).toHaveValue("Purok 2, Poblacion");
@@ -142,8 +146,36 @@ test("a census sheet becomes one record per row, with totals checked against the
   await expect(page.getByRole("textbox", { name: "Species, record 2" })).toHaveValue("Cat");
   // The sheet says 3 dogs, but only 2 dog rows were read: flagged, not "fixed".
   await expect(page.getByText(/The page says 3, but 2 records were read/)).toBeVisible();
-  await page.getByRole("button", { name: "Next: save" }).click();
-  await expect(page.getByRole("heading", { name: "2 datasets will be created" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Save 2 datasets" })).toBeVisible();
+});
+
+test("an imported form photo is read by itself; naming the columns keeps only those, then it saves", async ({ page, browser }) => {
+  await page.goto("/import");
+  await page.getByTestId("file-input").setInputFiles([await registrationForm(browser)]);
+  await page.getByRole("button", { name: "Extract data" }).click();
+  await expect(page).toHaveURL(/\/scans\/[\w-]+$/, { timeout: 30_000 });
+  // The files aren't on the device yet: downloading stays the user's choice, then reading starts.
+  await page.getByRole("button", { name: /^Read page$/ }).click();
+  await waitForCheck(page);
+
+  // Labels found on the page can be tapped instead of typed.
+  const bar = page.getByRole("region", { name: /What do you need/ });
+  const columns = bar.getByRole("textbox", { name: "Columns you need" });
+  await bar.getByRole("button", { name: /^Owner.s Name$/ }).click();
+  await expect(columns).toHaveValue(/^Owner.s Name$/);
+  await columns.fill("Owner's Name, Breed, Phone");
+  await bar.getByRole("button", { name: "Extract" }).click();
+  await expect(page.getByRole("textbox", { name: "Owner's Name", exact: true })).toHaveValue("Juan Dela Cruz");
+  await expect(page.getByRole("textbox", { name: "Breed", exact: true })).toHaveValue("Aspin");
+  await expect(page.getByRole("textbox", { name: /Pet.s Name/ })).toHaveCount(0);
+
+  // Not on the page: typed by hand. Then saved, with only the asked columns.
+  await page.getByRole("textbox", { name: "Phone", exact: true }).fill("0917 123 4567");
+  await page.getByRole("button", { name: "Save dataset" }).click();
+  await expect(page).toHaveURL(/\/datasets\/[\w-]+$/, { timeout: 30_000 });
+  await expect(page.getByRole("textbox", { name: "Owner's Name, row 1" })).toHaveValue("Juan Dela Cruz");
+  await expect(page.getByRole("textbox", { name: "Phone, row 1" })).toHaveValue("0917 123 4567");
+  await expect(page.getByRole("textbox", { name: /Pet.s Name, row 1/ })).toHaveCount(0);
 });
 
 test("recognition works offline once downloaded, and explains what to do when the files are missing", async ({ page, context, browser }) => {
@@ -168,7 +200,8 @@ test("recognition works offline once downloaded, and explains what to do when th
   await page.goto("/");
   await uploadFiles(page, [form]);
   await openRead(page, "Registration.png");
-  await readWith(page, /Pet registration form/);
+  // The files are on the device, so reading starts by itself.
+  await waitForCheck(page);
   await expect(page.getByRole("textbox", { name: "Owner's name" })).toHaveValue("Juan Dela Cruz");
   await context.setOffline(false);
 });
@@ -191,11 +224,13 @@ test("damaged and blank images fail safely, and values can still be typed by han
   await expect(other).toHaveAttribute("data-thumbnail-problem", "unsupported", { timeout: 20_000 });
 
   await openRead(page, "Broken.png");
-  await expect(page.getByRole("alert")).toContainText(/can't be opened/);
+  await page.getByRole("button", { name: /^Read page$/ }).click();
+  await expect(page.getByRole("list", { name: "Pages" })).toContainText(/can't be opened/, { timeout: 150_000 });
   await page.goto("/");
 
+  // The files are on the device now, so this one is read by itself.
   await openRead(page, "Blank.png");
-  await readWith(page, /Any document/);
+  await waitForCheck(page);
   await expect(page.getByText(/No text was found on these pages/)).toBeVisible();
   await expect(page.getByRole("button", { name: "Add row" })).toHaveCount(0);
 
@@ -204,8 +239,7 @@ test("damaged and blank images fail safely, and values can still be typed by han
   await page.getByRole("button", { name: "Type values myself" }).click();
   await page.getByRole("button", { name: "Add row" }).click();
   await page.getByRole("textbox", { name: "Text, record 1" }).fill("Written by hand");
-  await page.getByRole("button", { name: "Next: save" }).click();
-  await page.getByRole("button", { name: "Create dataset" }).click();
+  await page.getByRole("button", { name: "Save dataset" }).click();
   await expect(page.getByRole("textbox", { name: "Text, row 1" })).toHaveValue("Written by hand", { timeout: 30_000 });
 });
 
@@ -221,7 +255,7 @@ test("the camera screen offers retake-free fallbacks and sends pages straight to
   ]);
   await expect(page.getByText(/Skipped notes.txt \(not a photo or pdf\)/)).toBeVisible();
   await expect(page.getByRole("img", { name: "Page 1" })).toBeVisible();
-  await page.getByRole("button", { name: "Read text into a dataset" }).click();
+  await page.getByRole("button", { name: "Extract data" }).click();
   await expect(page).toHaveURL(/\/scans\/[\w-]+$/, { timeout: 30_000 });
   // The original photo was kept in the workspace.
   await page.goto("/");

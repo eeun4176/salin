@@ -85,11 +85,12 @@ test("the Read text steps fit a phone screen, from preparing a page to the datas
   await expect(page).toHaveURL(/\/scans\/[\w-]+$/, { timeout: 30_000 });
   const noOverflow = async () => expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
 
-  // Step 1 (page editor), step 2 (templates, model status), back to Datasets with the scan listed — a long name must not push the list sideways.
-  await expect(page.getByRole("tab", { name: "Crop & rotate" })).toBeVisible();
-  await noOverflow();
-  await page.getByRole("button", { name: "Next: read text" }).tap();
+  // Read (model status, options with templates), Fix pages (page editor), back to Datasets with the scan listed — a long name must not push the list sideways.
+  await page.getByText("Options").first().tap();
   await expect(page.getByRole("radio", { name: /Pet registration form/ })).toBeVisible();
+  await noOverflow();
+  await page.getByRole("button", { name: "Fix pages" }).tap();
+  await expect(page.getByRole("tab", { name: "Crop & rotate" })).toBeVisible();
   await noOverflow();
   await page.goto("/datasets");
   await expect(page.getByRole("link", { name: /Form photo.*Continue/ })).toBeVisible();

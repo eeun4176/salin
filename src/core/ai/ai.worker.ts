@@ -3,10 +3,11 @@
  * Runs the on-device AI models off the main thread, so the screen never
  * freezes: the handwriting recognizer (an ONNX model run directly with ONNX
  * Runtime Web) and the assistant language model (Transformers.js on the same
- * ONNX Runtime, on WebGPU or the CPU). Only one model is kept in memory at a
- * time — loading one unloads the other. Every file is read from Salin's
- * model cache; this worker has no way to fetch anything from the network,
- * and only text and pixel data (never documents) come in.
+ * ONNX Runtime, on WebGPU or the CPU; on laptops, WebLLM on WebGPU). Only one
+ * model is kept in memory at a time — loading one unloads the other. Every
+ * file is read from the model caches Salin filled; this worker fetches
+ * nothing from the network, and only text and pixel data (never documents)
+ * come in.
  */
 
 /// <reference lib="webworker" />
@@ -39,6 +40,18 @@ export type AiWorkerRequest =
       messages: ChatMessage[];
       maxNewTokens: number;
     }
+  | {
+      id: number;
+      type: "generate-webllm";
+      /** The WebLLM engine module in Salin's cache; the pinned model folder URL, WebLLM model id and its compiled GPU code (in WebLLM's caches). */
+      engine: { cache: string; key: string };
+      model: string;
+      modelId: string;
+      modelLib: string;
+      files: { cache: string; key: string }[];
+      messages: ChatMessage[];
+      maxNewTokens: number;
+    }
   | { id: number; type: "unload" };
 
 export type AiWorkerMessage =
@@ -53,6 +66,8 @@ const scope = self as unknown as DedicatedWorkerGlobalScope;
 let lineModel: { key: string; session: ort.InferenceSession } | null = null;
 type Transformers = typeof import("@huggingface/transformers");
 let assistant: { key: string; tokenizer: Awaited<ReturnType<Transformers["AutoTokenizer"]["from_pretrained"]>>; model: Awaited<ReturnType<Transformers["AutoModelForCausalLM"]["from_pretrained"]>> } | null = null;
+type WebLlm = typeof import("@mlc-ai/web-llm");
+let webllm: { key: string; engine: Awaited<ReturnType<WebLlm["CreateMLCEngine"]>> } | null = null;
 let runtimeKey = "";
 
 async function cached(cacheName: string, key: string): Promise<Response> {
@@ -71,8 +86,11 @@ async function ensureRuntime(cacheName: string, key: string) {
 
 async function unloadAssistant() {
   const current = assistant;
+  const llm = webllm;
   assistant = null;
+  webllm = null;
   await current?.model.dispose();
+  await llm?.engine.unload().catch(() => undefined);
 }
 
 async function unloadLines() {
@@ -146,11 +164,39 @@ async function generate(request: Extract<AiWorkerRequest, { type: "generate" }>,
   // enable_thinking: models with a reasoning mode (Qwen3) answer directly; the template gets extra options as variables.
   const options = { add_generation_prompt: true, return_dict: true, enable_thinking: false } as { add_generation_prompt: boolean; return_dict: true };
   const inputs = tokenizer.apply_chat_template(request.messages, options) as unknown as Record<string, unknown> & { input_ids: { dims: number[] } };
+  const promptLength = inputs.input_ids.dims.at(-1)!;
+  if (promptLength + request.maxNewTokens > 4096) throw new Error("The request exceeds the assistant context. Select fewer columns or ask about a specific page.");
   let tokens = 0;
   const streamer = new tf.TextStreamer(tokenizer, { skip_prompt: true, token_callback_function: () => progress("running", null, ++tokens) });
   const output = (await model.generate({ ...inputs, max_new_tokens: request.maxNewTokens, do_sample: false, streamer })) as { slice: (...args: unknown[]) => unknown };
-  const promptLength = inputs.input_ids.dims.at(-1)!;
   return tokenizer.batch_decode(output.slice(null, [promptLength, null]) as never, { skip_special_tokens: true })[0];
+}
+
+/**
+ * The laptop assistant through WebLLM. WebLLM fetches only files missing from
+ * its caches, so every file is checked first: a missing one stops here
+ * instead of being downloaded.
+ */
+async function generateWebLlm(request: Extract<AiWorkerRequest, { type: "generate-webllm" }>, progress: (stage: "loading" | "running", fraction: number | null) => void): Promise<string> {
+  await unloadLines();
+  if (webllm?.key !== request.model) {
+    await unloadAssistant();
+    for (const file of request.files) await cached(file.cache, file.key);
+    // The engine module comes from the cache too (it's 6.6 MB, so it isn't part of the app shell).
+    const engineUrl = URL.createObjectURL(await (await cached(request.engine.cache, request.engine.key)).blob());
+    const { CreateMLCEngine } = (await import(/* @vite-ignore */ engineUrl).finally(() => URL.revokeObjectURL(engineUrl))) as WebLlm;
+    const appConfig = { model_list: [{ model: request.model, model_id: request.modelId, model_lib: request.modelLib, overrides: { context_window_size: 4096 } }], cacheBackend: "cache" as const };
+    webllm = { key: request.model, engine: await CreateMLCEngine(request.modelId, { appConfig, initProgressCallback: (p) => progress("loading", p.progress) }) };
+  }
+  progress("running", null);
+  try {
+    const reply = await webllm.engine.chat.completions.create({ messages: request.messages, temperature: 0, max_tokens: request.maxNewTokens, extra_body: { enable_thinking: false } });
+    return (reply.choices[0]?.message.content ?? "").replace(/<think>[\s\S]*?<\/think>/, "").trim();
+  } catch (error) {
+    // A lost GPU device (an integrated GPU can reset under load) leaves the engine unusable: load it afresh next time.
+    await unloadAssistant();
+    throw error;
+  }
 }
 
 function classify(error: unknown): Extract<AiWorkerMessage, { type: "error" }>["code"] {
@@ -166,6 +212,7 @@ scope.onmessage = async (event: MessageEvent<AiWorkerRequest>) => {
     let result: unknown;
     if (request.type === "read-lines") result = await readLines(request, (fraction) => post({ id: request.id, type: "progress", stage: "running", fraction }));
     else if (request.type === "generate") result = await generate(request, (stage, fraction, tokens) => post({ id: request.id, type: "progress", stage, fraction, tokens }));
+    else if (request.type === "generate-webllm") result = await generateWebLlm(request, (stage, fraction) => post({ id: request.id, type: "progress", stage, fraction }));
     else {
       await unloadAssistant();
       await unloadLines();

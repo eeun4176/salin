@@ -1,0 +1,245 @@
+{
+  "date": "2026-10-21T02:40:52.214Z",
+  "environment": "Node on development laptop; deterministic offline path; no Qwen inference",
+  "cases": 22,
+  "exactMatchAccuracy": 0.36363636363636365,
+  "calculationCorrectness": 1,
+  "evidenceCitationAccuracy": 0.09090909090909091,
+  "unsupportedAnswerRate": 0.22727272727272727,
+  "latencyMs": {
+    "mean": 2.403913636363613,
+    "max": 21.976499999999987
+  },
+  "memory": {
+    "nodeHeapUsedBytes": 47512688,
+    "devicePeakBytes": null
+  },
+  "laptopQwen": {
+    "status": "not measured"
+  },
+  "physicalPhone": {
+    "status": "not measured"
+  },
+  "results": [
+    {
+      "question": "What is the contact number?",
+      "document": "notice",
+      "correct": false,
+      "citationCorrect": false,
+      "calculation": false,
+      "unsupportedAnswer": false,
+      "latencyMs": 21.976499999999987,
+      "answer": "1 matching row."
+    },
+    {
+      "question": "Ano ang contact number?",
+      "document": "notice",
+      "correct": false,
+      "citationCorrect": false,
+      "calculation": false,
+      "unsupportedAnswer": false,
+      "latencyMs": 1.322499999999991,
+      "answer": "1 matching row."
+    },
+    {
+      "question": "What is the reference ID?",
+      "document": "notice",
+      "correct": false,
+      "citationCorrect": false,
+      "calculation": false,
+      "unsupportedAnswer": false,
+      "latencyMs": 1.6346000000000913,
+      "answer": "1 matching row."
+    },
+    {
+      "question": "What is the deadline on page 2?",
+      "document": "pdf",
+      "correct": false,
+      "citationCorrect": false,
+      "calculation": false,
+      "unsupportedAnswer": false,
+      "latencyMs": 1.8843999999999141,
+      "answer": "1 matching row. I didn't use: “page”."
+    },
+    {
+      "question": "Ano ang deadline sa pahina 2?",
+      "document": "pdf",
+      "correct": false,
+      "citationCorrect": false,
+      "calculation": false,
+      "unsupportedAnswer": false,
+      "latencyMs": 1.667599999999993,
+      "answer": "1 matching row. I didn't use: “pahina”."
+    },
+    {
+      "question": "What is the contact number on page 2?",
+      "document": "pdf",
+      "correct": false,
+      "citationCorrect": false,
+      "calculation": false,
+      "unsupportedAnswer": true,
+      "latencyMs": 5.057800000000043,
+      "answer": "1 matching row. I didn't use: “page”."
+    },
+    {
+      "question": "What is the organizer?",
+      "document": "pdf",
+      "correct": false,
+      "citationCorrect": false,
+      "calculation": false,
+      "unsupportedAnswer": false,
+      "latencyMs": 2.6288999999999305,
+      "answer": "1 matching row."
+    },
+    {
+      "question": "How many rows?",
+      "document": "csv",
+      "correct": true,
+      "citationCorrect": false,
+      "calculation": true,
+      "unsupportedAnswer": false,
+      "latencyMs": 0.9713999999999032,
+      "answer": "3 rows match."
+    },
+    {
+      "question": "Ilang rows sa Malolos?",
+      "document": "csv",
+      "correct": true,
+      "citationCorrect": false,
+      "calculation": true,
+      "unsupportedAnswer": false,
+      "latencyMs": 0.9811999999999443,
+      "answer": "2 rows match."
+    },
+    {
+      "question": "Total amount",
+      "document": "csv",
+      "correct": true,
+      "citationCorrect": false,
+      "calculation": true,
+      "unsupportedAnswer": false,
+      "latencyMs": 1.3595000000000255,
+      "answer": "Total Amount: 2500 (from 3 rows)."
+    },
+    {
+      "question": "Kabuuang amount sa Malolos",
+      "document": "csv",
+      "correct": true,
+      "citationCorrect": false,
+      "calculation": true,
+      "unsupportedAnswer": false,
+      "latencyMs": 0.731499999999869,
+      "answer": "Total Amount: 1750 (from 2 rows)."
+    },
+    {
+      "question": "Show the name of Ana",
+      "document": "csv",
+      "correct": false,
+      "citationCorrect": false,
+      "calculation": false,
+      "unsupportedAnswer": false,
+      "latencyMs": 3.7833999999998014,
+      "answer": "1 matching row."
+    },
+    {
+      "question": "Show names and amounts",
+      "document": "csv",
+      "correct": true,
+      "citationCorrect": false,
+      "calculation": false,
+      "unsupportedAnswer": false,
+      "latencyMs": 1.2264999999999873,
+      "answer": "3 matching rows."
+    },
+    {
+      "question": "Total amount per city",
+      "document": "csv",
+      "correct": true,
+      "citationCorrect": false,
+      "calculation": true,
+      "unsupportedAnswer": false,
+      "latencyMs": 2.175700000000006,
+      "answer": "Total Amount by City: 2 groups."
+    },
+    {
+      "question": "How many rows?",
+      "document": "xlsx",
+      "correct": true,
+      "citationCorrect": false,
+      "calculation": true,
+      "unsupportedAnswer": false,
+      "latencyMs": 0.72199999999998,
+      "answer": "4 rows match."
+    },
+    {
+      "question": "Total amount",
+      "document": "xlsx",
+      "correct": true,
+      "citationCorrect": false,
+      "calculation": true,
+      "unsupportedAnswer": false,
+      "latencyMs": 0.722400000000107,
+      "answer": "Total Amount: 2800 (from 4 rows)."
+    },
+    {
+      "question": "What is the mayor's salary?",
+      "document": "notice",
+      "correct": false,
+      "citationCorrect": false,
+      "calculation": false,
+      "unsupportedAnswer": true,
+      "latencyMs": 1.003500000000031,
+      "answer": "9 matching rows. I didn't use: “mayor”, “salary”."
+    },
+    {
+      "question": "What does Ana prefer?",
+      "document": "csv",
+      "correct": false,
+      "citationCorrect": false,
+      "calculation": false,
+      "unsupportedAnswer": true,
+      "latencyMs": 0.483600000000024,
+      "answer": "1 matching row. I didn't use: “prefer”."
+    },
+    {
+      "question": "Average",
+      "document": "csv",
+      "correct": false,
+      "citationCorrect": false,
+      "calculation": false,
+      "unsupportedAnswer": true,
+      "latencyMs": 0.3528999999998632,
+      "answer": "Average Amount: 833.33 (from 3 rows)."
+    },
+    {
+      "question": "What is the contact number?",
+      "document": "scan",
+      "correct": false,
+      "citationCorrect": false,
+      "calculation": false,
+      "unsupportedAnswer": true,
+      "latencyMs": 1.1026999999999134,
+      "answer": "0 matching rows. I didn't use: “contact”, “number”."
+    },
+    {
+      "question": "Summarize this document",
+      "document": "notice",
+      "correct": false,
+      "citationCorrect": true,
+      "calculation": false,
+      "unsupportedAnswer": false,
+      "latencyMs": 0.7163000000000466,
+      "answer": "I couldn't tell what to look up. Name a column or a value from the data, or set up the on-device assistant in AI settings for freer questions."
+    },
+    {
+      "question": "Ibuod ang dokumento",
+      "document": "notice",
+      "correct": false,
+      "citationCorrect": true,
+      "calculation": false,
+      "unsupportedAnswer": false,
+      "latencyMs": 0.3812000000000353,
+      "answer": "I couldn't tell what to look up. Name a column or a value from the data, or set up the on-device assistant in AI settings for freer questions."
+    }
+  ]
+}

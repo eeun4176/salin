@@ -3,7 +3,8 @@
  * The manual way to transform a dataset — and the alternative when the
  * on-device assistant isn't available: pick an action (filter, sort,
  * rename, change type, count/total by group, standardize values, set
- * values where…, find duplicates, delete rows where…) and fill in its
+ * values where…, find duplicates, delete rows where…, keep only some
+ * columns) and fill in its
  * details with the same dropdowns used across the app. It builds the same
  * command the assistant would, which is then validated and previewed
  * before anything changes.
@@ -22,9 +23,10 @@ import type { ColumnType, DatasetColumn } from "@/types/processing";
 const ACTIONS: Choice<CommandAction>[] = [
   { value: "filter", label: "Filter rows", hint: "Show only the rows that match" },
   { value: "sort", label: "Sort rows" },
-  { value: "summarize", label: "Count or total by group", hint: "e.g. pets per barangay" },
+  { value: "summarize", label: "Count or total by group", hint: "e.g. customers per city" },
   { value: "find_duplicates", label: "Find duplicates" },
   { value: "normalize", label: "Standardize values", hint: "e.g. M / lalaki → Male" },
+  { value: "keep_columns", label: "Keep only some columns", hint: "The rest are removed" },
   { value: "rename_column", label: "Rename a column" },
   { value: "change_type", label: "Change a column's type" },
   { value: "set_value", label: "Set a value where…", hint: "Changes every matching row" },
@@ -124,6 +126,8 @@ export function TransformDialog({ open, onOpenChange, columns, onPreview }: Tran
       set_value: () => ({ action, column, value: current?.type === "boolean" ? (text || "true") === "true" : text, where: where() }),
       find_duplicates: () => ({ action, columns: picked }),
       delete_rows: () => ({ action, where: where() }),
+      // Ticked in column order.
+      keep_columns: () => ({ action, columns: columns.filter((c) => picked.includes(c.id)).map((c) => c.id) }),
     };
     onPreview(commands[action]());
   }
@@ -243,9 +247,9 @@ export function TransformDialog({ open, onOpenChange, columns, onPreview }: Tran
               </div>
             )}
 
-            {action === "find_duplicates" && (
+            {(action === "find_duplicates" || action === "keep_columns") && (
               <fieldset>
-                <legend className="text-xs font-medium text-salin-muted">Rows count as duplicates when these match (none ticked = every column)</legend>
+                <legend className="text-xs font-medium text-salin-muted">{action === "keep_columns" ? "Columns to keep" : "Rows count as duplicates when these match (none ticked = every column)"}</legend>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {columns.map((c) => (
                     <label key={c.id} className={cn("inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm ring-1", picked.includes(c.id) ? "bg-salin-primary-soft ring-salin-primary" : "ring-salin-border")}>

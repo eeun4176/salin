@@ -38,7 +38,8 @@ function cell(raw: string | undefined): CellValue {
   return text === "" ? null : text;
 }
 
-const isBlankRow = (row: string[]) => row.every((c) => c.trim() === "");
+/** Empty, or a blank form line that only has its row number ("1.", "2" … with nothing filled in). */
+const isBlankRow = (row: string[]) => row.every((c) => c.trim() === "") || (row.length > 2 && /^\d{1,4}\.?$/.test(row[0].trim()) && row.slice(1).every((c) => c.trim() === ""));
 
 const hasHeader = (table: ExtractedTable) => table.headerRows !== 0;
 

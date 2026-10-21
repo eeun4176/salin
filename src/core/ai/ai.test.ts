@@ -11,13 +11,15 @@
  * page layouts apart, and the AI runtime's queue, cancel and errors.
  */
 
+import { statSync } from "node:fs";
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { AI_MODELS, isApprovedModelUrl, recommendAiMode, variantFor } from "@/core/ai/ai-models";
+import { AI_MODELS, isApprovedModelUrl, recommendAiMode, variantFor, variantSource } from "@/core/ai/ai-models";
 import { AiError, createAiRuntime } from "@/core/ai/ai-runtime";
 import { findOnPage, isCloseCorrection } from "@/core/ai/grounding";
 import { cleanReading, decodeLine, HANDWRITING_CHARACTERS, lineTensor } from "@/core/ai/handwriting";
-import { commandMessages, extractJson, parseColumnNameReply, parseCommandReply, parseCorrectionReply, parseFieldReply, parseMappingReply } from "@/core/ai/llm-tasks";
+import { commandMessages, extractJson, parseCommandReply, parseCorrectionReply, parseFieldReply, parseMappingReply } from "@/core/ai/llm-tasks";
 import { acceptSuggestion, correctionSuggestions, fieldSuggestion, pendingSuggestions, rejectSuggestion, ruleSuggestions, templateRules, withHandwritingReadings } from "@/core/ai/suggestions";
 import type { DeviceCapabilities } from "@/core/ocr/models/capabilities";
 import { analyzeLayout } from "@/core/ocr/layout/layout-analysis";
@@ -26,7 +28,7 @@ import { extractionToDatasets } from "@/core/ocr/review/to-dataset";
 import { builtinTemplate, BUILTIN_TEMPLATES } from "@/core/ocr/templates/builtin-templates";
 import { extractDocument, makeValue, type MappingPage } from "@/core/ocr/templates/field-mapping";
 import { suggestTemplates } from "@/core/ocr/templates/template-suggest";
-import { suggestColumnName } from "@/core/processing/column-naming";
+import { nameColumns, suggestColumnName } from "@/core/processing/column-naming";
 import { emptyMarks, line, pageResult, words } from "@/test/ocr-fixtures";
 import type { Extraction, ExtractedField, FieldSpec, OcrLine } from "@/types/ocr";
 import type { DatasetColumn } from "@/types/processing";
@@ -204,7 +206,10 @@ describe("model replies are validated, never trusted", () => {
     const filipino = '{"action":"filter","where":[{"column":"Species","op":"equals","value":"Dog"},{"column":"Vaccinated","op":"equals","value":false}]}';
     expect(parseCommandReply(filipino, columns, "ipakita ang mga aso na hindi bakunado sa vaccinated list")).toMatchObject({ ok: true, command: { where: [{ value: "Dog" }, { value: false }] } });
     expect(parseCommandReply('{"action":"filter","where":[{"column":"Owner","op":"equals","value":"Ana"}]}', columns, "show the dogs")).toMatchObject({ ok: false });
+    // Naming the column doesn't ground a value the model copied from its examples ("owner of Hector" → Owner = Ana).
+    expect(parseCommandReply('{"action":"filter","where":[{"column":"Owner","op":"equals","value":"Ana"}]}', columns, "who is the owner of Hector?")).toMatchObject({ ok: false });
     expect(parseCommandReply('{"action":"filter","where":[{"column":"Age","op":"greater_than","value":3}]}', columns, "older than 3")).toMatchObject({ ok: true });
+    expect(parseCommandReply('{"action":"delete_rows","where":[{"column":"Age","op":"greater_than","value":99}]}', columns, "delete rows with age greater than 3")).toMatchObject({ ok: false });
     expect(parseCommandReply('{"action":"filter","where":[{"column":"Age","op":"greater_than_or_equal","value":3}]}', columns, "age 3 and up")).toMatchObject({ ok: true, command: { where: [{ op: "at_least" }] } });
   });
 
@@ -214,18 +219,16 @@ describe("model replies are validated, never trusted", () => {
     expect(() => parseFieldReply('["Juan"]', fields)).toThrow();
   });
 
-  it("validates corrections, label mappings and column names against what was asked", () => {
+  it("validates corrections and label mappings against what was asked", () => {
     const items = [{ id: "1", label: "Owner", type: "text", text: "Juan Dela Crvz" }];
     expect(parseCorrectionReply('{"1":"Juan Dela Cruz","9":"Nobody"}', items)).toEqual({ "1": "Juan Dela Cruz" });
     const fields = [{ key: "owner_name", label: "Owner's name" }, { key: "pet_name", label: "Pet's name" }];
-    expect([...parseMappingReply('{"1":"owner_name","2":"owner_name","3":"nope","7":"pet_name"}', ["Pangalan ng May-ari", "Buong pangalan", "Lahi"], fields)]).toEqual([[0, "owner_name"]]);
-    expect([...parseColumnNameReply('{"2":"Pet name","3":"A very long name that is not a column name at all, really"}', [2, 3])]).toEqual([[2, "Pet name"]]);
-  });
+    expect([...parseMappingReply('{"1":"owner_name","2":"owner_name","3":"nope","7":"pet_name"}', ["Pangalan ng May-ari", "Buong pangalan", "Lahi"], fields)]).toEqual([[0, "owner_name"]]);  });
 
   it("puts the real columns and a few values in the prompt, after examples on another table", () => {
     const messages = commandMessages("ipakita ang mga aso", columns, [{ id: "r", datasetId: "d", position: 0, source: null, values: { owner: "Ana", species: "Dog", age: 2, vaccinated: true } }]);
     const last = messages.at(-1)!.content;
-    expect(last).toContain("Species (text: Dog)");
+    expect(last).toContain("Species (text; values: Dog)");
     expect(last).toContain("Vaccinated (yes/no true/false)");
     expect(last).toContain("Request: ipakita ang mga aso");
     expect(messages[0].content).toContain("unsupported");
@@ -289,14 +292,29 @@ describe("models, modes and sources", () => {
   it("downloads the GPU build only when WebGPU can run it, and only from approved hosts", () => {
     expect(variantFor(AI_MODELS.assistant, caps()).dtype).toBe("q4f16");
     expect(variantFor(AI_MODELS.assistant, caps({ webGpuF16: false })).device).toBe("wasm");
+    // Phones keep the small build; WebGPU laptops with 8 GB get the larger one; without WebGPU or the memory figure, the regular build.
+    expect(variantFor(AI_MODELS.assistant, caps()).laptop).toBeUndefined();
+    expect(variantFor(AI_MODELS.assistant, caps({ mobile: false }))).toMatchObject({ laptop: true, device: "webgpu", webllm: "Qwen3-1.7B-q4f16_1-MLC" });
+    expect(variantFor(AI_MODELS.assistant, caps({ mobile: false, deviceMemoryGb: 4 })).laptop).toBeUndefined();
+    expect(variantFor(AI_MODELS.assistant, caps({ mobile: false, deviceMemoryGb: null })).laptop).toBeUndefined();
+    expect(variantFor(AI_MODELS.assistant, caps({ mobile: false, webGpu: "unsupported" })).device).toBe("wasm");
     vi.stubGlobal("location", { href: "http://localhost:4173/settings" });
     expect(isApprovedModelUrl("https://huggingface.co/x/resolve/abc/model.onnx")).toBe(true);
     expect(isApprovedModelUrl("/assets/ort.wasm")).toBe(true);
     expect(isApprovedModelUrl("https://cdn.example.com/model.onnx")).toBe(false);
     vi.unstubAllGlobals();
-    for (const asset of AI_MODELS.assistant.variants.flatMap((v) => v.assets)) {
-      if (asset.id !== "ai-runtime") expect(asset.url).toContain(`/resolve/${AI_MODELS.assistant.revision}/`);
+    for (const variant of AI_MODELS.assistant.variants) {
+      const { repo, revision } = variantSource(AI_MODELS.assistant, variant);
+      // Engines (ONNX Runtime, WebLLM's compiled model code) are served by Salin; model files come from the pinned revision.
+      for (const asset of variant.assets) if (asset.id !== "ai-runtime" && !/:(lib|engine)$/.test(asset.id)) expect(asset.url).toContain(`/${repo}/resolve/${revision}/`);
     }
+    // WebLLM's files go where WebLLM looks for them, so it never downloads anything itself; its engine module stays in Salin's cache.
+    const laptop = AI_MODELS.assistant.variants.find((v) => v.webllm)!;
+    expect(new Set(laptop.assets.map((a) => a.cache))).toEqual(new Set([undefined, "webllm/wasm", "webllm/config", "webllm/model"]));
+    expect(laptop.assets.filter((a) => /params_shard_\d+\.bin$/.test(a.url)).reduce((sum, a) => sum + a.bytes, 0)).toBe(968_001_536);
+    // Files Salin serves itself: the recorded sizes must be the shipped files' (a WebLLM upgrade must update them).
+    const shipped = { "assistant-laptop:engine": "node_modules/@mlc-ai/web-llm/lib/index.js", "assistant-laptop:lib": "src/core/ai/webllm/Qwen3-1.7B-q4f16_1_cs1k-webgpu.wasm" };
+    for (const [id, file] of Object.entries(shipped)) expect(laptop.assets.find((a) => a.id === id)!.bytes).toBe(statSync(file).size);
   });
 });
 
@@ -325,6 +343,10 @@ describe("templates and structure", () => {
     expect(suggestColumnName(["0917 123 4567", "09281234567"])).toBe("Contact no.");
     expect(suggestColumnName(["Juan", "Maria"])).toBeNull();
     expect(suggestColumnName(["Dog"])).toBeNull();
+    const col = (id: string, name: string) => ({ id, name, type: "text" as const, required: false, sourceHeader: null });
+    const rows = [{ values: { a: "M", b: "F", c: "Juan", d: "Dog" } }, { values: { a: "F", b: "M", c: "Ana", d: "Cat" } }];
+    // Given names win; a suggestion is used once; nothing fits → the placeholder stays.
+    expect(nameColumns({ columns: [col("a", "Column 1"), col("b", "Column 2"), col("c", "Column 3"), col("d", "Kind")], rows }, { 2: " Owner " }).map((c) => c.name)).toEqual(["Sex", "Column 2", "Owner", "Kind"]);
   });
 
   it("splits repeated record blocks on one page into separate records", () => {
@@ -387,7 +409,7 @@ describe("AI runtime", () => {
     expect(a[0].text).toBe("Bantay");
     expect(b).toHaveLength(1);
     expect(workers).toHaveLength(1);
-    const error = await runtime.generate([], AI_MODELS.assistant.variants[1]).catch((e) => e);
+    const error = await runtime.generate([], variantFor(AI_MODELS.assistant, null)).catch((e) => e);
     expect(error).toBeInstanceOf(AiError);
     expect(error.code).toBe("missing-files");
     expect(error.message).toMatch(/Settings → On-device AI/);
@@ -402,13 +424,13 @@ describe("AI runtime", () => {
       return w as never;
     }, async () => undefined);
     const controller = new AbortController();
-    const pending = runtime.generate([], AI_MODELS.assistant.variants[1], { signal: controller.signal });
+    const pending = runtime.generate([], variantFor(AI_MODELS.assistant, null), { signal: controller.signal });
     await new Promise((r) => setTimeout(r));
     controller.abort();
     await expect(pending).rejects.toBeDefined();
     expect(workers[0].terminated).toBe(true);
     hang = false;
-    expect(await runtime.generate([], AI_MODELS.assistant.variants[1])).toBe("ok");
+    expect(await runtime.generate([], variantFor(AI_MODELS.assistant, null))).toBe("ok");
     expect(workers).toHaveLength(2);
   });
 });

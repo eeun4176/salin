@@ -323,7 +323,7 @@ export function ScanPage() {
               onClick={() => void readText()}
               className="press inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-salin-primary text-sm font-semibold text-white shadow-[0_6px_16px_-6px_rgb(1_168_90/0.6)] hover:bg-salin-primary-strong disabled:opacity-45 disabled:shadow-none"
             >
-              {reading ? <LoaderCircle className="size-[18px] animate-spin" /> : <ScanText className="size-[18px]" />} Read text into a dataset
+              {reading ? <LoaderCircle className="size-[18px] animate-spin" /> : <ScanText className="size-[18px]" />} Extract data
             </button>
             <button
               type="button"

@@ -24,7 +24,7 @@ export const NORMALIZE_RULES: Record<NormalizeRule, { label: string; example: st
   date: { label: "Date → YYYY-MM-DD", example: "“Oct. 18, 2026” → “2026-10-18”" },
 };
 
-const SEX: Record<string, string> = { m: "Male", male: "Male", lalaki: "Male", lalake: "Male", f: "Female", female: "Female", babae: "Female" };
+const SEX: Record<string, string> = { m: "Male", male: "Male", males: "Male", man: "Male", men: "Male", boy: "Male", boys: "Male", lalaki: "Male", lalake: "Male", f: "Female", female: "Female", females: "Female", woman: "Female", women: "Female", girl: "Female", girls: "Female", babae: "Female" };
 const SPECIES: Record<string, string> = { dog: "Dog", dogs: "Dog", aso: "Dog", canine: "Dog", k9: "Dog", cat: "Cat", cats: "Cat", pusa: "Cat", feline: "Cat" };
 // Roman numerals and initials-like suffixes stay uppercase in names ("Juan Cruz III").
 const KEEP_UPPER = /^(i{1,3}|iv|v|vi{0,3}|jr|sr)\.?$/i;

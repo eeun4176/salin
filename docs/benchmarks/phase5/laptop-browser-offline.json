@@ -1,0 +1,52 @@
+{
+  "profile": "laptop-browser",
+  "physicalDevice": "development laptop",
+  "physicalPhone": false,
+  "runtime": "Chrome; no local LLM installed in this test profile",
+  "offline": true,
+  "externalRequests": 0,
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.8078.4 Safari/537.36",
+  "usedJsHeapBytes": 29742059,
+  "results": [
+    {
+      "source": "notice.pdf",
+      "question": "What is the deadline on page 2?",
+      "expected": "2026-11-15",
+      "correct": true,
+      "citationCorrect": true,
+      "latencyMs": 1030.3994999999995
+    },
+    {
+      "source": "notice.pdf",
+      "question": "Ano ang contact number?",
+      "expected": "09171234567",
+      "correct": true,
+      "citationCorrect": true,
+      "latencyMs": 261.84599999999955
+    },
+    {
+      "source": "registrations.csv",
+      "question": "Total amount",
+      "expected": "2500",
+      "correct": true,
+      "citationCorrect": true,
+      "latencyMs": 346.4403000000002
+    },
+    {
+      "source": "registrations.csv",
+      "question": "Ilang rows sa Malolos?",
+      "expected": "2 matching rows",
+      "correct": true,
+      "citationCorrect": true,
+      "latencyMs": 229.15509999999995
+    },
+    {
+      "source": "registrations.xlsx",
+      "question": "Total amount in sheet \"Late entries\"",
+      "expected": "300",
+      "correct": true,
+      "citationCorrect": true,
+      "latencyMs": 317.98109999999906
+    }
+  ]
+}

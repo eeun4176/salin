@@ -1,7 +1,8 @@
 /**
  * Processing Actions
  * The write side of the data tools UI. `extractData` turns workspace files
- * into a dataset with a progress toast (with Cancel, and Retry on failure);
+ * into a dataset with a progress toast (with Cancel, and Retry on failure;
+ * a scanned PDF goes on to text recognition by itself);
  * `extractTables` does the same for tables confirmed in an Excel workbook;
  * the others export, rename and delete datasets (delete has Undo). Uses one
  * processing service for the whole app, so a job keeps running while the
@@ -73,18 +74,15 @@ async function runWithProgress(job: ProcessingJob, onReady: OnDatasetReady, run:
   }
   // Retrying can't help when the file type or its content is the problem.
   const retryable = done.error?.code !== "unsupported-file" && done.error?.code !== "no-content";
-  // A scanned PDF (no text layer) can be read with OCR instead.
+  // A scanned PDF (no text layer) is read with OCR instead.
   const files = useWorkspaceStore.getState().files;
   const scanned = done.error?.code === "no-content" && done.sourceFileIds.every((id) => files.find((f) => f.id === id)?.kind === "pdf");
-  toast(
-    done.error?.message ?? "The data couldn't be extracted.",
-    scanned
-      ? { label: "Read text", onClick: () => void readWithOcr(done.sourceFileIds) }
-      : retryable
-        ? { label: "Retry", onClick: () => void retry(done, onReady) }
-        : undefined,
-    { duration: 8000 },
-  );
+  if (scanned) {
+    toast("This PDF is a scan, so it's read with text recognition instead.");
+    void readWithOcr(done.sourceFileIds);
+    return null;
+  }
+  toast(done.error?.message ?? "The data couldn't be extracted.", retryable ? { label: "Retry", onClick: () => void retry(done, onReady) } : undefined, { duration: 8000 });
   return null;
 }
 
@@ -116,9 +114,10 @@ async function queueAndRun(fileIds: string[], options: JobOptions, onReady: OnDa
  * Turns workspace files into one dataset, entirely on this device. Files are
  * combined in the given order. Calls `onReady` with the dataset id when done.
  */
-export async function extractData(fileIds: string[], onReady: OnDatasetReady) {
+export async function extractData(fileIds: string[], onReady: OnDatasetReady): Promise<string | null> {
   const id = await queueAndRun(fileIds, {}, onReady);
   if (id) onReady(id);
+  return id;
 }
 
 /** One dataset to make from a workbook: its name and the confirmed tables it combines. */

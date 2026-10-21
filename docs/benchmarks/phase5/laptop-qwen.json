@@ -1,0 +1,37 @@
+{
+  "profile": "laptop",
+  "physicalDevice": "development laptop",
+  "runtime": "ONNX Runtime Node CPU, q4; not browser WebLLM or physical phone",
+  "repo": "Qwen3-1.7B-ONNX",
+  "network": "disabled; existing local files only",
+  "loadMs": 46871.160599999996,
+  "exactMatchAccuracy": 1,
+  "evidenceCitationAccuracy": 1,
+  "calculationCorrectness": null,
+  "unsupportedAnswerRate": 0,
+  "meanLatencyMs": 74343.03606666667,
+  "sampledPeakProcessRssBytes": 2680520704,
+  "results": [
+    {
+      "question": "What should I bring?",
+      "reply": "{\"quotes\":[{\"source\":\"pdf:p2:l5:0\",\"quote\":\"Requirements: Bring a valid ID and proof of residence.\"}]}",
+      "exactMatch": true,
+      "citationsValid": true,
+      "latencyMs": 77383.3965
+    },
+    {
+      "question": "Ano ang dapat dalhin?",
+      "reply": "{\"quotes\":[{\"source\":\"pdf:p2:l5:0\",\"quote\":\"Requirements: Bring a valid ID and proof of residence.\"}]}",
+      "exactMatch": true,
+      "citationsValid": true,
+      "latencyMs": 60260.9632
+    },
+    {
+      "question": "What ang requirements na dapat dalhin?",
+      "reply": "{\"quotes\":[{\"source\":\"pdf:p2:l5:0\",\"quote\":\"Requirements: Bring a valid ID and proof of residence.\"}]}",
+      "exactMatch": true,
+      "citationsValid": true,
+      "latencyMs": 85384.74849999999
+    }
+  ]
+}

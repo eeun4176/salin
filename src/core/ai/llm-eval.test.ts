@@ -3,6 +3,8 @@
  * Benchmarks candidate local language models on Salin's real prompts:
  * plain-language requests (English and Filipino) about a veterinary
  * dataset, scored by whether the reply becomes the right validated command,
+ * questions asked in AI Studio ("how many…", "extract only the…"), scored
+ * by whether the read-only query plan is right and grounded in the question,
  * plus requested-field extraction from a form's text, scored by exact
  * values and by "null instead of guessing" for fields that aren't there.
  * Runs in Node with the same model weights the app downloads. Skipped
@@ -15,7 +17,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 
 import { describe, expect, it } from "vitest";
 
-import { commandMessages, fieldMessages, parseCommandReply, parseFieldReply, type ChatMessage } from "@/core/ai/llm-tasks";
+import { commandMessages, dataQuestionMessages, fieldMessages, parseCommandReply, parseDataQuestionPlan, parseFieldReply, type ChatMessage, type DataQuestionPlan } from "@/core/ai/llm-tasks";
 import { findColumn, type DatasetCommand } from "@/core/processing/dataset-commands";
 import type { DatasetColumn, DatasetRow } from "@/types/processing";
 
@@ -81,6 +83,34 @@ const HELD_OUT: { request: string; check: Check | "unsupported" }[] = [
   { request: "translate this table to Japanese", check: "unsupported" },
 ];
 
+type PlanCheck = (p: DataQuestionPlan, where: DatasetCommand | null) => boolean;
+const cols = (p: DataQuestionPlan, ...names: string[]) => p.action === "table" && (p.columns ?? []).length === names.length && names.every((name) => (p.columns ?? []).some((c) => findColumn(COLUMNS, c)?.id === id(name)));
+const none = (w: DatasetCommand | null) => w === null || n(w, 0);
+
+/** AI Studio questions: the model plans a read-only query; its filter must be the one asked for (checked like the app does). */
+const QUESTIONS: { request: string; set: "dev" | "held-out"; check: PlanCheck | "unsupported" }[] = [
+  { set: "dev", request: "How many dogs are there?", check: (p, w) => p.action === "count" && !!w && n(w, 1) && has(w, "Species", "equals", "dog") },
+  { set: "dev", request: "Ilan ang babae?", check: (p, w) => p.action === "count" && !!w && n(w, 1) && has(w, "Sex", "equals", "female") },
+  { set: "dev", request: "What is the contact number of Juan Dela Cruz?", check: (p, w) => !!w && n(w, 1) && has(w, "Owner", ["equals", "contains"], "juan dela cruz") && cols(p, "Contact no.") },
+  { set: "dev", request: "Extract only the owners and barangays", check: (p, w) => none(w) && cols(p, "Owner", "Barangay") },
+  { set: "dev", request: "Extract the pet names of the dogs only", check: (p, w) => !!w && n(w, 1) && has(w, "Species", "equals", "dog") && cols(p, "Pet name") },
+  { set: "dev", request: "Show the owners from Muzon", check: (p, w) => p.action === "table" && !!w && n(w, 1) && has(w, "Barangay", ["equals", "contains"], "muzon") },
+  { set: "dev", request: "List the unvaccinated pets", check: (p, w) => p.action === "table" && !!w && n(w, 1) && has(w, "Vaccinated", "equals", false) },
+  { set: "dev", request: "Which pets are older than 3?", check: (p, w) => p.action === "table" && !!w && n(w, 1) && (has(w, "Age", "greater_than", 3) || has(w, "Age", "at_least", 4)) },
+  { set: "dev", request: "How many pets in each barangay?", check: (p, w) => p.action === "group" && p.group_by.length === 1 && findColumn(COLUMNS, p.group_by[0])?.id === id("Barangay") && p.aggregate === "count" && none(w) },
+  { set: "dev", request: "What is the average age per species?", check: (p) => p.action === "group" && findColumn(COLUMNS, p.group_by[0] ?? "")?.id === id("Species") && p.aggregate === "average" && findColumn(COLUMNS, p.column ?? "")?.id === id("Age") },
+  { set: "dev", request: "Give me an overview", check: (p) => p.action === "overview" || (p.action === "group" && p.group_by.length === 0) },
+  { set: "dev", request: "Send this to my boss", check: "unsupported" },
+  { set: "held-out", request: "Extract the contact numbers only", check: (p, w) => none(w) && cols(p, "Contact no.") },
+  { set: "held-out", request: "Who owns Bantay?", check: (p, w) => !!w && n(w, 1) && has(w, "Pet name", ["equals", "contains"], "bantay") && cols(p, "Owner") },
+  { set: "held-out", request: "Get only the female cats", check: (p, w) => p.action === "table" && !!w && n(w, 2) && has(w, "Sex", "equals", "female") && has(w, "Species", "equals", "cat") },
+  { set: "held-out", request: "Ano ang pangalan ng alaga ni Maria Santos?", check: (p, w) => !!w && n(w, 1) && has(w, "Owner", ["equals", "contains"], "maria santos") && cols(p, "Pet name") },
+  { set: "held-out", request: "how many were registered after June 2026?", check: (p, w) => p.action === "count" && !!w && n(w, 1) && (has(w, "Date registered", "greater_than", "2026-06-30") || has(w, "Date registered", "at_least", "2026-07-01")) },
+  { set: "held-out", request: "What is the highest age?", check: (p) => p.action === "group" && p.aggregate === "max" && findColumn(COLUMNS, p.column ?? "")?.id === id("Age") },
+  { set: "held-out", request: "pull out the barangay and contact no. of the cats", check: (p, w) => !!w && n(w, 1) && has(w, "Species", "equals", "cat") && cols(p, "Barangay", "Contact no.") },
+  { set: "held-out", request: "Make me a pie chart", check: "unsupported" },
+];
+
 const FORM_TEXT = [
   "CITY VETERINARY OFFICE",
   "DOG REGISTRATION DATA BASE FORM",
@@ -104,7 +134,7 @@ const FIELDS = [
 const EXPECTED: Record<string, string | null> = { owner_name: "Juan Dela Cruz", address: "Purok 2, Brgy. Muzon", contact: "0917 555 0142", pet_name: "Bantay", color: "Brown and white", breed: null, email: null };
 
 describe.skipIf(!SPEC)("local language model evaluation", () => {
-  it("turns requests into the right commands and copies fields without guessing", { timeout: 3_600_000 }, async () => {
+  it("turns requests into the right commands and copies fields without guessing", { timeout: 6 * 3_600_000 }, async () => {
     const [model, dtype = "q8"] = SPEC!.split(":");
     const { AutoModelForCausalLM, AutoTokenizer, env } = await import("@huggingface/transformers");
     env.cacheDir = process.env.SALIN_HF_CACHE ?? "./node_modules/.cache/hf";
@@ -119,13 +149,15 @@ describe.skipIf(!SPEC)("local language model evaluation", () => {
     const lm = await AutoModelForCausalLM.from_pretrained(model, { dtype: dtype as "q8" });
     const loadMs = performance.now() - started;
 
-    async function ask(messages: ChatMessage[]) {
+    let asked = 0;
+    async function ask(messages: ChatMessage[], maxNewTokens = 160) {
       const options = { add_generation_prompt: true, return_dict: true, enable_thinking: false } as { add_generation_prompt: boolean; return_dict: true };
       const inputs = tokenizer.apply_chat_template(messages, options) as unknown as Record<string, unknown>;
       const t0 = performance.now();
-      const output = (await lm.generate({ ...inputs, max_new_tokens: 160, do_sample: false })) as { slice: (...a: unknown[]) => unknown };
+      const output = (await lm.generate({ ...inputs, max_new_tokens: maxNewTokens, do_sample: false })) as { slice: (...a: unknown[]) => unknown };
       const promptLength = (inputs.input_ids as { dims: number[] }).dims.at(-1)!;
       const text = tokenizer.batch_decode(output.slice(null, [promptLength, null]) as never, { skip_special_tokens: true })[0];
+      console.log(`· ${++asked} ${Math.round((performance.now() - t0) / 1000)} s`);
       return { text, ms: performance.now() - t0 };
     }
 
@@ -135,6 +167,27 @@ describe.skipIf(!SPEC)("local language model evaluation", () => {
       const parsed = parseCommandReply(text, COLUMNS, c.request);
       const correct = c.check === "unsupported" ? !parsed.ok && parsed.unsupported === true : parsed.ok && c.check(parsed.command);
       commands.push({ set: c.set, request: c.request, reply: text.trim(), valid: parsed.ok || parsed.unsupported === true, correct, ms: Math.round(ms) });
+    }
+
+    const questions = [];
+    for (const q of QUESTIONS) {
+      const { text, ms } = await ask(dataQuestionMessages(q.request, COLUMNS, ROWS), 240);
+      let correct = false;
+      let valid = false;
+      try {
+        const plan = parseDataQuestionPlan(text, q.request);
+        valid = true;
+        if (q.check === "unsupported") correct = plan.action === "unsupported";
+        else if (plan.action !== "unsupported") {
+          const conditions = "where" in plan ? plan.where : undefined;
+          // Same check the app applies before running a plan: conditions the question doesn't state are dropped.
+          const checked = conditions?.length ? parseCommandReply(JSON.stringify({ action: "filter", where: conditions }), COLUMNS, q.request) : null;
+          correct = (!checked || checked.ok) && q.check(plan, checked?.ok ? checked.command : null);
+        }
+      } catch {
+        // an unparseable plan stays invalid and wrong
+      }
+      questions.push({ set: q.set, request: q.request, reply: text.trim(), valid, correct, ms: Math.round(ms) });
     }
 
     const { text: fieldText, ms: fieldMs } = await ask(fieldMessages(FORM_TEXT, FIELDS));
@@ -153,6 +206,9 @@ describe.skipIf(!SPEC)("local language model evaluation", () => {
       commandAccuracy: commands.filter((c) => c.set === "dev" && c.correct).length / CASES.length,
       heldOutAccuracy: commands.filter((c) => c.set === "held-out" && c.correct).length / HELD_OUT.length,
       validReplies: commands.filter((c) => c.valid).length / commands.length,
+      questionAccuracy: questions.filter((q) => q.set === "dev" && q.correct).length / questions.filter((q) => q.set === "dev").length,
+      heldOutQuestionAccuracy: questions.filter((q) => q.set === "held-out" && q.correct).length / questions.filter((q) => q.set === "held-out").length,
+      meanQuestionMs: Math.round(questions.reduce((s, q) => s + q.ms, 0) / questions.length),
       meanCommandMs: Math.round(commands.reduce((s, c) => s + c.ms, 0) / commands.length),
       fieldAccuracy: fieldScores.filter((f) => f.correct).length / fieldScores.length,
       inventedFields: fieldScores.filter((f) => f.want === null && f.got !== null).map((f) => f.key),
@@ -160,9 +216,9 @@ describe.skipIf(!SPEC)("local language model evaluation", () => {
       files: [...fetched],
     };
     console.log(JSON.stringify({ ...summary, files: undefined }, null, 1));
-    console.table(commands.map((c) => ({ ok: c.correct ? "✓" : "✗", request: c.request.slice(0, 40), reply: c.reply.slice(0, 90) })));
+    console.table([...commands, ...questions].map((c) => ({ ok: c.correct ? "✓" : "✗", request: c.request.slice(0, 40), reply: c.reply.slice(0, 90) })));
     await mkdir("docs/benchmarks", { recursive: true });
-    await writeFile(`docs/benchmarks/llm-eval-${model.replace(/\W+/g, "_")}-${dtype}.json`, JSON.stringify({ summary, commands, fieldScores, fieldReply: fieldText }, null, 2));
+    await writeFile(`docs/benchmarks/llm-eval-${model.replace(/\W+/g, "_")}-${dtype}.json`, JSON.stringify({ summary, commands, questions, fieldScores, fieldReply: fieldText }, null, 2));
     expect(commands.length).toBe(CASES.length + HELD_OUT.length);
   });
 });

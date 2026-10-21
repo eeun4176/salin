@@ -88,7 +88,7 @@ function FieldList({ title, fields, onChange }: { title: string; fields: Editabl
           {f.type === "choice" && (
             <label className={`${small} sm:col-span-2`}>
               Choices (comma-separated)
-              <input value={f.options} onChange={(e) => update(i, { options: e.target.value })} placeholder="Dog, Cat, Other" required className={input} />
+              <input value={f.options} onChange={(e) => update(i, { options: e.target.value })} placeholder="Yes, No, Not sure" required className={input} />
             </label>
           )}
           <div className="flex items-center justify-between gap-2 sm:col-span-2">

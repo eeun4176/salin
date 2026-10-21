@@ -14,7 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createOcrRuntime, type EngineFactory } from "@/core/ocr/engine/ocr-runtime";
 import type { EngineConfig, OcrEngine, RawRecognition } from "@/core/ocr/engine/ocr-engine";
 import { MODEL_ASSETS, requiredAssets, type ModelAsset } from "@/core/ocr/models/model-assets";
-import { checkAssets, downloadAssets, loadAsset, ModelError, pruneStale, removeAssets, storedBytes } from "@/core/ocr/models/model-manager";
+import { checkAssets, downloadAssets, loadAsset, MODEL_CACHE, ModelError, pruneStale, removeAssets, storedBytes } from "@/core/ocr/models/model-manager";
 import { recommendProfile, type DeviceCapabilities } from "@/core/ocr/models/capabilities";
 import { emptyMarks, line } from "@/test/ocr-fixtures";
 
@@ -164,7 +164,10 @@ describe("model manager", () => {
 
   beforeEach(() => {
     cache = new FakeCache();
-    vi.stubGlobal("caches", { open: async () => cache, delete: async () => cache.store.clear() });
+    // Salin's own cache, plus the separate ones WebLLM reads from.
+    const named = new Map<string, FakeCache>([[MODEL_CACHE, cache]]);
+    const open = async (name: string) => named.get(name) ?? named.set(name, new FakeCache()).get(name)!;
+    vi.stubGlobal("caches", { open, delete: async (name: string) => void (await open(name)).store.clear() });
     vi.stubGlobal("location", { href: "http://localhost/" });
     vi.stubGlobal("navigator", { onLine: true, storage: undefined });
   });

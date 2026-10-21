@@ -1,14 +1,16 @@
 /**
  * Read Step
- * Step 2 of reading a scan: choose a template (generic, the veterinary
- * forms, or a saved one) and the languages, make sure the recognition files
- * are on the device (download size and progress shown), then read every
- * page on the device with per-page progress, Cancel, and Retry for pages
- * that failed. When OCR can't run here (or the user prefers), values can be
- * typed by hand while looking at the page.
+ * Step 1 of reading a scan: reads every page on the device by itself once
+ * the recognition files are here (download size and progress shown; the
+ * download is the user's choice), finding photo page edges first, with
+ * per-page progress, Stop, and Retry for pages that failed. After a first
+ * read, a template that clearly fits is picked automatically. The kind of
+ * document (generic, the built-in forms, or a saved one) and the languages
+ * are under Options. When OCR can't run here (or the user prefers), values
+ * can be typed by hand while looking at the page.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CircleCheck, CircleX, FileText, Keyboard, LoaderCircle, RotateCcw, ScanText, Square } from "lucide-react";
 
 import { engineAssetFor, OCR_LANGUAGES } from "@/core/ocr/models/model-assets";
@@ -21,7 +23,7 @@ import { primaryButton as primary, secondaryButton as secondary } from "@/compon
 import { reviewItems } from "@/core/ocr/review/review-state";
 import { ModelStatus } from "@/features/ocr/components/model-status";
 import { TemplateHint } from "@/features/ocr/components/template-hint";
-import { allTemplates, buildExtraction, manualExtraction } from "@/features/ocr/ocr-actions";
+import { allTemplates, applyClearMatch, autoCropPhotos, buildExtraction, manualExtraction } from "@/features/ocr/ocr-actions";
 import { cancelReading, isReading, readDocument, type ReadProgress } from "@/features/ocr/ocr-runner";
 import { useOcrStore, useProfileChoice } from "@/stores/ocr-store";
 import { toast } from "@/stores/toast-store";
@@ -111,6 +113,7 @@ export function ReadStep({ doc, pages, onDone }: { doc: OcrDocument; pages: OcrP
     if (!detected) return;
     setReading(true);
     await updateOcrDocument(doc.id, { stage: "read", languages }).catch(() => undefined);
+    await autoCropPhotos(await getOcrPages(doc.id));
     const outcome = await readDocument(doc.id, { config: { profile, languages, core: engineAssetFor(detected) }, pageIds, onProgress: setProgress });
     setReading(false);
     setProgress(null);
@@ -126,10 +129,19 @@ export function ReadStep({ doc, pages, onDone }: { doc: OcrDocument; pages: OcrP
     if (fresh.some((p) => p.state === "done")) {
       const extraction = await buildExtraction(latest, fresh);
       await updateOcrDocument(doc.id, { extraction, stage: "review" });
+      await applyClearMatch(latest, fresh);
       if (outcome.failed === 0) onDone();
       else toast(`${outcome.failed} page${outcome.failed === 1 ? "" : "s"} couldn't be read. Retry, or continue with the rest.`);
     }
   }
+
+  // A new scan starts reading by itself once the recognition files are on the device (downloading stays the user's choice).
+  const started = useRef(false);
+  useEffect(() => {
+    if (started.current || reading || !caps || model.status !== "ready" || pages.some((p) => p.state !== "pending")) return;
+    started.current = true;
+    void read();
+  });
 
   async function typeByHand() {
     const extraction = await manualExtraction(doc, pages);
@@ -143,8 +155,12 @@ export function ReadStep({ doc, pages, onDone }: { doc: OcrDocument; pages: OcrP
   ];
 
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
-      <section aria-labelledby="template-heading">
+    <div className="mx-auto grid max-w-2xl gap-6">
+      <details className="order-last rounded-2xl ring-1 ring-salin-border">
+        <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-salin-text">
+          Options <span className="font-normal text-salin-muted">· kind of document, languages</span>
+        </summary>
+        <div className="px-4 pb-4">
         <h3 id="template-heading" className="text-sm font-semibold text-salin-text">
           What kind of document is this?
         </h3>
@@ -174,7 +190,8 @@ export function ReadStep({ doc, pages, onDone }: { doc: OcrDocument; pages: OcrP
             ))}
           </div>
         </fieldset>
-      </section>
+        </div>
+      </details>
 
       <section aria-labelledby="read-heading" className="space-y-4">
         <h3 id="read-heading" className="text-sm font-semibold text-salin-text">

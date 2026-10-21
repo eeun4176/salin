@@ -1,0 +1,245 @@
+{
+  "date": "2026-10-21T02:41:15.343Z",
+  "environment": "Node on development laptop; deterministic offline path; no Qwen inference",
+  "cases": 22,
+  "exactMatchAccuracy": 1,
+  "calculationCorrectness": 1,
+  "evidenceCitationAccuracy": 1,
+  "unsupportedAnswerRate": 0,
+  "latencyMs": {
+    "mean": 3.607399999999974,
+    "max": 19.703599999999824
+  },
+  "memory": {
+    "nodeHeapUsedBytes": 43940344,
+    "devicePeakBytes": null
+  },
+  "laptopQwen": {
+    "status": "not measured"
+  },
+  "physicalPhone": {
+    "status": "not measured"
+  },
+  "results": [
+    {
+      "question": "What is the contact number?",
+      "document": "notice",
+      "correct": true,
+      "citationCorrect": true,
+      "calculation": false,
+      "unsupportedAnswer": false,
+      "latencyMs": 18.79599999999982,
+      "answer": "From the selected document:\nContact number: 09171234567"
+    },
+    {
+      "question": "Ano ang contact number?",
+      "document": "notice",
+      "correct": true,
+      "citationCorrect": true,
+      "calculation": false,
+      "unsupportedAnswer": false,
+      "latencyMs": 3.1542999999996937,
+      "answer": "Mula sa napiling dokumento:\nContact number: 09171234567"
+    },
+    {
+      "question": "What is the reference ID?",
+      "document": "notice",
+      "correct": true,
+      "citationCorrect": true,
+      "calculation": false,
+      "unsupportedAnswer": false,
+      "latencyMs": 13.539899999999761,
+      "answer": "From the selected document:\nReference ID: REG-00042"
+    },
+    {
+      "question": "What is the deadline on page 2?",
+      "document": "pdf",
+      "correct": true,
+      "citationCorrect": true,
+      "calculation": false,
+      "unsupportedAnswer": false,
+      "latencyMs": 0.9429999999997563,
+      "answer": "From the selected document:\nDeadline: 2026-11-15"
+    },
+    {
+      "question": "Ano ang deadline sa pahina 2?",
+      "document": "pdf",
+      "correct": true,
+      "citationCorrect": true,
+      "calculation": false,
+      "unsupportedAnswer": false,
+      "latencyMs": 1.2717999999999847,
+      "answer": "Mula sa napiling dokumento:\nDeadline: 2026-11-15"
+    },
+    {
+      "question": "What is the contact number on page 2?",
+      "document": "pdf",
+      "correct": true,
+      "citationCorrect": true,
+      "calculation": false,
+      "unsupportedAnswer": false,
+      "latencyMs": 2.918300000000272,
+      "answer": "The selected document does not provide enough clear evidence. Please specify the field, page, sheet, or filter you need."
+    },
+    {
+      "question": "What is the organizer?",
+      "document": "pdf",
+      "correct": true,
+      "citationCorrect": true,
+      "calculation": false,
+      "unsupportedAnswer": false,
+      "latencyMs": 1.1345000000001164,
+      "answer": "From the selected document:\nOrganizer: Bayan Learning Center"
+    },
+    {
+      "question": "How many rows?",
+      "document": "csv",
+      "correct": true,
+      "citationCorrect": true,
+      "calculation": true,
+      "unsupportedAnswer": false,
+      "latencyMs": 19.703599999999824,
+      "answer": "3 rows match."
+    },
+    {
+      "question": "Ilang rows sa Malolos?",
+      "document": "csv",
+      "correct": true,
+      "citationCorrect": true,
+      "calculation": true,
+      "unsupportedAnswer": false,
+      "latencyMs": 1.5682999999999083,
+      "answer": "2 matching rows."
+    },
+    {
+      "question": "Total amount",
+      "document": "csv",
+      "correct": true,
+      "citationCorrect": true,
+      "calculation": true,
+      "unsupportedAnswer": false,
+      "latencyMs": 2.457499999999982,
+      "answer": "Total Amount: 2500 (from 3 rows)."
+    },
+    {
+      "question": "Kabuuang amount sa Malolos",
+      "document": "csv",
+      "correct": true,
+      "citationCorrect": true,
+      "calculation": true,
+      "unsupportedAnswer": false,
+      "latencyMs": 1.216899999999896,
+      "answer": "Total Amount: 1750 (2 tala)."
+    },
+    {
+      "question": "Show the name of Ana",
+      "document": "csv",
+      "correct": true,
+      "citationCorrect": true,
+      "calculation": false,
+      "unsupportedAnswer": false,
+      "latencyMs": 1.8000999999999294,
+      "answer": "1 matching row."
+    },
+    {
+      "question": "Show names and amounts",
+      "document": "csv",
+      "correct": true,
+      "citationCorrect": true,
+      "calculation": false,
+      "unsupportedAnswer": false,
+      "latencyMs": 1.4670999999998457,
+      "answer": "3 matching rows."
+    },
+    {
+      "question": "Total amount per city",
+      "document": "csv",
+      "correct": true,
+      "citationCorrect": true,
+      "calculation": true,
+      "unsupportedAnswer": false,
+      "latencyMs": 1.7768999999998414,
+      "answer": "Total Amount by City: 2 groups."
+    },
+    {
+      "question": "How many rows?",
+      "document": "xlsx",
+      "correct": true,
+      "citationCorrect": true,
+      "calculation": true,
+      "unsupportedAnswer": false,
+      "latencyMs": 1.0475999999998749,
+      "answer": "4 rows match."
+    },
+    {
+      "question": "Total amount",
+      "document": "xlsx",
+      "correct": true,
+      "citationCorrect": true,
+      "calculation": true,
+      "unsupportedAnswer": false,
+      "latencyMs": 0.8575000000000728,
+      "answer": "Total Amount: 2800 (from 4 rows)."
+    },
+    {
+      "question": "What is the mayor's salary?",
+      "document": "notice",
+      "correct": true,
+      "citationCorrect": true,
+      "calculation": false,
+      "unsupportedAnswer": false,
+      "latencyMs": 2.0019999999999527,
+      "answer": "The selected document does not provide enough clear evidence. Please specify the field, page, sheet, or filter you need."
+    },
+    {
+      "question": "What does Ana prefer?",
+      "document": "csv",
+      "correct": true,
+      "citationCorrect": true,
+      "calculation": false,
+      "unsupportedAnswer": false,
+      "latencyMs": 0.9846000000002277,
+      "answer": "The selected document does not provide enough clear evidence. Please specify the field, page, sheet, or filter you need."
+    },
+    {
+      "question": "Average",
+      "document": "csv",
+      "correct": true,
+      "citationCorrect": true,
+      "calculation": false,
+      "unsupportedAnswer": false,
+      "latencyMs": 0.00860000000011496,
+      "answer": "The selected document does not provide enough clear evidence. Please specify the field, page, sheet, or filter you need."
+    },
+    {
+      "question": "What is the contact number?",
+      "document": "scan",
+      "correct": true,
+      "citationCorrect": true,
+      "calculation": false,
+      "unsupportedAnswer": false,
+      "latencyMs": 0.1368999999999687,
+      "answer": "The selected document does not provide enough clear evidence. Please specify the field, page, sheet, or filter you need."
+    },
+    {
+      "question": "Summarize this document",
+      "document": "notice",
+      "correct": true,
+      "citationCorrect": true,
+      "calculation": false,
+      "unsupportedAnswer": false,
+      "latencyMs": 1.4765000000002146,
+      "answer": "Summary of the available document evidence:\nCOMMUNITY TRAINING NOTICE\nOrganizer: Bayan Learning Center\nContact number: 09171234567\nVenue: San Isidro Hall\nREGISTRATION\nDeadline: 2026-11-15"
+    },
+    {
+      "question": "Ibuod ang dokumento",
+      "document": "notice",
+      "correct": true,
+      "citationCorrect": true,
+      "calculation": false,
+      "unsupportedAnswer": false,
+      "latencyMs": 1.1009000000003653,
+      "answer": "Buod mula sa ebidensya sa dokumento:\nCOMMUNITY TRAINING NOTICE\nOrganizer: Bayan Learning Center\nContact number: 09171234567\nVenue: San Isidro Hall\nREGISTRATION\nDeadline: 2026-11-15"
+    }
+  ]
+}

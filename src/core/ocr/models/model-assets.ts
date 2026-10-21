@@ -27,6 +27,8 @@ export interface ModelAsset {
   url: string;
   /** Download size in bytes. */
   bytes: number;
+  /** The Cache Storage it is kept in, when not Salin's own (WebLLM reads its files from its own named caches). */
+  cache?: string;
 }
 
 export interface OcrLanguage {

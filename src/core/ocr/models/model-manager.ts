@@ -34,10 +34,15 @@ export class ModelError extends Error {
 export const OFFLINE_MISSING_MESSAGE =
   "The text-recognition files aren't on this device yet, and you're offline. Connect to the internet once, then download them in Settings → Text recognition (or start reading again). Your pages are saved — you can also type the values yourself.";
 
-function openCache() {
+function openCache(name = MODEL_CACHE) {
   if (typeof caches === "undefined") throw new ModelError("unavailable", "This browser can't store recognition files (Cache Storage is unavailable — private browsing?).");
-  return caches.open(MODEL_CACHE);
+  return caches.open(name);
 }
+
+const cacheOf = (asset: ModelAsset) => openCache(asset.cache ?? MODEL_CACHE);
+
+/** Every cache that holds model files: Salin's own and those the AI runtimes read from. */
+const modelCaches = () => [...new Set([MODEL_CACHE, ...AI_ASSETS.map((a) => a.cache ?? MODEL_CACHE)])];
 
 /** Absolute URL, so cache keys match however the asset URL was written (the AI worker reads files by this key). */
 export const keyOf = (asset: ModelAsset) => new URL(asset.url, location.href).href;
@@ -51,10 +56,9 @@ export interface AssetStatus {
 
 /** Which of `assets` are stored and complete. */
 export async function checkAssets(assets: ModelAsset[]): Promise<AssetStatus[]> {
-  const cache = await openCache();
   return Promise.all(
     assets.map(async (asset) => {
-      const response = await cache.match(keyOf(asset));
+      const response = await (await cacheOf(asset)).match(keyOf(asset));
       const verified = Number(response?.headers.get("x-salin-bytes") ?? NaN);
       const ready = Boolean(response) && verified === asset.bytes;
       return { asset, ready, storedBytes: ready ? Number(response!.headers.get("x-salin-stored")) : null };
@@ -145,12 +149,11 @@ export async function downloadAssets(assets: ModelAsset[], options: { signal?: A
   // Ask the browser not to evict the models (and the workspace) under storage pressure.
   void requestPersistentStorage();
 
-  const cache = await openCache();
   let loaded = 0;
   for (const asset of missing) {
     options.signal?.throwIfAborted();
     options.onProgress?.({ loaded, total, asset });
-    await downloadInto(cache, asset, options.signal, (n) => {
+    await downloadInto(await cacheOf(asset), asset, options.signal, (n) => {
       loaded += n;
       options.onProgress?.({ loaded, total, asset });
     });
@@ -164,9 +167,9 @@ export async function downloadAssets(assets: ModelAsset[], options: { signal?: A
  * removed so they download again. Resolves to the assets that were damaged.
  */
 export async function verifyAssets(assets: ModelAsset[]): Promise<ModelAsset[]> {
-  const cache = await openCache();
   const damaged: ModelAsset[] = [];
   for (const asset of assets) {
+    const cache = await cacheOf(asset);
     const response = await cache.match(keyOf(asset));
     if (!response) continue;
     const stored = Number(response.headers.get("x-salin-stored"));
@@ -184,7 +187,7 @@ export async function verifyAssets(assets: ModelAsset[]): Promise<ModelAsset[]> 
  * first (only while online); offline, a clear "files missing" error is thrown.
  */
 export async function loadAsset(asset: ModelAsset, signal?: AbortSignal): Promise<Blob> {
-  const cache = await openCache();
+  const cache = await cacheOf(asset);
   const cached = await cache.match(keyOf(asset));
   if (cached) return cached.blob();
   if (!navigator.onLine) throw new ModelError("offline-missing", OFFLINE_MISSING_MESSAGE);
@@ -197,13 +200,15 @@ export async function loadAsset(asset: ModelAsset, signal?: AbortSignal): Promis
 /** Bytes used by stored model files: the given assets, or all of them. */
 export async function storedBytes(assets?: ModelAsset[]) {
   if (typeof caches === "undefined") return 0;
-  const cache = await caches.open(MODEL_CACHE);
   const only = assets ? new Set(assets.map(keyOf)) : null;
   let sum = 0;
-  for (const request of await cache.keys()) {
-    if (only && !only.has(request.url)) continue;
-    const response = await cache.match(request);
-    sum += Number(response?.headers.get("x-salin-stored") ?? 0);
+  for (const name of modelCaches()) {
+    const cache = await caches.open(name);
+    for (const request of await cache.keys()) {
+      if (only && !only.has(request.url)) continue;
+      const response = await cache.match(request);
+      sum += Number(response?.headers.get("x-salin-stored") ?? 0);
+    }
   }
   return sum;
 }
@@ -212,17 +217,18 @@ export async function storedBytes(assets?: ModelAsset[]) {
 export async function removeAssets(assets?: ModelAsset[]) {
   if (typeof caches === "undefined") return;
   if (!assets) {
-    await caches.delete(MODEL_CACHE);
+    await Promise.all(modelCaches().map((name) => caches.delete(name)));
     return;
   }
-  const cache = await caches.open(MODEL_CACHE);
-  await Promise.all(assets.map((a) => cache.delete(keyOf(a))));
+  await Promise.all(assets.map(async (a) => (await cacheOf(a)).delete(keyOf(a))));
 }
 
 /** Deletes cached files that no current asset points to (left over from an older app version). */
 export async function pruneStale() {
   if (typeof caches === "undefined") return;
-  const cache = await caches.open(MODEL_CACHE);
   const current = new Set([...Object.values(MODEL_ASSETS), ...AI_ASSETS].map(keyOf));
-  await Promise.all((await cache.keys()).filter((r) => !current.has(r.url)).map((r) => cache.delete(r)));
+  for (const name of modelCaches()) {
+    const cache = await caches.open(name);
+    await Promise.all((await cache.keys()).filter((r) => !current.has(r.url)).map((r) => cache.delete(r)));
+  }
 }

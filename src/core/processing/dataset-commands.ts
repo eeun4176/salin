@@ -4,7 +4,8 @@
  * Transform tools or from a natural-language request turned into a command
  * by the local AI: filter, sort, rename a column, change a column's type,
  * summarize / group with counts and totals, normalize values, set values
- * where a condition holds, find duplicate records, and delete rows. A
+ * where a condition holds, find duplicate records, delete rows, and keep
+ * only some columns. A
  * command is a small JSON object, validated with zod and then against the
  * dataset (columns must exist, values must fit the column type) before it
  * runs. Running is pure: it returns a preview (what would change, with
@@ -51,6 +52,7 @@ export const commandSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("set_value"), column: columnRef, value: scalar.nullable(), where: whereSchema }),
   z.object({ action: z.literal("find_duplicates"), columns: z.array(columnRef).max(10).default([]) }),
   z.object({ action: z.literal("delete_rows"), where: whereSchema }),
+  z.object({ action: z.literal("keep_columns"), columns: z.array(columnRef).min(1).max(50) }),
 ]);
 
 export type DatasetCommand = z.infer<typeof commandSchema>;
@@ -58,7 +60,7 @@ export type CommandAction = DatasetCommand["action"];
 export type Condition = z.infer<typeof conditionSchema>;
 
 /** Actions that rewrite many cells or remove rows: their preview asks for a clear confirmation. */
-export const DESTRUCTIVE_ACTIONS = new Set<CommandAction>(["set_value", "normalize", "change_type", "delete_rows"]);
+export const DESTRUCTIVE_ACTIONS = new Set<CommandAction>(["set_value", "normalize", "change_type", "delete_rows", "keep_columns"]);
 
 /* ------------------------------------------------------------------
    Validation against a dataset
@@ -181,6 +183,8 @@ export function resolveCommand(input: unknown, columns: DatasetColumn[]): Resolv
       }
       case "find_duplicates":
         return { ok: true, command: { ...command, columns: command.columns.map((ref) => columnOf(columns, ref).id) } };
+      case "keep_columns":
+        return { ok: true, command: { ...command, columns: [...new Set(command.columns.map((ref) => columnOf(columns, ref).id))] } };
     }
   } catch (error) {
     if (error instanceof CommandError) return { ok: false, message: error.message };
@@ -464,6 +468,30 @@ export function runCommand(command: DatasetCommand, target: CommandTarget): Comm
           : `No duplicates by ${keyColumns.map((c) => c.name).join(", ")}.`,
       };
     }
+
+    case "keep_columns": {
+      const kept = command.columns.map(col);
+      const keep = new Set(command.columns);
+      const removed = columns.filter((c) => !keep.has(c.id)).map((c) => c.name);
+      const reordered = kept.some((c, i) => c !== columns[i]);
+      const rows = target.rows.map((row) => ({ ...row, values: Object.fromEntries(Object.entries(row.values).filter(([id]) => keep.has(id))) }));
+      return {
+        kind: "change",
+        columns: kept,
+        rows,
+        structural: true,
+        changedRowIds: [],
+        affectedRows: 0,
+        affectedColumns: removed.length ? removed : reordered ? kept.map((c) => c.name) : [],
+        destructive: removed.length > 0,
+        samples: [],
+        message: removed.length
+          ? `${plural(removed.length, "column")} will be removed: ${removed.join(", ")}. You can undo it right after.`
+          : reordered
+            ? "The columns will be put in this order."
+            : "The dataset already has only these columns.",
+      };
+    }
   }
 }
 
@@ -538,5 +566,7 @@ export function describeCommand(command: DatasetCommand, columns: DatasetColumn[
       return `Find duplicate rows${command.columns.length ? ` by ${command.columns.map(name).join(", ")}` : ""}`;
     case "delete_rows":
       return `Delete rows where ${describeWhere(command.where, columns)}`;
+    case "keep_columns":
+      return `Keep only ${command.columns.map(name).join(", ")}`;
   }
 }

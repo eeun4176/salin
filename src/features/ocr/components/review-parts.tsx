@@ -216,9 +216,12 @@ interface RecordTableProps {
   onAddRow: () => void;
   onRedraw: () => void;
   drawing: boolean;
+  /** Tapping words on the page fills the selected cell, then moves to the next one. */
+  onFill: () => void;
+  filling: boolean;
 }
 
-export function RecordTable({ set, group, selectedKey, suggested, attentionOnly, onSelect, onChange, onConfirmRow, onRemoveRow, onAddRow, onRedraw, drawing }: RecordTableProps) {
+export function RecordTable({ set, group, selectedKey, suggested, attentionOnly, onSelect, onChange, onConfirmRow, onRemoveRow, onAddRow, onRedraw, drawing, onFill, filling }: RecordTableProps) {
   const rows = attentionOnly ? set.rows.filter((row) => set.columns.some((c) => row.cells[c.key] && valueState(row.cells[c.key], c) !== "ready")) : set.rows;
   return (
     <section aria-label={`${set.label} table`} className="rounded-2xl ring-1 ring-salin-border">
@@ -227,6 +230,9 @@ export function RecordTable({ set, group, selectedKey, suggested, attentionOnly,
           {set.label} <span className="font-normal text-salin-muted">· {set.rows.length} record{set.rows.length === 1 ? "" : "s"}</span>
         </h4>
         <div className="flex flex-wrap gap-2">
+          <button type="button" aria-pressed={filling} onClick={onFill} className={cn(tableButton, filling && "bg-sky-50 ring-sky-400 dark:bg-sky-400/15")}>
+            <Crosshair className="size-3.5" /> {filling ? "Tapping words on the page…" : "Tap words on page"}
+          </button>
           <button type="button" aria-pressed={drawing} onClick={onRedraw} className={cn(tableButton, drawing && "bg-sky-50 ring-sky-400 dark:bg-sky-400/15")}>
             <SquareDashedMousePointer className="size-3.5" /> {drawing ? "Drag around the table on the page…" : "Redraw table area"}
           </button>
@@ -257,7 +263,7 @@ export function RecordTable({ set, group, selectedKey, suggested, attentionOnly,
             {rows.length === 0 && (
               <tr>
                 <td colSpan={set.columns.length + 3} className="px-2 py-4 text-center text-xs text-salin-muted">
-                  {attentionOnly ? "Every record here looks fine." : "No records — use Add row to type them from the page, or Redraw table area."}
+                  {attentionOnly ? "Every record here looks fine." : "No records — use Add row, then type or tap the words on the page; or Redraw table area."}
                 </td>
               </tr>
             )}

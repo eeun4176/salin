@@ -135,6 +135,20 @@ describe("runCommand", () => {
     expect(ROWS).toHaveLength(4);
   });
 
+  it("keeps only the named columns, in that order, with every row and its source", () => {
+    const outcome = run({ action: "keep_columns", columns: ["pet name", "owner", "Owner"] });
+    if (outcome.kind !== "change") throw new Error("expected a change");
+    expect(outcome.columns.map((c) => c.id)).toEqual(["pet", "owner"]);
+    expect(outcome.rows.map((r) => r.values)).toEqual(ROWS.map((r) => ({ pet: r.values.pet, owner: r.values.owner })));
+    expect(outcome.rows.map((r) => r.id)).toEqual(ROWS.map((r) => r.id));
+    expect(outcome).toMatchObject({ structural: true, destructive: true, affectedColumns: ["Barangay", "Species", "Sex", "Age", "Vaccinated", "Date registered", "Contact no."] });
+    expect(ROWS[0].values.brgy).toBe("Muzon");
+    expect(resolveCommand({ action: "keep_columns", columns: ["Breed"] }, COLUMNS)).toMatchObject({ ok: false, message: expect.stringContaining("“Breed”") });
+    expect(resolveCommand({ action: "keep_columns", columns: [] }, COLUMNS).ok).toBe(false);
+    const same = run({ action: "keep_columns", columns: COLUMNS.map((c) => c.name) });
+    expect(same).toMatchObject({ affectedColumns: [], destructive: false });
+  });
+
   it("describes commands in plain language", () => {
     const resolved = resolveCommand({ action: "filter", where: [{ column: "Species", op: "equals", value: "Dog" }, { column: "Vaccinated", op: "equals", value: false }] }, COLUMNS);
     expect(resolved.ok && describeCommand(resolved.command, COLUMNS)).toBe("Show rows where Species is “Dog” and Vaccinated is “No”");

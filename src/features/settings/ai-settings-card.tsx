@@ -14,7 +14,7 @@ import { useEffect, useState } from "react";
 import { Bot, Copy, Download, Gauge, LoaderCircle, ShieldCheck, Square, Trash2, TriangleAlert } from "lucide-react";
 
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
-import { AI_MODEL_HOST, AI_MODELS, AI_MODES, AI_RUNTIME, variantFor, type AiModelId } from "@/core/ai/ai-models";
+import { AI_MODEL_HOST, AI_MODELS, AI_MODES, AI_RUNTIME, variantFor, variantSource, type AiModelId } from "@/core/ai/ai-models";
 import { aiRuntime } from "@/core/ai/ai-runtime";
 import { totalBytes } from "@/core/ocr/models/model-assets";
 import { errorMessage } from "@/core/storage/errors";
@@ -46,7 +46,7 @@ function ModelCard({ id, storage }: { id: AiModelId; storage: StorageStatus | nu
   const free = storage?.supported && storage.quota ? storage.quota - storage.usage : null;
   const tooBig = free !== null && state.status === "missing" && needed * 1.1 > free;
   const slow = id === "assistant" && variant.device === "wasm";
-  const shortSha = model.revision.slice(0, 7);
+  const source = variantSource(model, variant);
 
   const facts: [string, string][] = [
     ["Download", `${formatBytes(size)}${variant.assets.some((a) => a.id === AI_RUNTIME.id) ? ` (includes the ${formatBytes(AI_RUNTIME.bytes)} AI engine shared by both models)` : ""}`],
@@ -55,7 +55,7 @@ function ModelCard({ id, storage }: { id: AiModelId; storage: StorageStatus | nu
     ["Can do", model.capabilities.join(" · ")],
     ["Needs", model.requirements],
     ["License", model.license],
-    ["Source", `${new URL(AI_MODEL_HOST).host} · ${model.repo} @ ${shortSha} (pinned)`],
+    ["Source", `${new URL(AI_MODEL_HOST).host} · ${source.repo} @ ${source.revision.slice(0, 7)} (pinned)`],
   ];
 
   return (

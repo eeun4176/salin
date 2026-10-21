@@ -166,7 +166,42 @@ function isHeaderLike(sheet: SheetModel, r: number, range: CellRange, filled: Oc
     if (seen.has(value.toLowerCase())) return false;
     seen.add(value.toLowerCase());
   }
-  return seen.size > 0;
+  // One title merged across the table isn't a header row.
+  return seen.size >= Math.min(2, width);
+}
+
+/** A form's fill-in label ("BARANGAY: ________", "DATE OF CENSUS:", "Prepared by"): part of the form, not a column name or a record. */
+const FORM_LABEL = /:\s*_*\s*$|_{3,}/;
+
+/** A row holding only form labels ("Prepared By:", "Noted By:", "________"). */
+function isFormLine(sheet: SheetModel, r: number, range: CellRange, covered: Map<string, CellRange>) {
+  const values: string[] = [];
+  for (let c = range.s.c; c <= range.e.c; c++) if (!covered.has(cellKey(r, c)) && text(sheet, r, c)) values.push(text(sheet, r, c));
+  return values.length > 0 && values.every((v) => FORM_LABEL.test(v));
+}
+
+/** A line above a table: one value (a title, often merged across), or only form labels. */
+function isLabelLine(sheet: SheetModel, r: number, range: CellRange, covered: Map<string, CellRange>) {
+  const values: string[] = [];
+  for (let c = range.s.c; c <= range.e.c; c++) if (!covered.has(cellKey(r, c)) && text(sheet, r, c)) values.push(text(sheet, r, c));
+  return values.length === 1 || (values.length > 0 && values.every((v) => FORM_LABEL.test(v)));
+}
+
+/**
+ * A lower header row under group labels ("Dog", "Cat" under "Type of Pet"; "D", "C" under each "Sex" column): short text only,
+ * under a row with merged group labels. Unlike a top header, its labels may repeat and may leave columns blank.
+ */
+function isSubHeader(sheet: SheetModel, r: number, range: CellRange, covered: Map<string, CellRange>) {
+  if (!hasWideMerge(r - 1, range, sheet)) return false;
+  let labels = 0;
+  for (let c = range.s.c; c <= range.e.c; c++) {
+    if (covered.has(cellKey(r, c))) continue;
+    const value = text(sheet, r, c);
+    if (!value) continue;
+    if (kindOf(value) !== "text" || value.length > 40 || sheet.formulas.has(cellKey(r, c))) return false;
+    labels++;
+  }
+  return labels >= 2;
 }
 
 /** True if row `r` has a merge that spans several columns inside `range`. */
@@ -180,9 +215,10 @@ export function suggestHeaderRows(sheet: SheetModel, range: CellRange) {
   const filled = occupancy(sheet, covered);
   const top = range.s.r;
   if (rangeRows(range) < 2 || !isHeaderLike(sheet, top, range, filled, covered)) return 0;
-  // Two-row header: a merged group label ("Q1") over its sub-columns ("Jan", "Feb").
-  if (rangeRows(range) > 2 && hasWideMerge(top, range, sheet) && isHeaderLike(sheet, top + 1, range, filled, covered)) return 2;
-  return 1;
+  // Two- or three-row headers: merged group labels ("Q1", "Type of Pet") over their sub-columns ("Jan", "Feb"; "Dog", "Cat").
+  let rows = 1;
+  while (rows < MAX_HEADER_ROWS && rangeRows(range) > rows + 1 && hasWideMerge(top + rows - 1, range, sheet) && (isHeaderLike(sheet, top + rows, range, filled, covered) || isSubHeader(sheet, top + rows, range, covered))) rows++;
+  return rows;
 }
 
 /* ------------------------------------------------------------------
@@ -211,7 +247,8 @@ function measure(sheet: SheetModel, range: CellRange, headerRows: number, filled
   }
   for (let r = firstData; r <= range.e.r; r++) {
     const n = filledCount(filled, r, range);
-    if (n === 0) continue;
+    // A blank form line keeps only its number ("1", "2." …): not a record (the dataset leaves it out too).
+    if (n === 0 || (n === 1 && rangeColumns(range) > 2 && /^\d{1,4}\.?$/.test(text(sheet, r, range.s.c)))) continue;
     dataRows++;
     filledCells += n;
   }
@@ -283,11 +320,11 @@ export function describeTable(
    Detection
 ------------------------------------------------------------------- */
 
-/** Title or note lines: up to three rows holding a single value each (or one row with two). */
+/** Title or note lines: up to six rows each holding a single value or only form labels ("BARANGAY: ____"), or one row with two values. */
 function isTitleLine(sheet: SheetModel, range: CellRange, covered: Map<string, CellRange>) {
   if (rangeRows(range) === 1) return valueCount(sheet, range.s.r, range, covered) <= 2;
-  if (rangeRows(range) > 3) return false;
-  for (let r = range.s.r; r <= range.e.r; r++) if (valueCount(sheet, r, range, covered) > 1) return false;
+  if (rangeRows(range) > 6) return false;
+  for (let r = range.s.r; r <= range.e.r; r++) if (valueCount(sheet, r, range, covered) > 0 && !isLabelLine(sheet, r, range, covered)) return false;
   return true;
 }
 
@@ -324,16 +361,11 @@ export function detectTables(sheet: SheetModel): DetectedTable[] {
     const above = [...titles].find((t) => t.e.r < range.s.r && range.s.r - t.e.r <= 3 && t.s.c <= range.e.c && t.e.c >= range.s.c);
     if (above) title = rowText(sheet, above);
 
-    // Title lines glued to the top of the block (one filled cell, often merged across).
-    while (
-      rangeRows(range) > 2 &&
-      rangeColumns(range) >= 2 &&
-      valueCount(sheet, range.s.r, range, covered) === 1 &&
-      !isHeaderLike(sheet, range.s.r, range, filled, covered) &&
-      isHeaderLike(sheet, range.s.r + 1, range, filled, covered)
-    ) {
+    // Title and form lines glued to the top of the block ("City of …", "CENSUS FORM", "BARANGAY: ____  DATE: ____"), down to the first header row.
+    const headerAt = rangeColumns(range) >= 2 ? Array.from({ length: 6 }, (_, k) => range.s.r + k).find((r) => r < range.e.r - 1 && isHeaderLike(sheet, r, range, filled, covered)) : undefined;
+    if (headerAt !== undefined && headerAt > range.s.r && Array.from({ length: headerAt - range.s.r }, (_, k) => range.s.r + k).every((r) => !rowFilled(filled, r, range) || isLabelLine(sheet, r, range, covered))) {
       title ??= rowText(sheet, { s: range.s, e: { r: range.s.r, c: range.e.c } });
-      range = { s: { r: range.s.r + 1, c: range.s.c }, e: range.e };
+      range = { s: { r: headerAt, c: range.s.c }, e: range.e };
     }
 
     const headerRows = suggestHeaderRows(sheet, range);
@@ -342,6 +374,13 @@ export function detectTables(sheet: SheetModel): DetectedTable[] {
       range = { s: range.s, e: { r: range.e.r - 1, c: range.e.c } };
       notes.push("Left out the Total row at the bottom");
     }
+    // Sign-off lines glued to the bottom of a form ("Prepared By:", "Noted By:") aren't records either.
+    let signOff = false;
+    while (rangeRows(range) - headerRows > 1 && isFormLine(sheet, range.e.r, range, covered)) {
+      range = { s: range.s, e: { r: range.e.r - 1, c: range.e.c } };
+      signOff = true;
+    }
+    if (signOff) notes.push("Left out the sign-off lines at the bottom");
     tables.push(describeTable(sheet, range, headerRows, "detected", title, notes));
   }
   return tables.sort((a, b) => a.range.s.r - b.range.s.r || a.range.s.c - b.range.s.c);

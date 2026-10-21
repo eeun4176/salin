@@ -14,7 +14,8 @@ const IDENTIFIER_HEADER = /\b(id|code|zip|postal|phone|mobile|telephone|tel|acco
 const NUMBER = /^[+-]?(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d+)?(?:e[+-]?\d+)?$/i;
 const ISO_DATE = /^(\d{4})-(\d{1,2})-(\d{1,2})$/;
 const SLASH_DATE = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
-const TRUE_WORDS = /^(true|yes|y)$/i;
+// Tick marks too: a column of ✓ (or x, /) on a form's checkbox grid is yes/no.
+const TRUE_WORDS = /^(true|yes|y|✓|✔|☑|✅|x|\/)$/i;
 const FALSE_WORDS = /^(false|no|n)$/i;
 
 export function parseNumber(raw: string): number | null {

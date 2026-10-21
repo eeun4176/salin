@@ -15,7 +15,7 @@
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { chromium, expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 
 import { openWorkspace, uploadFiles, waitForOfflineReady, type SampleFile } from "./helpers";
 
@@ -78,7 +78,7 @@ async function openRead(page: Page, fileName: string, template: RegExp) {
   await page.getByRole("button", { name: `More actions for ${fileName}`, exact: true }).click();
   await page.getByRole("menuitem", { name: "Read text (OCR)" }).click();
   await expect(page).toHaveURL(/\/scans\/[\w-]+$/, { timeout: 30_000 });
-  await page.getByRole("button", { name: "Next: read text" }).click();
+  await page.getByText("Options").first().click();
   await page.getByRole("radio", { name: template }).check();
   await page.getByRole("button", { name: /^Read (page|\d+ pages)$/ }).click();
   await expect(page.getByRole("checkbox", { name: "Only show what needs a look" })).toBeVisible({ timeout: 150_000 });
@@ -148,9 +148,7 @@ test("handwriting is read on the device, offline, and offered as suggestions the
   for (const [name, value] of Object.entries(required)) if (name !== field) await page.getByRole("textbox", { name, exact: true }).fill(value);
   await page.getByRole("button", { name: /^Species: / }).click();
   await page.getByRole("menuitemradio", { name: "Cat" }).click();
-  await page.getByRole("button", { name: "Next: save" }).click();
-  await expect(page.getByRole("heading", { name: "1 dataset will be created" })).toBeVisible();
-  await page.getByRole("button", { name: "Create dataset" }).click();
+  await page.getByRole("button", { name: /^Save (dataset|\d+ datasets)$/ }).click();
   await expect(page).toHaveURL(/\/datasets\/[\w-]+$/, { timeout: 30_000 });
   await expect(page.getByRole("textbox", { name: `${field}, row 1` })).toHaveAttribute("title", /Suggested by the handwriting reader, approved in review/);
 
@@ -187,8 +185,7 @@ test("rule suggestions, Transform with preview, filter and undo work without any
   // Without AI downloaded, the tools say how to turn them on.
   await expect(page.getByText(/Set it up in Settings|Download the handwriting reader|Turn on AI Lite/).first()).toBeVisible();
 
-  await page.getByRole("button", { name: "Next: save" }).click();
-  await page.getByRole("button", { name: /^Create \d+ datasets?$/ }).click();
+  await page.getByRole("button", { name: /^Save (dataset|\d+ datasets)$/ }).click();
   await page.getByRole("link", { name: /Animals/ }).first().click().catch(async () => {
     await page.goto("/datasets");
     await page.getByRole("link", { name: /Animals/ }).click();
@@ -231,11 +228,19 @@ test("rule suggestions, Transform with preview, filter and undo work without any
   await expect(page.getByRole("textbox", { name: "Owner, row 2" })).toHaveValue("Ben Reyes");
 });
 
-test("the assistant turns a plain-language request into a previewed, validated change", async ({ page, context }) => {
-  test.skip(!process.env.SALIN_E2E_ASSISTANT, "Set SALIN_E2E_ASSISTANT=1 to run (downloads a ~500 MB model once).");
+// Playwright needs the fixtures argument; this test makes its own disk-backed browser instead.
+// eslint-disable-next-line no-empty-pattern
+test("the assistant turns a plain-language request into a previewed, validated change", async ({}, testInfo) => {
+  test.skip(!process.env.SALIN_E2E_ASSISTANT, "Set SALIN_E2E_ASSISTANT=1 to run (downloads a ~600 MB model once).");
   test.setTimeout(1_200_000);
+  // A disk-backed profile, like a real browser: Playwright's default in-memory storage can't keep a model file this large.
+  const { channel, baseURL } = testInfo.project.use;
+  const context = await chromium.launchPersistentContext(testInfo.outputPath("profile"), { channel, baseURL });
+  const page = context.pages()[0] ?? (await context.newPage());
   const requests: { url: string; method: string }[] = [];
   await serveModels(context, requests);
+  // The phone build (Qwen3-0.6B); the laptop build runs with WebLLM and is checked by hand (docs/PHASE5_AI.md).
+  await context.addInitScript(() => Object.defineProperty(navigator, "deviceMemory", { get: () => 4 }));
 
   await page.goto("/settings");
   await page.getByRole("radio", { name: /^AI Advanced/ }).check();
@@ -258,4 +263,5 @@ test("the assistant turns a plain-language request into a previewed, validated c
   await expect(page.getByText(/Showing 2 of 3 rows/)).toBeVisible();
 
   expectOnlyApprovedRequests(requests);
+  await context.close();
 });

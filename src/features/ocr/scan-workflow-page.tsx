@@ -1,21 +1,23 @@
 /**
  * Read Text Page (/scans/:documentId)
- * The guided OCR workflow for one scan, in four steps:
- *   1. Prepare pages — crop, rotate, clean up, add or reorder pages.
- *   2. Read text — pick a template and read every page on the device.
- *   3. Review — check each value against the page; fix, pick or confirm.
- *   4. Save — create the datasets.
- * Everything is saved as you go, so a scan can be left and resumed (it's
- * listed under Datasets → Scans). The original files are never changed.
+ * The OCR workflow for one scan, in two steps:
+ *   1. Read — every page is read on the device by itself (page edges found,
+ *      a fitting template picked); options are tucked away.
+ *   2. Check & save — say which columns you need, check each value against
+ *      the page (fix, tap words on the page, or confirm), and save.
+ * "Fix pages" (crop, rotate, clean up, add or reorder pages) is there when
+ * a photo needs it. Everything is saved as you go, so a scan can be left
+ * and resumed (it's listed under Datasets → Scans). The original files are
+ * never changed.
  */
 
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { ArrowRight, LoaderCircle, Pencil, ScanText, Trash2 } from "lucide-react";
+import { ArrowRight, Crop, LoaderCircle, Pencil, ScanText, Trash2 } from "lucide-react";
 
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { NameDialog } from "@/components/common/name-dialog";
-import { primaryButton, StepFooter } from "@/components/common/step-footer";
+import { primaryButton, secondaryButton, StepFooter } from "@/components/common/step-footer";
 import { Stepper, type StepInfo } from "@/components/common/stepper";
 import { PageFrame } from "@/components/layout/page-frame";
 import { validateName } from "@/core/storage/names";
@@ -31,19 +33,18 @@ import { toast } from "@/stores/toast-store";
 import type { OcrStage } from "@/types/ocr";
 
 const STEPS: StepInfo[] = [
-  { label: "Prepare pages", description: "Crop, rotate and clean up." },
-  { label: "Read text", description: "Pick a template and read." },
-  { label: "Review", description: "Check values against the page." },
-  { label: "Save", description: "Create your dataset." },
+  { label: "Read", description: "Reading the pages on this device." },
+  { label: "Check & save", description: "Pick what you need and save." },
 ];
 
-const STEP_OF: Record<OcrStage, number> = { prepare: 1, read: 2, review: 3, done: 4 };
+const STEP_OF: Record<OcrStage, number> = { prepare: 1, read: 1, review: 2, done: 2 };
 
 export function ScanWorkflowPage() {
   const { documentId = "" } = useParams();
   const scan = useScan(documentId);
   const [step, setStep] = useState<number | null>(null);
   const [selectedPage, setSelectedPage] = useState(0);
+  const [fixingPages, setFixingPages] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const refresh = useOcrStore((s) => s.refresh);
@@ -79,11 +80,16 @@ export function ScanWorkflowPage() {
   const current = step ?? STEP_OF[doc.stage];
   const go = (n: number) => {
     setStep(n);
+    setFixingPages(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
   const toReview = () => {
     void updateOcrDocument(doc.id, { stage: "review" }).catch(() => undefined);
-    go(3);
+    go(2);
+  };
+  const fixPages = () => {
+    setFixingPages(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   return (
@@ -101,49 +107,44 @@ export function ScanWorkflowPage() {
       <Stepper steps={STEPS} current={current} className="mt-5" />
 
       <div className="mt-8 border-t border-salin-border pt-6">
-        {current === 1 && (
+        {fixingPages ? (
           <>
             <PrepareStep doc={doc} pages={pages} selected={selectedPage} onSelect={setSelectedPage} />
-            <StepFooter message={<span className="text-salin-muted">{pages.length} page{pages.length === 1 ? "" : "s"} · edits are saved automatically</span>}>
-              <button type="button" onClick={() => go(2)} className={primaryButton}>
-                Next: read text <ArrowRight className="size-4" />
+            <StepFooter message={<span className="text-salin-muted">{pages.length} page{pages.length === 1 ? "" : "s"} · edits are saved automatically — read again to use them</span>}>
+              <button type="button" onClick={() => go(1)} className={primaryButton}>
+                Done <ArrowRight className="size-4" />
               </button>
             </StepFooter>
           </>
-        )}
-        {current === 2 && (
+        ) : current === 1 ? (
           <>
             <ReadStep doc={doc} pages={pages} onDone={toReview} />
-            <StepFooter message={doc.extraction ? undefined : <span className="text-salin-muted">Pick the kind of document, then press <strong className="font-semibold text-salin-text">Read</strong> — or type the values yourself.</span>}>
-              <button type="button" onClick={() => go(1)} className="press inline-flex h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold text-salin-text ring-1 ring-salin-border hover:bg-salin-tile">
-                Back
+            <StepFooter>
+              <button type="button" onClick={fixPages} className={secondaryButton}>
+                <Crop className="size-4" /> Fix pages
               </button>
               {/* Until something is read, the step's own Read button is the way forward. */}
               {doc.extraction && (
                 <button type="button" onClick={toReview} className={primaryButton}>
-                  Next: review <ArrowRight className="size-4" />
+                  Next: check & save <ArrowRight className="size-4" />
                 </button>
               )}
             </StepFooter>
           </>
-        )}
-        {current === 3 &&
-          (doc.extraction ? (
-            // A freshly mapped extraction (not just an edit) starts the review over.
-            <ReviewStep key={doc.extraction.id ?? doc.id} doc={doc} pages={pages} onBack={() => go(2)} onNext={() => go(4)} />
-          ) : (
-            <p className="py-10 text-center text-sm text-salin-muted">Read the pages first (step 2), or choose to type the values yourself.</p>
-          ))}
-        {current === 4 && (
+        ) : doc.stage === "done" && doc.datasetIds.length ? (
           <SaveStep
             doc={doc}
-            pages={pages}
             onBack={() => {
               // Reviewing a saved scan again: saving makes new datasets; the old ones stay.
-              if (doc.stage === "done") void updateOcrDocument(doc.id, { stage: "review" }).catch(() => undefined);
-              go(3);
+              void updateOcrDocument(doc.id, { stage: "review" }).catch(() => undefined);
+              go(2);
             }}
           />
+        ) : doc.extraction ? (
+          // A freshly mapped extraction (not just an edit) starts the review over.
+          <ReviewStep key={doc.extraction.id ?? doc.id} doc={doc} pages={pages} onBack={() => go(1)} onFixPages={fixPages} />
+        ) : (
+          <p className="py-10 text-center text-sm text-salin-muted">Read the pages first (step 1), or choose to type the values yourself.</p>
         )}
       </div>
 
