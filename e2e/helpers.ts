@@ -45,7 +45,6 @@ export const sample = {
       buffer: XLSX.write(book, { type: "buffer", bookType: "xlsx" }) as Buffer,
     };
   },
-  txt: (name: string, body: string): SampleFile => ({ name, mimeType: "text/plain", buffer: Buffer.from(body) }),
   png: (name = "Receipt.png"): SampleFile => ({
     name,
     mimeType: "image/png",

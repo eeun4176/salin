@@ -33,16 +33,21 @@ const EXTENSION_KINDS: Record<string, FileKind> = {
   pdf: "pdf",
   xlsx: "xlsx",
   csv: "csv",
-  txt: "txt",
   png: "png",
   jpg: "jpg",
   jpeg: "jpg",
-  webp: "webp",
 };
 
-/** `accept` attribute for every supported import format (docs 5.2). */
-export const ACCEPT_ATTR =
-  ".pdf,.xlsx,.csv,.txt,.png,.jpg,.jpeg,.webp,application/pdf,text/csv,text/plain,image/png,image/jpeg,image/webp,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+/** What each way in takes: imports (workspace, Import, AI Studio) take all five kinds; scans take photos and PDFs of paper forms. */
+const SOURCE_KINDS: Record<IntakeFile["source"], { kinds: FileKind[]; reason: string }> = {
+  import: { kinds: ["pdf", "xlsx", "csv", "png", "jpg"], reason: "Use a PDF, XLSX, CSV, PNG or JPG file" },
+  scan: { kinds: ["png", "jpg", "pdf"], reason: "Not a photo or PDF" },
+};
+
+/** `accept` attribute for imports: PDF, XLSX, CSV, PNG and JPG. */
+export const ACCEPT_ATTR = ".pdf,.xlsx,.csv,.png,.jpg,.jpeg,application/pdf,text/csv,image/png,image/jpeg,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+/** `accept` attribute for scans: JPG, PNG and PDF. */
+export const SCAN_ACCEPT_ATTR = ".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png";
 
 export const MAX_FILE_BYTES = 50 * 1024 * 1024;
 
@@ -70,15 +75,15 @@ export function toIntakeFiles(files: Iterable<File | PickedFile>, source: Intake
     const { file, folderPath } = entry instanceof File ? { file: entry, folderPath: folderPathOf(entry) } : entry;
     if (file.name.startsWith(".") || SYSTEM_FILES.has(file.name.toLowerCase())) continue;
     const kind = detectKind(file.name);
-    if (!kind) {
-      result.rejected.push({ name: file.name, reason: "Unsupported file type" });
+    if (!kind || !SOURCE_KINDS[source].kinds.includes(kind)) {
+      result.rejected.push({ name: file.name, reason: SOURCE_KINDS[source].reason });
       continue;
     }
     if (file.size > MAX_FILE_BYTES) {
       result.rejected.push({ name: file.name, reason: "Larger than 50 MB" });
       continue;
     }
-    const isImage = kind === "png" || kind === "jpg" || kind === "webp";
+    const isImage = kind === "png" || kind === "jpg";
     result.ok.push({
       id: crypto.randomUUID(),
       file,

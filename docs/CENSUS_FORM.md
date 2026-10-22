@@ -6,16 +6,17 @@ One owner and up to three pets per sheet, on long bond paper (216 × 330 mm), pr
 
 The code strip says which version a sheet is, so every version keeps scanning. **Print forms** prints the newest.
 
-| Field | v1 | **v2 (printed now)** |
-|---|---|---|
-| Owner name, address, pet name | One letter box per character | **Open writing lines** (address: 2 lines) |
-| Contact number | 11 digit boxes | 11 digit boxes |
-| Color | Letter boxes | **Tick boxes**: Black, White, Brown, Gray, Orange, Mixed/spotted, Other (other colors go in Remarks) |
-| Age | Tens and ones bubbles (easy to misfill) | **One row**: 0–20+ years, 0–11 months |
-| Registered In | "20" + tens and ones bubbles | **Tick boxes**: the 8 years up to the census year, Earlier, Not yet |
-| Other vaccines, remarks | Letter boxes | Open writing lines |
+| Field | v1 | v2 | **v3 (printed now)** |
+|---|---|---|---|
+| Owner name, address, pet name | One letter box per character | **Open writing lines** (address: 2 lines) | Open writing lines (**address: 1 line**) |
+| Contact number | 11 digit boxes | 11 digit boxes | 11 digit boxes |
+| Color | Letter boxes | **Tick boxes**: Black, White, Brown, Gray, Orange, Mixed/spotted, Other (other colors go in Remarks) | Tick boxes |
+| Age | Tens and ones bubbles (easy to misfill) | **One row**: 0–20+ years, 0–11 months | One row |
+| Registered In | "20" + tens and ones bubbles | **Tick boxes**: the 8 years up to the census year, Earlier, Not yet | Tick boxes |
+| Other vaccines, remarks | Letter boxes | Open writing lines | Open writing lines, side by side, named left of the line |
+| Type of pet … Registered In | Rows of tick boxes, each starting where the last ended | Same as v1 | **A grid**: each category in its own cell, its name on top; tick boxes sit on 12 shared columns, so they line up from row to row |
 
-The v2 mix keeps letter boxes only where a fixed count matters (11 digits). Names and addresses are written naturally, which is what handwriting readers are trained on. Everything with a short list of answers is a tick box, which reads near-perfectly.
+The v2 mix keeps letter boxes only where a fixed count matters (11 digits). Names and addresses are written naturally, which is what handwriting readers are trained on. Everything with a short list of answers is a tick box, which reads near-perfectly. v3 keeps the v2 fields and makes the pet record easier to fill in and check: Type / Sex / Sterilized, Breed / Classification, Vaccination status / Laps, Color, Registered In, then Other vaccines / Remarks. The title reads "DOG & CAT CENSUS WORKING SHEET FORM".
 
 ## How it's read
 
@@ -25,7 +26,7 @@ The v2 mix keeps letter boxes only where a fixed count matters (11 digits). Name
 | Flatten | `read-sheet.ts` → `flatten` | Homography from the marker centres to the layout's, extended to the whole page, at 8 px/mm (1728 × 2640). |
 | Code strip | `code-strip.ts` | 44 squares: version (4 bits), main/continuation (1), barangay index (7), census date as days since 2024-01-01 (14), sheet number (12), position-weighted checksum (6). Any single misread square is rejected. A bad strip means "not a census sheet" and the page goes through normal OCR. All four orientations are tried, the hollow-marker one first. |
 | Local alignment | `read-sheet.ts` → `alignment` | Printers, scanner apps and paper curl leave boxes up to ~1 mm from where the corners put them. Each row of boxes, bubbles or letter boxes is shifted (±1.2 mm) onto its own printed outlines before anything is measured; each code square takes its best spot within ±1 mm. |
-| Tick boxes and bubbles | `read-sheet.ts` → `answer` | Ink share inside the box (bubbles: the middle 40 %) (outline left out, 20 % inset): ≥ 0.10 ticked, ≤ 0.035 empty, in between "unclear" (same thresholds as `findCheckboxes`). Exactly one tick is the answer, none is unanswered, two or more is `multiple-marks`. |
+| Tick boxes and bubbles | `read-sheet.ts` → `answer` | Ink share inside the box (bubbles: the middle 40 %) (outline left out, 20 % inset): ≥ 0.10 ticked, ≤ 0.035 empty, in between "unclear" (same thresholds as `findCheckboxes`). Exactly one tick is the answer, none is unanswered, two or more is `multiple-marks`. One light mark with every other box clean is offered as the answer but flagged (`checkbox-unclear`, "The mark is faint"), so the reviewer confirms it instead of finding a blank. |
 | Handwriting | `handwritingOnly` + `census-extraction.ts` | Readers see a copy that holds only the insides of the letter boxes and writing lines, so printed words and box lines can't be mistaken for values. Text is uppercased and limited to capitals, digits and `. , ' # / -` (digits only for the contact number). Letter boxes: the empty boxes decide where the spaces go. Open lines: read as written. |
 
 The layout (`src/core/census/census-layout.ts`) is the only source of positions, for printing (`features/census/components/census-sheet.tsx`) and reading alike. **Never move anything within a version**: bump `FORM_VERSION` and add a new layout instead. Barangays are encoded by their position in `barangays.ts`, so only append to that list.

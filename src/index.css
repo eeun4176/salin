@@ -35,8 +35,10 @@
   --color-salin-tile: #f1f4f2;
   --color-salin-tile-hover: #e8eeea;
   --color-salin-border-strong: #c9d1cc;
-  /* Hero dot grid. */
-  --color-salin-dot: #d6ddd9;
+  /* Navigation chrome: the floating sidebar and the phone bottom bar. */
+  --color-salin-bar: #ffffff;
+  /* Dialogs and sheets. */
+  --color-salin-dialog: #ffffff;
   /* Toast background (dark in both themes). */
   --color-salin-toast: #1d1f1e;
 
@@ -238,51 +240,53 @@
 }
 
 /* ---------------------------------------------------------------
-   Dark theme (Settings → Appearance). The brand green stays the same so
-   white text on green buttons keeps its contrast; surfaces, text and
-   borders switch to a dark green-grey palette.
+   Dark theme (Settings → Appearance): neutral greys that lift with
+   elevation — base #121212, cards #1E1E1E, app bars #272727, menus #2E2E2E,
+   dialogs #383838. The brand green stays the same so white text on green
+   buttons keeps its contrast.
 ---------------------------------------------------------------- */
 .dark {
   color-scheme: dark;
-  --color-salin-primary-soft: #133524;
+  --color-salin-primary-soft: #183626;
   --color-salin-primary-ink: #7fe0ae;
-  --color-salin-text: #e6ece8;
-  --color-salin-muted: #a5aea9;
-  --color-salin-subtle: #7d8782;
-  --color-salin-canvas: #0e1311;
-  --color-salin-border: #28322d;
-  --color-salin-border-strong: #3b4741;
-  --color-salin-surface: #151c19;
-  --color-salin-tile: #1c2420;
-  --color-salin-tile-hover: #242e29;
-  --color-salin-dot: #27312c;
-  --color-salin-toast: #26302b;
+  --color-salin-text: #e8e8e8;
+  --color-salin-muted: #a6a6a6;
+  --color-salin-subtle: #7f7f7f;
+  --color-salin-canvas: #121212;
+  --color-salin-border: #2f2f2f;
+  --color-salin-border-strong: #474747;
+  --color-salin-surface: #1e1e1e;
+  --color-salin-bar: #272727;
+  --color-salin-dialog: #383838;
+  --color-salin-tile: #2c2c2c;
+  --color-salin-tile-hover: #363636;
+  --color-salin-toast: #383838;
 
-  --background: #0e1311;
-  --foreground: #e6ece8;
-  --card: #151c19;
-  --card-foreground: #e6ece8;
-  --popover: #1a221e;
-  --popover-foreground: #e6ece8;
+  --background: #121212;
+  --foreground: #e8e8e8;
+  --card: #1e1e1e;
+  --card-foreground: #e8e8e8;
+  --popover: #2e2e2e;
+  --popover-foreground: #e8e8e8;
   --primary: #01a85a;
   --primary-foreground: #ffffff;
-  --secondary: #1c2420;
-  --secondary-foreground: #e6ece8;
-  --muted: #1c2420;
-  --muted-foreground: #a5aea9;
-  --accent: #133524;
+  --secondary: #2c2c2c;
+  --secondary-foreground: #e8e8e8;
+  --muted: #2c2c2c;
+  --muted-foreground: #a6a6a6;
+  --accent: #183626;
   --accent-foreground: #7fe0ae;
   --destructive: oklch(0.704 0.191 22.216);
-  --border: #28322d;
-  --input: #34403a;
+  --border: #2f2f2f;
+  --input: #3a3a3a;
   --ring: #01a85a;
-  --sidebar: #151c19;
-  --sidebar-foreground: #e6ece8;
+  --sidebar: #272727;
+  --sidebar-foreground: #e8e8e8;
   --sidebar-primary: #01a85a;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #133524;
+  --sidebar-accent: #183626;
   --sidebar-accent-foreground: #7fe0ae;
-  --sidebar-border: #28322d;
+  --sidebar-border: #2f2f2f;
   --sidebar-ring: #01a85a;
 }
 

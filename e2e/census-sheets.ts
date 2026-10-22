@@ -16,7 +16,7 @@ const FIRST = ["JUAN", "MARIA", "JOSE", "ANA", "MARK", "ROSE", "IAN", "JOY", "CA
 const LAST = ["DELA CRUZ", "SANTOS", "REYES", "GARCIA", "BAUTISTA", "CABALQUINTO", "MENDOZA", "VILLANUEVA", "AQUINO", "TORRES"];
 const STREETS = ["BLK 2 LOT 5", "PUROK 3", "123 RIZAL ST", "PH 1 BLK 7", "SITIO PAG ASA", "VC2 AREA G"];
 const PETS = ["MOCHA", "BANTAY", "CHOCO", "MINGMING", "BROWNIE", "PUTI", "TIGER", "LUCKY"];
-// The v2 sheet's Color tick boxes.
+// The sheet's Color tick boxes (v2 and later).
 const COLORS = ["BROWN", "BLACK", "WHITE", "GRAY", "ORANGE", "MIXED/SPOTTED"];
 
 /** Seeded random numbers, so a run can be repeated. */
@@ -104,7 +104,7 @@ export async function filledPhoto(browser: Browser, svg: string, truth: Truth, n
         const y = Number(t.getAttribute("y")) - 3.5;
         add("path", { d: `M${x + 0.6 + next()} ${y + 2.4} L${x + 1.9} ${y + 3.9} L${x + 3.6 + next() * 0.6} ${y + 0.4 + next()}`, stroke: ink, "stroke-width": 0.5, fill: "none", "stroke-linecap": "round" });
       };
-      // v2 sheet: open lines (rounded) in print order — owner name, 2 address lines, then per pet: name, other vaccines, remarks;
+      // v3 sheet: open lines (rounded) in print order — owner name, address, then per pet: name, other vaccines, remarks;
       // letter boxes only for the contact number.
       const lines = [...svg.querySelectorAll('rect[stroke="#8a8f8c"][rx]')];
       const boxes = [...svg.querySelectorAll('rect[stroke="#8a8f8c"]:not([rx])')];
@@ -134,7 +134,7 @@ export async function filledPhoto(browser: Browser, svg: string, truth: Truth, n
       onLine(lines[0], truth.owner_name);
       onLine(lines[1], truth.address);
       inBoxes(0, truth.contact);
-      onLine(lines[3], truth.pet_name);
+      onLine(lines[2], truth.pet_name);
       tick(truth.color, 0);
       tick(truth.type, 0);
       tick(truth.sex, 0);

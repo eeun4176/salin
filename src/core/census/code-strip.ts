@@ -8,8 +8,8 @@
  */
 
 /** The version printed now; every version in SUPPORTED_VERSIONS still scans. */
-export const FORM_VERSION = 2;
-export const SUPPORTED_VERSIONS = [1, 2];
+export const FORM_VERSION = 3;
+export const SUPPORTED_VERSIONS = [1, 2, 3];
 
 export interface SheetCode {
   version: number;

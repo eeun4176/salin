@@ -33,18 +33,19 @@ test("uploading a folder recreates its structure", async ({ page }) => {
   await mkdir(join(root, "Census", "Batch 1"), { recursive: true });
   await writeFile(join(root, "Census", "summary.csv"), "a,b\n1,2");
   await writeFile(join(root, "Census", "Batch 1", "form.pdf"), "%PDF-1.4");
-  await writeFile(join(root, "Census", "Batch 1", "notes.txt"), "Text files are supported.");
+  // Text files aren't imported: skipped.
+  await writeFile(join(root, "Census", "Batch 1", "notes.txt"), "Text files aren't imported.");
 
   await openWorkspace(page);
   await page.getByTestId("folder-input").setInputFiles(join(root, "Census"));
-  await expect(page.getByText(/Saved 3 files to Workspace/)).toBeVisible();
+  await expect(page.getByText(/Saved 2 files to Workspace/)).toBeVisible();
 
   await card(page, "Census").click();
   await expect(page.getByRole("navigation", { name: "Breadcrumb" })).toContainText("Census");
   await expect(card(page, "summary.csv")).toBeVisible();
   await card(page, "Batch 1").click();
   await expect(card(page, "form.pdf")).toBeVisible();
-  await expect(card(page, "notes.txt")).toBeVisible();
+  await expect(card(page, "notes.txt")).toBeHidden();
   await expect(page.getByRole("navigation", { name: "Breadcrumb" })).toContainText("Census");
 });
 

@@ -22,7 +22,7 @@ import { useObjectUrl } from "@/features/ocr/hooks/use-scan";
 import { MAX_SCAN_PAGES } from "@/features/ocr/ocr-actions";
 import { pageSource, pdfPageCount } from "@/features/ocr/page-sources";
 import { toast } from "@/stores/toast-store";
-import { toIntakeFiles } from "@/stores/intake-store";
+import { SCAN_ACCEPT_ATTR, toIntakeFiles } from "@/stores/intake-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { cn } from "@/lib/utils";
 import type { Enhancements, OcrDocument, OcrPage, PageEdits, QuarterTurn } from "@/types/ocr";
@@ -297,10 +297,9 @@ function AddPages({ doc, pageCount }: { doc: OcrDocument; pageCount: number }) {
   async function onFiles(event: ChangeEvent<HTMLInputElement>) {
     const picked = Array.from(event.target.files ?? []);
     event.target.value = "";
-    const { ok, rejected } = toIntakeFiles(picked, "scan");
-    const usable = ok.filter((f) => ["png", "jpg", "webp", "pdf"].includes(f.kind));
-    const skipped = rejected.length + ok.length - usable.length;
-    if (skipped) toast(`Skipped ${skipped} file${skipped === 1 ? "" : "s"}: use JPG, PNG, WebP or PDF under 50 MB.`);
+    const { ok: usable, rejected } = toIntakeFiles(picked, "scan");
+    const skipped = rejected.length;
+    if (skipped) toast(`Skipped ${skipped} file${skipped === 1 ? "" : "s"}: use JPG, PNG or PDF under 50 MB.`);
     if (!usable.length) return;
     try {
       // Count PDF pages before saving, so a damaged PDF isn't saved for nothing.
@@ -319,13 +318,13 @@ function AddPages({ doc, pageCount }: { doc: OcrDocument; pageCount: number }) {
     } catch (e) {
       toast(e instanceof Error && e.name === "PdfOpenError" ? e.message : errorMessage(e, "The pages couldn't be added."));
     } finally {
-      ok.forEach((f) => f.previewUrl && URL.revokeObjectURL(f.previewUrl));
+      usable.forEach((f) => f.previewUrl && URL.revokeObjectURL(f.previewUrl));
     }
   }
 
   return (
     <>
-      <input ref={uploadRef} type="file" accept="image/png,image/jpeg,image/webp,application/pdf,.pdf,.jpg,.jpeg,.png,.webp" multiple className="sr-only" tabIndex={-1} aria-hidden="true" onChange={(e) => void onFiles(e)} />
+      <input ref={uploadRef} type="file" accept={SCAN_ACCEPT_ATTR} multiple className="sr-only" tabIndex={-1} aria-hidden="true" onChange={(e) => void onFiles(e)} />
       <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="sr-only" tabIndex={-1} aria-hidden="true" onChange={(e) => void onFiles(e)} />
       <button type="button" onClick={() => uploadRef.current?.click()} className="grid aspect-[3/4] w-16 shrink-0 place-items-center rounded-lg border-2 border-dashed border-salin-border-strong text-salin-muted hover:border-salin-primary hover:text-salin-primary sm:w-[72px]">
         <span className="flex flex-col items-center gap-0.5 text-[10px] font-semibold">

@@ -1,6 +1,19 @@
 import { readFile, writeFile } from "node:fs/promises";
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { openWorkspace, uploadFiles, waitForOfflineReady } from "./helpers";
+
+const wide = (page: Page) => (page.viewportSize()?.width ?? 0) >= 1024;
+
+/** The latest answer's sources: the drawer on wide screens, the bottom sheet on phones. */
+async function openSources(page: Page) {
+  if (wide(page)) return page.getByRole("complementary", { name: "Sources" });
+  await page.getByRole("button", { name: /^Sources \(\d+\)$/ }).click();
+  return page.getByRole("dialog", { name: "Sources" });
+}
+
+async function closeSources(page: Page) {
+  if (!wide(page)) await page.keyboard.press("Escape");
+}
 
 for (const profile of ["laptop-browser", "phone-emulation"] as const) {
   test(`${profile}: selected document answers and exports work fully offline`, async ({ page, context }) => {
@@ -33,11 +46,10 @@ for (const profile of ["laptop-browser", "phone-emulation"] as const) {
       const started = performance.now();
       await page.getByRole("button", { name: "Send", exact: true }).click();
       await expect(page.getByRole("log")).toContainText(value);
-      const details = page.locator("details").last();
-      await expect(details).toContainText("Sources (");
-      await details.locator("summary").click();
-      await expect(details).toContainText(source);
-      if (question.includes("page 2")) await expect(details).toContainText("page 2");
+      const sources = await openSources(page);
+      await expect(sources).toContainText(source);
+      if (question.includes("page 2")) await expect(sources).toContainText("page 2");
+      await closeSources(page);
       results.push({ source, question, expected: value, correct: true, citationCorrect: true, latencyMs: performance.now() - started });
     }
     await page.getByRole("button", { name: /^Source:/ }).click();
@@ -83,6 +95,6 @@ test("a raster form reaches Ask SALIN through real OCR and answers offline", asy
   const started = performance.now();
   await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByRole("log")).toContainText("09171234567");
-  await expect(page.locator("details").last()).toContainText("page 1");
+  await expect(await openSources(page)).toContainText("page 1");
   await writeFile("docs/benchmarks/phase5/ocr-offline.json", JSON.stringify({ environment: "Chrome on development laptop", source: "contact-form.png", engine: "real Tesseract.js through the scan workflow", offlineAnswer: true, question: "What is the contact number?", expected: "09171234567", exactMatch: true, citationCorrect: true, latencyMs: performance.now() - started }, null, 2));
 });

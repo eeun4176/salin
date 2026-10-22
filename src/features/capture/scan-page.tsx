@@ -20,7 +20,7 @@ import { FolderPickerDialog } from "@/features/workspace/components/folder-picke
 import { folderUrl } from "@/features/workspace/use-open-item";
 import { saveIntakeFiles } from "@/features/workspace/workspace-actions";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
-import { toIntakeFiles, useIntakeStore, type IntakeFile } from "@/stores/intake-store";
+import { SCAN_ACCEPT_ATTR, toIntakeFiles, useIntakeStore, type IntakeFile } from "@/stores/intake-store";
 import { toast } from "@/stores/toast-store";
 import { cn } from "@/lib/utils";
 
@@ -110,12 +110,8 @@ export function ScanPage() {
     const files = Array.from(event.target.files ?? []);
     event.target.value = "";
     const { ok, rejected } = toIntakeFiles(files, "scan");
-    const usable = ok.filter((f) => f.kind === "png" || f.kind === "jpg" || f.kind === "webp" || f.kind === "pdf");
-    const wrongType = ok.filter((f) => !usable.includes(f));
-    wrongType.forEach((f) => f.previewUrl && URL.revokeObjectURL(f.previewUrl));
-    setPages((p) => [...p, ...usable]);
-    const skipped = [...rejected, ...wrongType.map((f) => ({ name: f.name, reason: "Not a photo or PDF" }))];
-    if (skipped.length) toast(`Skipped ${skipped.map((r) => `${r.name} (${r.reason.toLowerCase()})`).join(", ")}. Use JPG, PNG, WebP or PDF under 50 MB.`);
+    setPages((p) => [...p, ...ok]);
+    if (rejected.length) toast(`Skipped ${rejected.map((r) => `${r.name} (${r.reason.toLowerCase()})`).join(", ")}. Use JPG, PNG or PDF under 50 MB.`);
   }
 
   /** A photo from the phone's camera app: checked like a live capture. */
@@ -184,7 +180,7 @@ export function ScanPage() {
 
   return (
     <PageFrame title="Scan Document" description="Capture paper forms with your camera. Pages stay on this device.">
-      <input ref={uploadRef} type="file" accept="image/png,image/jpeg,image/webp,application/pdf,.pdf,.jpg,.jpeg,.png,.webp" multiple className="sr-only" tabIndex={-1} aria-hidden="true" onChange={onUpload} />
+      <input ref={uploadRef} type="file" accept={SCAN_ACCEPT_ATTR} multiple className="sr-only" tabIndex={-1} aria-hidden="true" data-testid="scan-file-input" onChange={onUpload} />
       <input ref={nativeRef} type="file" accept="image/*" capture="environment" className="sr-only" tabIndex={-1} aria-hidden="true" onChange={onNativeCapture} />
 
       <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_17.5rem]">

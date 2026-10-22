@@ -7,11 +7,12 @@
  * status, where it came from (file or scan) and last change, with a ⋮ menu.
  * On desktop a row opens in the detail pane beside the list; on phones it
  * opens the full review screen.
- * Rows stack cleanly on phones. "New dataset" opens the document picker.
+ * Rows stack cleanly on phones. "New dataset" opens the document picker, as
+ * does arriving from the sidebar's New Document → New Dataset.
  */
 
 import { useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
 import { ChevronRight, CircleCheck, House, Plus, ScanText, Table2, TriangleAlert } from "lucide-react";
 
 import { ChoiceMenu } from "@/components/common/choice-menu";
@@ -127,6 +128,14 @@ export function DatasetsView() {
   const scans = useScans();
   const query = useUiStore((s) => s.query).trim().toLowerCase();
   const [picking, setPicking] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+  // Sent here by New Document → New Dataset: the picker is open until closed, which drops the flag so Back doesn't reopen it.
+  const requested = (location.state as { newDataset?: boolean } | null)?.newDataset === true;
+  function onPickerChange(open: boolean) {
+    setPicking(open);
+    if (!open && requested) navigate({ pathname: location.pathname, search: location.search }, { replace: true, state: null });
+  }
   const [status, setStatus] = useState<StatusFilter>("all");
   const [sort, setSort] = useState<SortKey>("updated");
 
@@ -224,7 +233,7 @@ export function DatasetsView() {
         )}
       </div>
 
-      <DocumentPickerDialog open={picking} onOpenChange={setPicking} />
+      <DocumentPickerDialog open={picking || requested} onOpenChange={onPickerChange} />
     </div>
   );
 }

@@ -41,7 +41,6 @@ test("file cards show each file's real content", async ({ page }) => {
     sample.png("Photo.png"),
     sample.textPdf("Form.pdf", [["Census Form 2026", "Household: Cruz"]]),
     sample.csv("Pets.csv", "Name,Pet\nAna,Bantay"),
-    sample.txt("Notes.txt", "Bantay: rabies shot done"),
     sample.xlsx("Clinics.xlsx", { Clinics: [["Clinic", "Town"], ["Vet Plus", "Poblacion"]] }),
   ]);
 
@@ -51,7 +50,6 @@ test("file cards show each file's real content", async ({ page }) => {
     ["Photo.png", "image"],
     ["Form.pdf", "image"],
     ["Pets.csv", "table", "Bantay"],
-    ["Notes.txt", "text", "rabies shot done"],
     ["Clinics.xlsx", "table", "Vet Plus"],
   ];
   for (const [name, kind, text] of expected) {

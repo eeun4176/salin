@@ -2,7 +2,7 @@
  * Import Page (/import)
  * Drag-and-drop or browse for files and whole folders, review the queue,
  * then Extract data (the files are saved to the workspace and read: photos
- * and PDFs with text recognition, spreadsheets and text as data), save
+ * and PDFs with text recognition, spreadsheets as data), save
  * everything into a chosen workspace folder (folder structure is kept), or
  * hand the files to Ask Salin AI.
  */
@@ -29,7 +29,7 @@ import { useIntakeStore, type PickedFile } from "@/stores/intake-store";
 import { toast } from "@/stores/toast-store";
 import { cn } from "@/lib/utils";
 
-const FORMATS: FileKind[] = ["pdf", "xlsx", "csv", "txt", "png", "jpg", "webp"];
+const FORMATS: FileKind[] = ["pdf", "xlsx", "csv", "png", "jpg"];
 
 const hasFiles = (event: DragEvent) => event.dataTransfer?.types.includes("Files") ?? false;
 
@@ -89,7 +89,7 @@ export function ImportPage() {
     const intake = useIntakeStore.getState().queue;
     const scannable = intake.filter((f) => OCR_KINDS.has(f.kind)).length;
     if (scannable && scannable < intake.length) {
-      toast("Extract photos and PDFs separately from spreadsheets and text files — remove one kind from the list.");
+      toast("Extract photos and PDFs separately from spreadsheets — remove one kind from the list.");
       return;
     }
     setExtracting(true);
@@ -201,12 +201,12 @@ export function ImportPage() {
           </button>
         </div>
 
-        <div className="mt-7 flex flex-wrap items-center justify-center gap-1.5" aria-label="Supported formats: PDF, XLSX, CSV, TXT, PNG, JPG, WebP">
+        <div className="mt-7 flex flex-wrap items-center justify-center gap-1.5" aria-label="Supported formats: PDF, XLSX, CSV, PNG, JPG">
           {FORMATS.map((kind) => (
             <FileTypeIcon key={kind} kind={kind} className="size-9" />
           ))}
         </div>
-        <p className="mt-2 text-xs text-salin-subtle">PDF, XLSX, CSV, TXT, PNG, JPG, WebP · up to 50 MB each</p>
+        <p className="mt-2 text-xs text-salin-subtle">PDF, XLSX, CSV, PNG, JPG · up to 50 MB each</p>
       </div>
 
       {queue.length > 0 && (

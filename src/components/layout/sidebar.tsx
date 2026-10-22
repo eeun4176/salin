@@ -1,17 +1,20 @@
 /**
  * Sidebar
- * The dashboard's left pane on screens 760px and wider: the logo, the
- * "New Document" menu (scan with the camera or import files), links to every
+ * The dashboard's left pane on screens 760px and wider, a floating white card
+ * 12px in from the edges: the logo, the morphing "New Document" menu (scan,
+ * import or start a dataset), pill links to every
  * area with item counts, how much this device stores, and the signed-in
- * paravet's menu (install, sign out). Below 1024px it narrows to an icon
- * rail; phones use the bottom bar instead.
+ * paravet's menu (install, sign out). The PanelLeft button or Ctrl/Cmd+B folds
+ * it from 264px to a 64px icon rail (remembered on this device; screens under
+ * 1024px start folded); phones use the bottom bar instead.
  */
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
-import { Camera, ChevronDown, ClipboardList, Download, HardDrive, LogOut, Plus, Settings, Sparkles, Upload, type LucideIcon } from "lucide-react";
+import { ClipboardList, Download, HardDrive, LogOut, PanelLeft, Settings, Sparkles, type LucideIcon } from "lucide-react";
 
 import { Logo } from "@/components/brand/logo";
+import { NewDocumentMenu } from "@/components/layout/new-document-menu";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { getStorageStatus } from "@/core/storage/storage-health";
 import { SECTION_LINKS, isSectionActive } from "@/features/workspace/section-links";
@@ -22,6 +25,12 @@ import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
 import { toast } from "@/stores/toast-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
+
+const COLLAPSED_KEY = "salin_sidebar_collapsed";
+const IS_MAC = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.userAgent);
+/** Text that wipes out right to left while the sidebar folds into the rail (`group/rail` is the aside). */
+const wipe =
+  "min-w-0 whitespace-nowrap transition-[clip-path,opacity] duration-400 ease-[cubic-bezier(.32,.72,0,1)] [clip-path:inset(0_0_0_0)] motion-reduce:transition-none group-data-collapsed/rail:[clip-path:inset(0_100%_0_0)] group-data-collapsed/rail:opacity-0";
 
 const OTHER_LINKS: { to: string; label: string; icon: LucideIcon }[] = [
   { to: "/census", label: "Census", icon: ClipboardList },
@@ -47,38 +56,16 @@ function NavLink({ to, label, icon: Icon, count, active }: { to: string; label: 
       aria-current={active ? "page" : undefined}
       title={label}
       className={cn(
-        "flex h-10 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-[background-color,color,box-shadow] duration-300 ease-spring max-lg:justify-center max-lg:px-0",
-        active ? "bg-salin-surface text-salin-text shadow-[0_0_0_1px_var(--color-salin-border),0_1px_2px_rgb(0_0_0/0.04)]" : "text-salin-muted hover:bg-salin-tile hover:text-salin-text",
+        "flex h-10 items-center gap-3 overflow-hidden rounded-full px-[11px] text-sm font-medium transition-[background-color,color] duration-300 ease-spring",
+        active ? "bg-salin-primary/10 text-salin-text" : "text-salin-muted hover:bg-salin-tile hover:text-salin-text",
       )}
     >
       <Icon aria-hidden="true" className={cn("size-[18px] shrink-0", active && "text-salin-primary")} strokeWidth={1.9} />
-      <span className="flex-1 truncate max-lg:sr-only">{label}</span>
-      {count !== undefined && count > 0 && <span className="text-xs text-salin-subtle tabular-nums max-lg:hidden">{count.toLocaleString()}</span>}
+      <span className={cn(wipe, "flex flex-1 items-center gap-3")}>
+        <span className="flex-1 truncate">{label}</span>
+        {count !== undefined && count > 0 && <span className="text-xs text-salin-subtle tabular-nums">{count.toLocaleString()}</span>}
+      </span>
     </Link>
-  );
-}
-
-function NewDocumentMenu() {
-  const navigate = useNavigate();
-  return (
-    <DropdownMenu modal={false}>
-      <DropdownMenuTrigger
-        aria-label="New Document"
-        className="press flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-salin-primary px-3 text-sm font-semibold text-white shadow-[0_6px_16px_-8px_rgb(1_168_90/0.7)] outline-none hover:bg-salin-primary-strong focus-visible:ring-3 focus-visible:ring-salin-primary/30"
-      >
-        <Plus aria-hidden="true" className="size-[18px] shrink-0" strokeWidth={2.2} />
-        <span className="max-lg:sr-only">New Document</span>
-        <ChevronDown aria-hidden="true" className="ml-auto size-4 opacity-80 max-lg:hidden" />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-60 rounded-xl p-1.5">
-        <DropdownMenuItem className="gap-2.5 py-2" onSelect={() => navigate("/scan")}>
-          <Camera /> Scan Document
-        </DropdownMenuItem>
-        <DropdownMenuItem className="gap-2.5 py-2" onSelect={() => navigate("/import")}>
-          <Upload /> Import Files
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
   );
 }
 
@@ -100,10 +87,10 @@ function StorageBadge() {
     <Link
       to="/settings"
       title="Stored on this device"
-      className="flex h-9 items-center gap-2 rounded-xl px-3 text-xs text-salin-muted ring-1 ring-salin-border hover:text-salin-text max-lg:justify-center max-lg:px-0"
+      className="flex h-9 items-center gap-2 overflow-hidden rounded-xl px-3 text-xs text-salin-muted ring-1 ring-salin-border hover:text-salin-text"
     >
       <HardDrive aria-hidden="true" className="size-4 shrink-0" />
-      <span className="tabular-nums max-lg:sr-only">{formatBytes(usage)} Local</span>
+      <span className={cn(wipe, "tabular-nums")}>{formatBytes(usage)} Local</span>
     </Link>
   );
 }
@@ -133,12 +120,12 @@ function AccountMenu() {
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger
         aria-label={`Account: ${session.name}`}
-        className="flex w-full items-center gap-2.5 rounded-xl p-1.5 text-left outline-none hover:bg-salin-tile focus-visible:ring-2 focus-visible:ring-salin-primary max-lg:justify-center"
+        className="flex w-full items-center gap-2.5 overflow-hidden rounded-xl p-1 text-left outline-none hover:bg-salin-tile focus-visible:ring-2 focus-visible:ring-salin-primary"
       >
         <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-full bg-salin-primary-soft text-xs font-semibold text-salin-primary-ink">
           {initials}
         </span>
-        <span className="min-w-0 flex-1 max-lg:hidden">
+        <span className={cn(wipe, "flex-1")}>
           <span className="block truncate text-sm font-medium text-salin-text">{session.name}</span>
           <span className="block truncate text-[11px] text-salin-subtle">{session.key}</span>
         </span>
@@ -165,33 +152,89 @@ function AccountMenu() {
   );
 }
 
+/** Folded or not: remembered on this device; without a saved choice, screens under 1024px start folded. Ctrl/Cmd+B toggles it outside text fields. */
+function useCollapsed() {
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      const saved = localStorage.getItem(COLLAPSED_KEY);
+      if (saved !== null) return saved === "true";
+    } catch {
+      // Storage blocked (private mode): fall back to the screen width.
+    }
+    return !window.matchMedia("(min-width: 64rem)").matches;
+  });
+
+  const toggle = useCallback(() => {
+    setCollapsed((was) => {
+      try {
+        localStorage.setItem(COLLAPSED_KEY, String(!was));
+      } catch {
+        // Not remembered this time; the toggle still works.
+      }
+      return !was;
+    });
+  }, []);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() !== "b" || !(IS_MAC ? event.metaKey : event.ctrlKey) || event.altKey || event.shiftKey) return;
+      if (event.target instanceof Element && event.target.closest("input, textarea, [contenteditable]:not([contenteditable='false'])")) return;
+      event.preventDefault();
+      toggle();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [toggle]);
+
+  return [collapsed, toggle] as const;
+}
+
 export function Sidebar() {
   const { pathname } = useLocation();
   const items = useWorkspaceStore((s) => s.items);
   const hidden = useWorkspaceStore((s) => s.hiddenFolderIds);
   const counts = sectionCounts(items, hidden);
+  const [collapsed, toggle] = useCollapsed();
+  const shortcut = IS_MAC ? "⌘B" : "Ctrl+B";
 
   return (
-    <aside className="sticky top-0 hidden h-dvh flex-col gap-5 border-r border-salin-border bg-salin-canvas px-3 py-4 nav:flex">
-      <div className="flex h-10 items-center px-2 max-lg:justify-center max-lg:px-0">
-        <Logo className="max-lg:hidden" />
-        <Link to="/" aria-label="Salin home" className="rounded-md text-[26px] leading-none font-extrabold text-salin-primary lg:hidden">
-          S
-        </Link>
-      </div>
-      <NewDocumentMenu />
-      <nav aria-label="Primary" className="flex flex-1 flex-col gap-1">
-        {SECTION_LINKS.map((link) => (
-          <NavLink key={link.to} {...link} count={counts[link.to]} active={isSectionActive(link.to, pathname)} />
-        ))}
-        <div aria-hidden="true" className="my-2 h-px bg-salin-border" />
-        {OTHER_LINKS.map((link) => (
-          <NavLink key={link.to} {...link} active={pathname.startsWith(link.to)} />
-        ))}
-      </nav>
-      <div className="space-y-2">
-        <StorageBadge />
-        <AccountMenu />
+    <aside data-collapsed={collapsed || undefined} className="group/rail sticky top-0 z-40 hidden h-dvh shrink-0 p-3 nav:block">
+      <div
+        className={cn(
+          "flex h-full flex-col gap-5 rounded-[24px] border border-salin-border bg-salin-bar px-[11px] py-4 shadow-sm transition-[width] duration-[640ms] ease-[cubic-bezier(.32,.72,0,1)] motion-reduce:transition-none",
+          collapsed ? "w-16" : "w-[264px]",
+        )}
+      >
+        <div className="relative flex h-10 items-center">
+          <div inert={collapsed} className={cn(wipe, "px-2")}>
+            <Logo />
+          </div>
+          <button
+            type="button"
+            onClick={toggle}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-expanded={!collapsed}
+            aria-keyshortcuts={IS_MAC ? "Meta+B" : "Control+B"}
+            title={`${collapsed ? "Expand" : "Collapse"} sidebar (${shortcut})`}
+            className="absolute top-0 right-0 grid size-10 place-items-center rounded-xl text-salin-muted outline-none hover:bg-salin-tile hover:text-salin-text focus-visible:ring-2 focus-visible:ring-salin-primary"
+          >
+            <PanelLeft aria-hidden="true" className="size-[18px]" strokeWidth={1.9} />
+          </button>
+        </div>
+        <NewDocumentMenu collapsed={collapsed} />
+        <nav aria-label="Primary" className="flex flex-1 flex-col gap-1">
+          {SECTION_LINKS.map((link) => (
+            <NavLink key={link.to} {...link} count={counts[link.to]} active={isSectionActive(link.to, pathname)} />
+          ))}
+          <div aria-hidden="true" className="my-2 h-px bg-salin-border" />
+          {OTHER_LINKS.map((link) => (
+            <NavLink key={link.to} {...link} active={pathname.startsWith(link.to)} />
+          ))}
+        </nav>
+        <div className="space-y-2">
+          <StorageBadge />
+          <AccountMenu />
+        </div>
       </div>
     </aside>
   );

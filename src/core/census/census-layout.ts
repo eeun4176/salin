@@ -1,5 +1,5 @@
 /**
- * Census Sheet Layouts (CVO-CENSUS v1 and v2)
+ * Census Sheet Layouts (CVO-CENSUS v1, v2 and v3)
  * Where everything sits on the printed Dog & Cat working sheet, in
  * millimetres on long bond paper (216 × 330 mm). Printing draws from it and
  * scanning reads from it, so the two always agree: four corner markers to
@@ -8,15 +8,17 @@
  * number bubbles that are read by how much ink is inside them. One owner
  * and three pets per sheet; a continuation sheet carries pets 4–6.
  *
- * v1 uses one letter box per character everywhere. v2 (printed now) keeps
- * boxes only for the contact number; names, address and remarks are open
- * writing lines, Color is tick boxes, age is one row of bubbles and
- * Registered In is a row of years. Markers and the code strip sit in the
- * same place in every version, so any sheet says which layout it uses.
+ * v1 uses one letter box per character everywhere. v2 keeps boxes only for
+ * the contact number; names, address and remarks are open writing lines,
+ * Color is tick boxes, age is one row of bubbles and Registered In is a row
+ * of years. v3 (printed now) keeps the v2 fields with a one-line address and
+ * lays the pet record out as a grid: every category in its own cell, tick
+ * boxes in the same columns from row to row. Markers and the code strip sit
+ * in the same place in every version, so any sheet says which layout it uses.
  * Never move anything within a version — add a new version instead.
  */
 
-import { CODE_BITS, FORM_VERSION } from "@/core/census/code-strip";
+import { CODE_BITS, FORM_VERSION, SUPPORTED_VERSIONS } from "@/core/census/code-strip";
 
 export interface Rect {
   x: number;
@@ -89,6 +91,8 @@ export interface CensusLayout {
   ownerCaptions: Caption[];
   /** Thin guide boxes around sections (printing only). */
   frames: Rect[];
+  /** Thin lines between cells (printing only): Rects with no width or no height. */
+  rules: Rect[];
 }
 
 export const PAGE = { width: 216, height: 330 };
@@ -109,6 +113,11 @@ const PET_HEIGHT = 70;
 const PET_HEIGHT_V2 = 72;
 const LINE_H = 6.5;
 const PET_GAP = 1.5;
+const PET_HEIGHT_V3 = 74.5;
+const PET_GAP_V3 = 1;
+/** v3 pet grid: the frame's width in 12 columns, and the height of a row of tick boxes. */
+const GRID = (RIGHT - LEFT + 4) / 12;
+const GRID_ROW = 8.2;
 
 /** Approximate width of capital text in mm (Inter semibold), so option labels never collide. */
 export const textWidth = (text: string, size: number) => text.length * size * 0.64;
@@ -191,6 +200,10 @@ const PET_CHOICES: [string, string, string[]][][] = [
   ],
 ];
 
+const COLOR: [string, string, string[]] = ["color", "COLOR", ["BLACK", "WHITE", "BROWN", "GRAY", "ORANGE", "MIXED/SPOTTED", "OTHER"]];
+// Years are printed from the census year (YEAR-7 … YEAR-0): the same boxes every year.
+const REGISTERED: [string, string, string[]] = ["registered", "REGISTERED IN (YEAR)", [...[7, 6, 5, 4, 3, 2, 1, 0].map((k) => `YEAR-${k}`), "EARLIER", "NOT YET"]];
+
 function petBlock(slot: number, top: number, captions: Caption[], frames: Rect[]): PetBlock {
   frames.push(rect(LEFT - 2, top, RIGHT - LEFT + 4, PET_HEIGHT));
   const notApplicable = rect(RIGHT - 52, top + 0.9, BOX, BOX);
@@ -260,9 +273,8 @@ function petBlockV2(slot: number, top: number, captions: Caption[], frames: Rect
     [top + 26.5, PET_CHOICES[0]],
     [top + 34.2, PET_CHOICES[1]],
     [top + 41.9, PET_CHOICES[2]],
-    [top + 49.6, [["color", "COLOR", ["BLACK", "WHITE", "BROWN", "GRAY", "ORANGE", "MIXED/SPOTTED", "OTHER"]]]],
-    // Years are printed from the census year (YEAR-7 … YEAR-0): the same boxes every year.
-    [top + 57.3, [["registered", "REGISTERED IN (YEAR)", [...[7, 6, 5, 4, 3, 2, 1, 0].map((k) => `YEAR-${k}`), "EARLIER", "NOT YET"]]]],
+    [top + 49.6, [COLOR]],
+    [top + 57.3, [REGISTERED]],
   ]);
 
   const half = (RIGHT - LEFT - 6) / 2;
@@ -272,9 +284,86 @@ function petBlockV2(slot: number, top: number, captions: Caption[], frames: Rect
   return { slot, frame: rect(LEFT - 2, top, RIGHT - LEFT + 4, PET_HEIGHT_V2), titleAt: { x: LEFT, y: top + 3.8 }, notApplicable, writeIns, choices: groups, numbers };
 }
 
+/**
+ * One row of the v3 pet grid: each category gets `spans` columns, its name
+ * on top and its tick boxes on column lines, so boxes line up down the rows.
+ * Throws if a category's options don't fit its columns (caught by the layout tests).
+ */
+function gridRow(captions: Caption[], rules: Rect[], top: number, specs: [string, string, string[]][], spans: number[]): ChoiceGroup[] {
+  let col = 0;
+  return specs.map(([key, label, values], i) => {
+    const cellX = LEFT - 2 + col * GRID;
+    if (col > 0) rules.push(rect(cellX, top, 0, GRID_ROW));
+    captions.push({ x: cellX + 2.5, y: top + 2.3, text: label, size: CAPTION, bold: true });
+    let at = col;
+    const options = values.map((value) => {
+      const box = rect(LEFT - 2 + at * GRID + 2.5, top + 3, BOX, BOX);
+      captions.push({ x: box.x + BOX + 1.2, y: box.y + BOX - 1, text: value, size: OPTION });
+      // M and W print wider than textWidth allows ("BROWN" would touch the next box).
+      const width = textWidth(YEAR_OPTION.test(value) ? "0000" : value, OPTION) + (value.match(/[MW]/g)?.length ?? 0) * 0.8;
+      at += Math.ceil((BOX + 1.2 + width + 2) / GRID);
+      return { value, box };
+    });
+    col += spans[i];
+    if (at > col) throw new Error(`Census layout: ${label} doesn't fit its ${spans[i]} columns.`);
+    return { key, label, options };
+  });
+}
+
+/**
+ * v3 pet block: name and age as on v2, then a grid of categories (type, sex,
+ * sterilized / breed, classification / vaccination, laps / color / registered
+ * in), then other vaccines and remarks side by side.
+ */
+function petBlockV3(slot: number, top: number, captions: Caption[], frames: Rect[], rules: Rect[]): PetBlock {
+  const frame = rect(LEFT - 2, top, RIGHT - LEFT + 4, PET_HEIGHT_V3);
+  frames.push(frame);
+  const notApplicable = rect(RIGHT - 52, top + 1, BOX, BOX);
+  captions.push({ x: notApplicable.x + BOX + 1.2, y: top + 4.5, text: "N/A — NO PET IN THIS SLOT", size: OPTION });
+
+  const writeIns = [openLine(captions, "pet_name", "NAME OF PET", LEFT, top + 9, RIGHT - LEFT)];
+
+  const ageY = top + 21.4;
+  captions.push({ x: LEFT, y: ageY - 3.3, text: "AGE — YEARS", size: CAPTION, bold: true });
+  const years = bubbles(captions, LEFT, ageY, 21);
+  captions.splice(captions.length - 1, 1, { x: years[20].x + BUBBLE / 2, y: ageY - 0.5, text: "20+", size: 1.9, anchor: "middle" });
+  const monthsX = LEFT + 21 * BUBBLE_PITCH + 8;
+  captions.push({ x: monthsX, y: ageY - 3.3, text: "AGE — MONTHS", size: CAPTION, bold: true });
+  const months = bubbles(captions, monthsX, ageY, 12);
+  const numbers: NumberGroup[] = [
+    { key: "age_years", label: "Age (years)", base: 0, places: [{ weight: 1, bubbles: years }] },
+    { key: "age_months", label: "Age (months)", base: 0, places: [{ weight: 1, bubbles: months }] },
+  ];
+
+  const gridTop = top + 26.6;
+  const rows: [[string, string, string[]][], number[]][] = [
+    [PET_CHOICES[0], [4, 4, 4]],
+    [PET_CHOICES[1], [6, 6]],
+    [PET_CHOICES[2], [8, 4]],
+    [[COLOR], [12]],
+    [[REGISTERED], [12]],
+  ];
+  for (let r = 0; r <= rows.length; r++) rules.push(rect(frame.x, gridTop + r * GRID_ROW, frame.width, 0));
+  const groups = rows.flatMap(([specs, spans], r) => gridRow(captions, rules, gridTop + r * GRID_ROW, specs, spans));
+
+  // Other vaccines | remarks, each named left of its line.
+  const lineTop = gridTop + rows.length * GRID_ROW;
+  const lineY = lineTop + 0.7;
+  const middle = frame.x + 6 * GRID;
+  rules.push(rect(middle, lineTop, 0, top + PET_HEIGHT_V3 - lineTop));
+  captions.push({ x: LEFT, y: lineY + 3.6, text: "OTHER VACCINES", size: CAPTION, bold: true });
+  captions.push({ x: middle + 2.5, y: lineY + 2.4, text: "REMARKS", size: CAPTION, bold: true });
+  captions.push({ x: middle + 2.5, y: lineY + 4.8, text: "(OR OTHER COLOR)", size: 1.9 });
+  writeIns.push({ key: "other_vaccines", label: "OTHER VACCINES", open: true, rows: [[rect(LEFT + 22, lineY, middle - 2.5 - (LEFT + 22), 5.5)]] });
+  writeIns.push({ key: "remarks", label: "REMARKS (OR OTHER COLOR)", open: true, rows: [[rect(middle + 23.5, lineY, RIGHT - (middle + 23.5), 5.5)]] });
+
+  return { slot, frame, titleAt: { x: LEFT, y: top + 4.4 }, notApplicable, writeIns, choices: groups, numbers };
+}
+
 export function buildCensusLayout(version: number = FORM_VERSION): CensusLayout {
   const captions: Caption[] = [];
   const frames: Rect[] = [];
+  const rules: Rect[] = [];
   const near = MARKER_INSET;
   const far = (size: number) => size - MARKER_INSET - MARKER;
   const markers = [rect(near, near, MARKER, MARKER), rect(far(PAGE.width), near, MARKER, MARKER), rect(far(PAGE.width), far(PAGE.height), MARKER, MARKER), rect(near, far(PAGE.height), MARKER, MARKER)];
@@ -283,8 +372,9 @@ export function buildCensusLayout(version: number = FORM_VERSION): CensusLayout 
   const code = Array.from({ length: CODE_BITS }, (_, i) => rect(codeX + i * pitch, 28, 2.5, 2.5));
 
   frames.push(rect(LEFT - 2, 36.5, RIGHT - LEFT + 4, 10));
-  frames.push(rect(LEFT - 2, 48, RIGHT - LEFT + 4, 41));
   const v1 = version === 1;
+  const v3 = version >= 3;
+  frames.push(rect(LEFT - 2, 48, RIGHT - LEFT + 4, v3 ? 35.5 : 41));
   captions.push({
     x: RIGHT,
     y: 52.3 - 1.6,
@@ -301,8 +391,8 @@ export function buildCensusLayout(version: number = FORM_VERSION): CensusLayout 
       ]
     : [
         openLine(ownerCaptions, "owner_name", "FULL NAME OF OWNER", LEFT, 55, RIGHT - LEFT),
-        openLine(ownerCaptions, "address", "COMPLETE ADDRESS", LEFT, 64.5, RIGHT - LEFT, 2),
-        writeIn(ownerCaptions, "contact", "CONTACT NUMBER (0000-000-0000)", LEFT, 81, 11, 1, true),
+        openLine(ownerCaptions, "address", "COMPLETE ADDRESS", LEFT, v3 ? 65 : 64.5, RIGHT - LEFT, v3 ? 1 : 2),
+        writeIn(ownerCaptions, "contact", "CONTACT NUMBER (0000-000-0000)", LEFT, v3 ? 75 : 81, 11, 1, true),
       ];
 
   // Continuation sheets print this in the owner block instead.
@@ -310,10 +400,16 @@ export function buildCensusLayout(version: number = FORM_VERSION): CensusLayout 
     key: "continued_from",
     label: "Continued from sheet no.",
     base: 0,
-    places: [1000, 100, 10, 1].map((weight, i) => ({ weight, bubbles: bubbles([], LEFT + 40, 58 + i * 7.5, 10) })),
+    places: [1000, 100, 10, 1].map((weight, i) => ({ weight, bubbles: bubbles([], LEFT + 40, v3 ? 56 + i * 6.6 : 58 + i * 7.5, 10) })),
   };
 
-  const pets = [0, 1, 2].map((slot) => (v1 ? petBlock(slot, 91 + slot * (PET_HEIGHT + PET_GAP), captions, frames) : petBlockV2(slot, 91 + slot * (PET_HEIGHT_V2 + PET_GAP), captions, frames)));
+  const pets = [0, 1, 2].map((slot) =>
+    v1
+      ? petBlock(slot, 91 + slot * (PET_HEIGHT + PET_GAP), captions, frames)
+      : v3
+        ? petBlockV3(slot, 84.5 + slot * (PET_HEIGHT_V3 + PET_GAP_V3), captions, frames, rules)
+        : petBlockV2(slot, 91 + slot * (PET_HEIGHT_V2 + PET_GAP), captions, frames),
+  );
 
   return {
     page: PAGE,
@@ -327,10 +423,11 @@ export function buildCensusLayout(version: number = FORM_VERSION): CensusLayout 
     captions,
     ownerCaptions,
     frames,
+    rules,
   };
 }
 
-const LAYOUTS = new Map([1, 2].map((v) => [v, buildCensusLayout(v)]));
+const LAYOUTS = new Map(SUPPORTED_VERSIONS.map((v) => [v, buildCensusLayout(v)]));
 
 /** The layout a sheet of this form version was printed with. */
 export function layoutFor(version: number): CensusLayout {

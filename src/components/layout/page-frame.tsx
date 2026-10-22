@@ -9,7 +9,6 @@ import { Link } from "react-router";
 import { ArrowLeft } from "lucide-react";
 
 import { AppHeader } from "@/components/layout/app-header";
-import { SpotlightGrid } from "@/components/brand/spotlight-grid";
 import { cn } from "@/lib/utils";
 
 interface PageFrameProps {
@@ -25,7 +24,7 @@ interface PageFrameProps {
 
 /**
  * Shared frame for Scan, Import, AI Studio and Settings: a compact version of
- * the hero band with the same spotlight grid, then the white card overlay.
+ * the hero band with the same mint wash, then the white card overlay.
  */
 export function PageFrame({ title, description, aside, back = { to: "/", label: "Workspace" }, children, className }: PageFrameProps) {
   return (
@@ -35,7 +34,6 @@ export function PageFrame({ title, description, aside, back = { to: "/", label: 
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgb(1_168_90/0.16)_0%,rgb(1_168_90/0.06)_50%,transparent_92%)]"
         />
-        <SpotlightGrid />
         <div className="relative mx-auto max-w-5xl px-4 pt-5 pb-16 sm:px-6 md:pt-7 md:pb-20">
           <AppHeader className="nav:hidden" />
           <div className="mt-8 flex flex-wrap items-end justify-between gap-4 md:mt-10">

@@ -94,7 +94,7 @@ export function MobileNav() {
 
       <nav
         aria-label="Primary"
-        className="fixed inset-x-0 bottom-0 z-50 border-t border-salin-border bg-salin-surface pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_-16px_rgb(16_40_28/0.18)]"
+        className="fixed inset-x-0 bottom-0 z-50 border-t border-salin-border bg-salin-bar pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_-16px_rgb(16_40_28/0.18)]"
       >
         <div className="grid h-(--mobile-nav-h) grid-cols-5">
           {left.map((link) => (

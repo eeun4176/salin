@@ -1,8 +1,8 @@
 /**
  * Login Page
  * Where a paravet unlocks their local workspace with an Account Key and
- * password. Checks run on the device (see local-auth.ts), so it works with
- * no connection. Wrong or missing entries shake the field and explain what
+ * password, in floating-label fields. Checks run on the device (see
+ * local-auth.ts), so it works with no connection. Wrong or missing entries shake the field and explain what
  * to fix; a correct sign-in shows a short welcome while the workspace
  * opens, then returns to the page the user was trying to reach.
  */
@@ -106,7 +106,7 @@ export function LoginPage() {
               <p className="mt-1.5 text-sm text-salin-muted">Enter your Account Key and password to unlock your local workspace.</p>
 
               <form noValidate onSubmit={submit} className="mt-6 space-y-4">
-                <Field id="account-key" label="Account Key" icon={<Key />} error={errors.key} shake={attempt}>
+                <Field id="account-key" label="Account Key" hint="e.g. PV2026-XXXXXX-0000" icon={<Key />} error={errors.key} shake={attempt}>
                   {(props) => (
                     <input
                       {...props}
@@ -114,7 +114,6 @@ export function LoginPage() {
                       autoComplete="username"
                       autoCapitalize="characters"
                       spellCheck={false}
-                      placeholder="e.g. PV2026-XXXXXX-0000"
                       value={key}
                       onChange={(event) => {
                         setKey(event.target.value);
@@ -192,6 +191,8 @@ export function LoginPage() {
 
 interface InputProps {
   id: string;
+  /** One space, so the label can float while the field has text (:placeholder-shown). */
+  placeholder: " ";
   className: string;
   "aria-invalid": boolean;
   "aria-describedby"?: string;
@@ -200,6 +201,8 @@ interface InputProps {
 interface FieldProps {
   id: string;
   label: string;
+  /** Example shown under the field (the floating label takes the placeholder's place). */
+  hint?: string;
   icon: ReactNode;
   error?: string;
   shake: number;
@@ -208,16 +211,11 @@ interface FieldProps {
   children: (props: InputProps) => ReactNode;
 }
 
-function Field({ id, label, icon, error, shake, aside, trailing, children }: FieldProps) {
+function Field({ id, label, hint, icon, error, shake, aside, trailing, children }: FieldProps) {
   const errorId = useId();
+  const hintId = useId();
   return (
     <div>
-      <div className="mb-1.5 flex items-center justify-between">
-        <label htmlFor={id} className="text-sm font-medium text-salin-text">
-          {label}
-        </label>
-        {aside}
-      </div>
       {/* Keyed by attempt so a repeat error shakes again. */}
       <div key={error ? shake : "ok"} className={cn("relative", error && "animate-shake")}>
         <span aria-hidden="true" className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-salin-subtle [&_svg]:size-[18px]">
@@ -225,21 +223,44 @@ function Field({ id, label, icon, error, shake, aside, trailing, children }: Fie
         </span>
         {children({
           id,
+          placeholder: " ",
           "aria-invalid": Boolean(error),
-          "aria-describedby": error ? errorId : undefined,
+          "aria-describedby": error ? errorId : hint ? hintId : undefined,
           className: cn(
-            "h-[46px] w-full rounded-xl border border-salin-border bg-salin-surface pl-11 text-[15px] text-salin-text outline-none transition-[border-color,box-shadow] placeholder:text-salin-subtle",
-            "focus-visible:outline-none focus:border-salin-primary focus:shadow-[0_0_0_0.5px_var(--color-salin-primary),0_0_0_4.5px_rgb(1_168_90/0.16)]",
-            "aria-invalid:border-[#EF4444] aria-invalid:focus:shadow-[0_0_0_0.5px_#EF4444,0_0_0_4.5px_rgb(239_68_68/0.16)]",
+            "peer h-[54px] w-full rounded-xl border border-salin-border bg-salin-surface pt-[21px] pb-1.5 pl-11 text-[15px] text-salin-text outline-none transition-[border-color,box-shadow]",
+            "focus-visible:outline-none focus:border-salin-primary focus:ring-4 focus:ring-salin-primary/20",
+            "aria-invalid:border-[#EF4444] aria-invalid:focus:ring-[#EF4444]/20",
             trailing ? "pr-12" : "pr-3.5",
           ),
         })}
+        {/* Rests inside the field; lifts above the text on focus or once filled. */}
+        <label
+          htmlFor={id}
+          className={cn(
+            "pointer-events-none absolute top-[17px] left-11 origin-left text-[15px] leading-5 whitespace-nowrap text-salin-muted",
+            "transition-[translate,scale,color] duration-[580ms] ease-[cubic-bezier(.32,.72,0,1)] motion-reduce:transition-none",
+            "peer-focus:-translate-y-[10px] peer-focus:scale-[0.74] peer-focus:text-salin-primary",
+            "peer-[:not(:placeholder-shown)]:-translate-y-[10px] peer-[:not(:placeholder-shown)]:scale-[0.74] peer-[:not(:placeholder-shown)]:text-salin-primary",
+            "peer-aria-invalid:text-[#B91C1C]",
+          )}
+        >
+          {label}
+        </label>
         {trailing && <span className="absolute top-1/2 right-1.5 -translate-y-1/2">{trailing}</span>}
       </div>
-      {error && (
-        <p id={errorId} role="alert" className="mt-1.5 text-[13px] text-[#B91C1C]">
-          {error}
-        </p>
+      {(error || hint || aside) && (
+        <div className="mt-1.5 flex items-start justify-between gap-3">
+          {error ? (
+            <p id={errorId} role="alert" className="text-[13px] text-[#B91C1C]">
+              {error}
+            </p>
+          ) : (
+            <p id={hintId} className="text-xs text-salin-subtle">
+              {hint}
+            </p>
+          )}
+          {aside}
+        </div>
       )}
     </div>
   );

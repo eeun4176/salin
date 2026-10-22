@@ -51,7 +51,7 @@ export function reportRejected(rejected: IntakeResult["rejected"]) {
   toast(
     rejected.length === 1
       ? `Skipped “${first.name}”: ${first.reason.toLowerCase()}.`
-      : `Skipped ${rejected.length} files that aren't PDF, XLSX, CSV, TXT, PNG, JPG or WebP (or are over 50 MB).`,
+      : `Skipped ${rejected.length} files that aren't PDF, XLSX, CSV, PNG or JPG (or are over 50 MB).`,
   );
 }
 

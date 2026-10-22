@@ -13,6 +13,7 @@
 
 import { CENSUS_LAYOUT, layoutFor, optionText, type Rect, type WriteIn } from "@/core/census/census-layout";
 import { barangayName } from "@/core/census/barangays";
+import { SUPPORTED_VERSIONS } from "@/core/census/code-strip";
 import type { AnswerRead, CensusSheetRead } from "@/core/census/omr/read-sheet";
 import { letterArea, SHEET_SCALE } from "@/core/census/omr/read-sheet";
 import { splitCellId } from "@/core/ocr/review/review-state";
@@ -24,7 +25,7 @@ export const CENSUS_TEMPLATE_ID = "cvo-census-v1";
 export const CENSUS_TEMPLATE_NAME = "CVO census sheet (v1)";
 
 /** Fields written by hand (letter boxes or open lines) in any version, as opposed to tick boxes and bubbles. */
-export const CENSUS_LETTER_FIELDS = new Set([1, 2].flatMap((v) => [...layoutFor(v).owner, ...layoutFor(v).pets[0].writeIns]).map((w) => w.key));
+export const CENSUS_LETTER_FIELDS = new Set(SUPPORTED_VERSIONS.flatMap((v) => [...layoutFor(v).owner, ...layoutFor(v).pets[0].writeIns]).map((w) => w.key));
 
 const choice = (key: string, label: string, options: string[], required = false): FieldSpec => ({ key, label, type: "choice", options, required });
 
@@ -72,7 +73,7 @@ const asTemplateField = ({ key, label, type, required, options }: FieldSpec) => 
 export const CENSUS_TEMPLATE = parseTemplate({
   id: CENSUS_TEMPLATE_ID,
   name: CENSUS_TEMPLATE_NAME,
-  description: "The printed CVO-CENSUS working sheet (v1 and v2): one owner and up to three pets, read from tick boxes, bubbles and handwriting fields.",
+  description: "The printed CVO-CENSUS working sheet (v1 to v3): one owner and up to three pets, read from tick boxes, bubbles and handwriting fields.",
   kind: "table",
   builtIn: true,
   fields: [...SHEET_FIELDS, ...OWNER_FIELDS].map(asTemplateField),
@@ -105,6 +106,7 @@ function answerValue(spec: FieldSpec, read: AnswerRead | undefined, page: number
   if (!read) return makeValue(spec, null);
   const box = px(read.box);
   if (read.state === "answered") return makeValue(spec, { text: display(read.value!), confidence: 99, mapping: 1, page, box });
+  if (read.state === "faint") return makeValue(spec, { text: display(read.value!), confidence: 70, mapping: 1, page, box }, ["checkbox-unclear"], `The mark is faint. Check that ${display(read.value!)} is right.`);
   if (read.state === "unanswered") return { ...makeValue(spec, null), page, box };
   const empty = { text: "", confidence: 0, mapping: 1, page, box };
   if (read.state === "multiple") {

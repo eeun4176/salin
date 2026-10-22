@@ -40,7 +40,7 @@ npx tsc -b           # type check only
 
 React 19 + TypeScript (~6), Vite 8, Tailwind v4 + shadcn/ui (radix-ui), lucide-react, react-router, zustand, Dexie (IndexedDB), zod, pdfjs-dist, SheetJS `xlsx`, papaparse, fflate, vite-plugin-pwa/Workbox, tesseract.js (printed OCR), onnxruntime-web + @huggingface/transformers (handwriting + assistant), Vitest (+ fake-indexeddb), Playwright.
 
-Design tokens: primary `#01A85A`, text `#1D1F1E`, canvas `#F8FAF9`, border `#E6EBE8`, surface `#FFFFFF`, font Inter, Lucide outline icons; minimal, breathable, subtle borders.
+Design tokens: primary `#01A85A`, text `#1D1F1E`, canvas `#F8FAF9`, border `#E6EBE8`, surface `#FFFFFF`, font Inter, Lucide outline icons; minimal, breathable, subtle borders. Dark theme: base `#121212`, cards `#1E1E1E`, bars (`salin-bar`) `#272727`, menus `#2E2E2E`, dialogs (`salin-dialog`) `#383838`, same green.
 
 ## Layout
 
@@ -54,7 +54,7 @@ src/
     ocr/          imaging/, layout/, engine/ (Tesseract), models/ (capabilities, model-assets, model-manager), templates/, review/, benchmark/
     ai/           ai-models (pinned catalog), ai.worker, ai-runtime, handwriting, llm-tasks, grounding, suggestions
     auth/         local-auth (on-device sign-in, session in the settings table)
-    census/       census-layout (CVO-CENSUS v1 sheet geometry), code-strip, omr/ (markers, OMR), census-extraction, census-records, summary-workbook, xlsx-patch
+    census/       census-layout (CVO-CENSUS v1–v3 sheet geometry), code-strip, omr/ (markers, OMR), census-extraction, census-records, summary-workbook, xlsx-patch
   features/       UI per area: auth (login), home, workspace, import, capture, ocr (scan workflow), processing (dataset review), census (records, print forms), ai (review assist), ai-studio, settings, backup
   stores/         zustand stores (workspace, ocr, ai, ui, toast…)
   types/          shared domain types
@@ -62,7 +62,7 @@ e2e/              Playwright specs
 docs/             PHASE4_OCR.md, PHASE5_AI.md, OCR_BENCHMARKS.md, CENSUS_FORM.md, benchmarks/*.json
 ```
 
-Navigation: from 760px (Tailwind `nav:` breakpoint, `useDesktopLayout`) a dashboard — sidebar (`components/layout/sidebar.tsx`: New Document, Workspace/Recents/Favorites/Trash with counts, Census, AI Studio, Settings, storage, account) | list pane (340px, `@container` queries) | detail pane (`file-detail.tsx` for `?preview=`, `dataset-detail.tsx` for `?dataset=` on /datasets). Phones keep the hero, bottom nav and full-screen preview dialog. Recents/Favorites/Trash are query views over metadata, not copies. Everything but /login sits behind `RequireSession`; e2e signs in once in `e2e/auth.setup.ts`.
+Navigation: from 760px (Tailwind `nav:` breakpoint, `useDesktopLayout`) a dashboard — sidebar (`components/layout/sidebar.tsx`, a floating card 12px from the edges: the morphing New Document menu in `new-document-menu.tsx`, Workspace/Recents/Favorites/Trash with counts, Census, AI Studio, Settings, storage, account; folds 264px ↔ 64px rail with the PanelLeft button or Ctrl/Cmd+B, saved in `localStorage` `salin_sidebar_collapsed`) | list pane (340px default, drag the divider for 260–480px, `@container` queries) | detail pane (`file-detail.tsx` for `?preview=`, `dataset-detail.tsx` for `?dataset=` on /datasets). Phones keep the hero, bottom nav and full-screen preview dialog. Recents/Favorites/Trash are query views over metadata, not copies. Everything but /login sits behind `RequireSession`; e2e signs in once in `e2e/auth.setup.ts`.
 
 ## On-device AI (Phase 4–5) — how it fits together
 

@@ -125,15 +125,15 @@ test("Excel workbooks and text PDFs are read on the device, with links back to t
 
 test("New dataset combines documents, and deleting a dataset can be undone", async ({ page }) => {
   await openWorkspace(page);
-  await uploadFiles(page, [sample.txt("a.txt", "Line one\nLine two"), sample.txt("b.txt", "Line three")]);
+  await uploadFiles(page, [sample.csv("a.csv", "Text\nLine one\nLine two"), sample.csv("b.csv", "Text\nLine three")]);
 
   await page.getByRole("link", { name: /^Datasets/ }).click();
   await expect(page.getByText("No datasets yet")).toBeVisible();
   await page.getByRole("button", { name: "New dataset" }).click();
   const picker = page.getByRole("dialog");
   // Rows are combined in the order the documents are ticked.
-  await picker.getByRole("checkbox", { name: /^a.txt/ }).check();
-  await picker.getByRole("checkbox", { name: /^b.txt/ }).check();
+  await picker.getByRole("checkbox", { name: /^a.csv/ }).check();
+  await picker.getByRole("checkbox", { name: /^b.csv/ }).check();
   await picker.getByRole("button", { name: "Combine 2 documents" }).click();
 
   await expectReview(page, "a + 1 more");

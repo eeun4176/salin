@@ -25,7 +25,8 @@ export type MarkState = "checked" | "unchecked" | "unclear";
 export interface AnswerRead {
   /** The one marked option (or number), `null` when unanswered or unclear. */
   value: string | null;
-  state: "answered" | "unanswered" | "multiple" | "unclear";
+  /** "faint": one light mark and every other box clean — likely the answer, but a person checks it. */
+  state: "answered" | "faint" | "unanswered" | "multiple" | "unclear";
   /** The marked options, when several are. */
   marked: string[];
   /** Where on the flattened sheet, in mm. */
@@ -123,7 +124,9 @@ function answer(mask: Uint8Array, width: number, options: { value: string; box: 
   const marked = options.filter((_, i) => states[i] === "checked").map((o) => o.value);
   const box = union(options.map((o) => o.box));
   if (marked.length > 1) return { value: null, state: "multiple", marked, box };
-  if (states.includes("unclear")) return { value: null, state: "unclear", marked, box };
+  const faint = options.filter((_, i) => states[i] === "unclear").map((o) => o.value);
+  if (marked.length === 0 && faint.length === 1) return { value: faint[0], state: "faint", marked: faint, box };
+  if (faint.length) return { value: null, state: "unclear", marked, box };
   if (marked.length === 0) return { value: null, state: "unanswered", marked, box };
   return { value: marked[0], state: "answered", marked, box };
 }
@@ -137,7 +140,7 @@ function numberAnswer(mask: Uint8Array, width: number, group: NumberGroup): Answ
   // Nothing filled at all: unanswered. Leading places left empty count as 0 (e.g. age 7 = only the ones row).
   if (places.every((p) => p.state === "unanswered")) return { value: null, state: "unanswered", marked, box };
   const value = group.places.reduce((sum, place, i) => sum + place.weight * Number(places[i].value ?? 0), group.base);
-  return { value: String(value), state: "answered", marked, box };
+  return { value: String(value), state: places.some((p) => p.state === "faint") ? "faint" : "answered", marked, box };
 }
 
 /** A row of letter boxes moved onto its printed lines. */

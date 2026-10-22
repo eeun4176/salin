@@ -2,8 +2,9 @@
  * Census Sheet Reader Tests
  * Synthetic sheets drawn from the layout, photographed at an angle and in
  * every orientation: the code strip, ticks, bubbles, double ticks, faint
- * smudges, empty slots and inked letter boxes read back as filled in — and a
- * page that isn't a census sheet is refused.
+ * marks, empty slots and inked letter boxes read back as filled in — and a
+ * page that isn't a census sheet is refused. v2 and v3 sheets read with
+ * their own layouts.
  */
 
 import { describe, expect, it } from "vitest";
@@ -59,10 +60,11 @@ describe("readFlatSheet", () => {
     expect(read.emptySlots).toEqual([false, false, true]);
   });
 
-  it("leaves double ticks, faint smudges and blanks for the reviewer", () => {
+  it("leaves double ticks, faint marks and blanks for the reviewer", () => {
     const read = readFlatSheet(filled)!;
     expect(read.answers["pet1.type"]).toMatchObject({ value: null, state: "multiple", marked: ["DOG", "CAT"] });
-    expect(read.answers["pet1.sex"]).toMatchObject({ value: null, state: "unclear" });
+    // The only mark in the group, but light: offered as the answer, for a person to check.
+    expect(read.answers["pet1.sex"]).toMatchObject({ value: "MALE", state: "faint" });
     expect(read.answers["pet1.breed"]).toMatchObject({ value: null, state: "unanswered" });
     expect(read.answers["pet2.registered"]).toMatchObject({ value: null, state: "unanswered" });
   });
@@ -132,5 +134,26 @@ describe("v2 sheets", () => {
     // Evenly spaced letters are one word; the skipped position in the owner's name is the one gap between words.
     expect(found.read.writing?.["owner.owner_name"][0]?.gaps).toHaveLength(1);
     expect(found.read.writing?.["pet0.pet_name"][0]?.gaps).toEqual([]);
+  });
+});
+
+describe("v3 sheets", () => {
+  const v3: SheetCode = { ...code, version: 3 };
+  const sheet = drawSheet({
+    code: v3,
+    answers: { "pet0.type": "DOG", "pet0.sex": "MALE", "pet0.classification": "SEMI-CONFINED", "pet0.vaccination": "BOOSTER", "pet0.laps": "NO", "pet0.age_years": "4", "pet0.color": "MIXED/SPOTTED", "pet0.registered": "EARLIER", "pet2.color": "OTHER" },
+    faint: { "pet1.sterilized": "UNKNOWN" },
+    writing: { "owner.address": [0, 1, 2], "pet0.remarks": [0, 1] },
+  });
+
+  it("reads the grid of tick boxes, the one-line address and the side-by-side lines", () => {
+    const found = locateAndRead(photograph(sheet, 180))!;
+    expect(found.read.code).toEqual(v3);
+    const value = (key: string) => found.read.answers[key].value;
+    expect(["type", "sex", "classification", "vaccination", "laps", "age_years", "color", "registered"].map((k) => value(`pet0.${k}`))).toEqual(["DOG", "MALE", "SEMI-CONFINED", "BOOSTER", "NO", "4", "MIXED/SPOTTED", "EARLIER"]);
+    expect(value("pet2.color")).toBe("OTHER");
+    expect(found.read.answers["pet1.sterilized"]).toMatchObject({ value: "UNKNOWN", state: "faint" });
+    expect(found.read.inked["owner.address"]).toEqual([[true]]);
+    expect([found.read.inked["pet0.other_vaccines"], found.read.inked["pet0.remarks"]]).toEqual([[[false]], [[true]]]);
   });
 });

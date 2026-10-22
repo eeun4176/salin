@@ -1,6 +1,6 @@
 /**
  * Home Hero
- * Top banner of the home screen: header, dot-grid spotlight, typewriter
+ * Top banner of the home screen: header, mint wash, typewriter
  * headline, floating file-type badges and the Scan/Import buttons.
  */
 
@@ -10,7 +10,6 @@ import { FileDown, ScanLine } from "lucide-react";
 
 import { AppHeader } from "@/components/layout/app-header";
 import { FileTypeIcon } from "@/components/brand/file-type-icon";
-import { SpotlightGrid } from "@/components/brand/spotlight-grid";
 import { TypewriterHeadline } from "@/features/home/typewriter-headline";
 import type { FileKind } from "@/features/workspace/types";
 import { cn } from "@/lib/utils";
@@ -21,7 +20,6 @@ const BADGES: { kind: FileKind; className: string; tilt: number; delay: number; 
   { kind: "png", className: "left-[1%] top-[42%] xl:left-[3%]", tilt: 8, delay: 1.1, duration: 7 },
   { kind: "jpg", className: "left-[11%] top-[70%] xl:left-[13%]", tilt: -4, delay: 0.6, duration: 5.6 },
   { kind: "pdf", className: "right-[11%] top-[10%] xl:right-[13%]", tilt: 7, delay: 0.4, duration: 6.6 },
-  { kind: "webp", className: "right-[1%] top-[43%] xl:right-[3%]", tilt: -7, delay: 1.5, duration: 7.4 },
   { kind: "xlsx", className: "right-[11%] top-[70%] xl:right-[13%]", tilt: 5, delay: 0.9, duration: 5.9 },
 ];
 
@@ -38,7 +36,6 @@ export function Hero() {
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgb(1_168_90/0.16)_0%,rgb(1_168_90/0.07)_42%,transparent_88%)]"
       />
-      <SpotlightGrid />
 
       <div className="relative mx-auto max-w-5xl px-4 pt-5 sm:px-6 md:pt-7">
         <AppHeader />
@@ -83,7 +80,7 @@ export function Hero() {
 
             {/* Below desktop there is no room for floating badges, so formats sit in a row. */}
             <div aria-hidden="true" className="mt-6 flex items-center gap-1.5 md:order-last md:mt-7 lg:hidden">
-              {(["pdf", "xlsx", "csv", "jpg", "png", "webp"] as const).map((kind) => (
+              {(["pdf", "xlsx", "csv", "jpg", "png"] as const).map((kind) => (
                 <FileTypeIcon key={kind} kind={kind} className="size-9" />
               ))}
             </div>

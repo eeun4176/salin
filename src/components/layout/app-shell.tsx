@@ -36,7 +36,7 @@ export function AppShell() {
   useScrollReset();
 
   return (
-    <div className="min-h-dvh bg-salin-canvas nav:grid nav:grid-cols-[64px_minmax(0,1fr)] lg:grid-cols-[220px_minmax(0,1fr)]">
+    <div className="min-h-dvh bg-salin-canvas nav:flex">
       <a
         href="#main"
         className="sr-only z-[100] rounded-lg bg-salin-surface px-3 py-2 text-sm font-semibold text-salin-primary shadow focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
@@ -44,7 +44,7 @@ export function AppShell() {
         Skip to content
       </a>
       <Sidebar />
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <Outlet />
       </div>
       <FilePreview />

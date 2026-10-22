@@ -76,7 +76,8 @@ export function PrintFormsPage() {
               heading="Barangay"
               value={barangay}
               onChange={setBarangay}
-              options={BARANGAYS.map((b, i) => ({ value: String(i), label: b.name, hint: `District ${b.district}` }))}
+              searchable
+              options={BARANGAYS.map((b, i) => ({ value: String(i), label: b.name, short: `${b.name} · District ${b.district}`, group: `District ${b.district}` }))}
             />
           </div>
           <label className="grid gap-1.5 text-sm font-medium text-salin-text">

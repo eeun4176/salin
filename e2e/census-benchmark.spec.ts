@@ -80,7 +80,7 @@ async function readScan(page: Page, fileName: string) {
   await page.waitForTimeout(2000);
 }
 
-// v2 sheets: Color is a tick box (checked with the other marks below).
+// v2 and later: Color is a tick box (checked with the other marks below).
 const LETTER_FIELDS = ["owner_name", "address", "contact", "pet_name"] as const;
 const normal = (key: string, text: string) => (key === "contact" ? text.replace(/\D/g, "") : text.replace(/\s+/g, " ").trim());
 

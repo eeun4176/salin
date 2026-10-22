@@ -8,15 +8,20 @@
  * photos, PDFs and spreadsheets go to Read text or Extract data. Without
  * the assistant, the page explains how to set it up and points to the
  * manual Transform tools. Everything runs on this device.
+ * Laid out as a full-height workspace: a header bar (source, status, AI mode,
+ * Sources, Export), the thread (replies appear word by word, with [1] [2]
+ * citation chips), a Sources drawer on wide screens (a sheet on phones) and
+ * the composer at the bottom.
  */
 
-import { useEffect, useRef, useState, type ChangeEvent, type FormEvent, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type KeyboardEvent } from "react";
 import { useNavigate } from "react-router";
-import { Bot, FileSpreadsheet, Files, LoaderCircle, Paperclip, ScanText, SendHorizontal, Settings, ShieldCheck, Square, Table2, User, Wand2, X } from "lucide-react";
+import { BookOpenText, Bot, Download, FileSpreadsheet, Files, LoaderCircle, Paperclip, ScanText, SendHorizontal, Settings, ShieldCheck, Square, Table2, Wand2, X } from "lucide-react";
 
 import { ChoiceMenu } from "@/components/common/choice-menu";
 import { FileTypeIcon } from "@/components/brand/file-type-icon";
-import { PageFrame } from "@/components/layout/page-frame";
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
+import { AI_MODES } from "@/core/ai/ai-models";
 import { AiError } from "@/core/ai/ai-runtime";
 import { describeCommand, displayValue, runCommand, type CommandOutcome, type DatasetCommand } from "@/core/processing/dataset-commands";
 import { errorMessage } from "@/core/storage/errors";
@@ -32,9 +37,8 @@ import { datasetUrl } from "@/features/processing/hooks/use-document-processing"
 import { extractData } from "@/features/processing/processing-actions";
 import { formatBytes } from "@/features/workspace/query";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
-import { scrollToY } from "@/lib/lenis";
 import { cn } from "@/lib/utils";
-import { useAiFeature } from "@/stores/ai-store";
+import { useAiFeature, useAiStore, type AiModeSetting } from "@/stores/ai-store";
 import { ACCEPT_ATTR, toIntakeFiles, useIntakeStore, type IntakeFile } from "@/stores/intake-store";
 import { toast } from "@/stores/toast-store";
 
@@ -49,6 +53,81 @@ type ChatMessage = { id: string; role: "user"; text: string; attachments: Intake
 const SUGGESTIONS = ["Give me an overview", "How many rows per city?", "Show the rows with no email", "Find duplicate names", "Ilan ang bawat kategorya?"];
 
 const SCANNABLE = new Set(["png", "jpg", "webp", "pdf"]);
+
+const MODE_OPTIONS: { value: AiModeSetting; label: string; hint: string }[] = [
+  { value: "auto", label: "Auto", hint: "Picks the right mode for this device." },
+  ...(["standard", "lite", "advanced"] as const).map((mode) => ({ value: mode, label: AI_MODES[mode].label, hint: AI_MODES[mode].description })),
+];
+
+type Analysis = Extract<ChatMessage, { kind: "analysis" }>;
+/** A citation chip being pointed at: which reply, and which of its sources. */
+type Cite = { messageId: string; index: number };
+
+function downloadAnswer({ datasetName, answer }: Analysis) {
+  const headers = answer.headers ?? [];
+  const columns = headers.map((name, i) => ({ id: String(i), name, type: "text" as const, required: false, sourceHeader: null }));
+  const rows = (answer.rows ?? []).map((values) => ({ values: Object.fromEntries(values.map((v, i) => [String(i), v])), source: null }));
+  void import("@/core/processing/dataset-export").then(({ exportDataset }) => downloadBlob(exportDataset({ name: datasetName, content: { columns, rows } }, "csv"), `${datasetName}-answer.csv`)).catch(() => toast("The answer could not be exported. Please try again."));
+}
+
+/** A new reply, revealed word by word behind a blinking caret; screen readers get the whole text at once. */
+function StreamedText({ text }: { text: string }) {
+  const reduced = useReducedMotion();
+  const words = useMemo(() => text.split(/(?<=\s)/), [text]);
+  const [shown, setShown] = useState(reduced ? words.length : 0);
+  useEffect(() => {
+    if (shown >= words.length) return;
+    // Long answers take about the same time as short ones (~2.5 s at most).
+    const timer = setTimeout(() => setShown((n) => Math.min(words.length, n + Math.max(1, Math.ceil(words.length / 90)))), 28);
+    return () => clearTimeout(timer);
+  }, [shown, words.length]);
+  return (
+    <p className="text-[15px] whitespace-pre-wrap text-salin-text">
+      <span className="sr-only">{text}</span>
+      <span aria-hidden="true">
+        {words.slice(0, shown).join("")}
+        {shown < words.length && <span className="animate-caret ml-px font-light text-salin-primary">|</span>}
+      </span>
+    </p>
+  );
+}
+
+/** The sources behind one reply: numbered cards with a file badge and a 3-line snippet. The pointed-at one lifts left with a green ring. */
+function SourceList({ message, active }: { message: Analysis; active: number | null }) {
+  const refs = useRef<(HTMLLIElement | null)[]>([]);
+  useEffect(() => {
+    if (active !== null) refs.current[active]?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [active]);
+  const citations = message.answer.citations;
+  return (
+    <>
+      <ol className="space-y-2.5">
+        {citations.slice(0, 100).map((source, i) => (
+          <li
+            key={source.id}
+            ref={(el) => {
+              refs.current[i] = el;
+            }}
+            className={cn(
+              "rounded-2xl bg-salin-surface p-3 ring-1 ring-salin-border transition-[translate,box-shadow] duration-300 ease-[cubic-bezier(.32,.72,0,1)] motion-reduce:transition-none",
+              active === i && "-translate-x-[5px] shadow-[0_8px_20px_-12px_rgb(1_168_90/0.5)] ring-2 ring-salin-primary",
+            )}
+          >
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="grid size-6 shrink-0 place-items-center rounded-md bg-salin-primary-soft text-[11px] font-semibold text-salin-primary-ink tabular-nums">{i + 1}</span>
+              <span className="min-w-0 truncate rounded-md bg-salin-tile px-1.5 py-0.5 text-[11px] font-medium text-salin-muted" title={source.label}>
+                {source.label}
+              </span>
+              {source.confidence !== null && <span className="ml-auto shrink-0 text-[11px] text-salin-subtle tabular-nums">OCR {Math.round(source.confidence)}%</span>}
+            </div>
+            <p className="mt-2 line-clamp-3 text-[13px] whitespace-pre-wrap text-salin-text">{source.text}</p>
+          </li>
+        ))}
+      </ol>
+      {citations.length > 100 && <p className="mt-3 text-xs text-salin-muted">Showing the first 100 source records. Calculations use all matching records.</p>}
+    </>
+  );
+}
 
 function AttachmentChip({ file, onRemove }: { file: IntakeFile; onRemove?: () => void }) {
   return (
@@ -101,7 +180,7 @@ function ResultTable({ outcome }: { outcome: Extract<CommandOutcome, { kind: "ta
   );
 }
 
-function AssistantMessage({ message }: { message: Extract<ChatMessage, { role: "assistant" }> }) {
+function AssistantMessage({ message, active, onCite }: { message: Extract<ChatMessage, { role: "assistant" }>; active: number | null; onCite: (cite: Cite | null, open?: boolean) => void }) {
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
 
@@ -133,7 +212,7 @@ function AssistantMessage({ message }: { message: Extract<ChatMessage, { role: "
         <p className="sr-only">Salin AI said:</p>
         {message.kind === "text" && (
           <>
-            <p className="text-[15px] text-salin-text">{message.text}</p>
+            <StreamedText text={message.text} />
             <div className="mt-2 flex flex-wrap gap-2">
               {message.actions?.includes("transform") && message.datasetId && (
                 <button type="button" onClick={() => navigate(datasetUrl(message.datasetId!))} className={action}>
@@ -167,26 +246,40 @@ function AssistantMessage({ message }: { message: Extract<ChatMessage, { role: "
         )}
         {message.kind === "analysis" && (
           <>
-            <p className="text-[15px] whitespace-pre-wrap text-salin-text">{message.answer.text}</p>
+            <StreamedText text={message.answer.text} />
+            {message.answer.citations.length > 0 && (
+              <div className="mt-2 flex flex-wrap items-center gap-1.5" onMouseLeave={() => onCite(null)}>
+                <span className="text-xs text-salin-muted">Sources</span>
+                {message.answer.citations.slice(0, 8).map((source, i) => (
+                  <button
+                    key={source.id}
+                    type="button"
+                    aria-label={`Source ${i + 1}: ${source.label}`}
+                    title={source.label}
+                    onMouseEnter={() => onCite({ messageId: message.id, index: i })}
+                    onFocus={() => onCite({ messageId: message.id, index: i })}
+                    onClick={() => onCite({ messageId: message.id, index: i }, true)}
+                    className={cn(
+                      "press h-6 min-w-6 rounded-md px-1.5 text-[11px] font-semibold tabular-nums ring-1 transition-colors",
+                      active === i ? "bg-salin-primary text-white ring-salin-primary" : "bg-salin-primary-soft text-salin-primary-ink ring-salin-primary/20 hover:ring-salin-primary",
+                    )}
+                  >
+                    [{i + 1}]
+                  </button>
+                ))}
+                {message.answer.citations.length > 8 && (
+                  <button type="button" onClick={() => onCite({ messageId: message.id, index: 8 }, true)} className="text-xs font-semibold text-salin-primary hover:underline">
+                    +{message.answer.citations.length - 8} more
+                  </button>
+                )}
+              </div>
+            )}
             {message.answer.kind === "table" && (
               <ResultTable outcome={{ kind: "table", title: message.datasetName, headers: message.answer.headers ?? [], rows: message.answer.rows ?? [], message: message.answer.text }} />
             )}
             {message.answer.kind !== "unsupported" && message.answer.understood && <p className="mt-2 text-xs text-salin-muted">I read this as: {message.answer.understood}</p>}
-            {message.answer.citations.length > 0 && <details className="mt-2 text-xs text-salin-muted">
-              <summary className="cursor-pointer font-semibold">Sources ({message.answer.citations.length})</summary>
-              <ul className="mt-2 space-y-2">{message.answer.citations.slice(0, 100).map((source, i) => <li key={source.id}>
-                <p className="font-medium">[{i + 1}] {source.label}{source.confidence !== null ? ` · OCR ${Math.round(source.confidence)}%` : ""}</p>
-                <p className="whitespace-pre-wrap">{source.text}</p>
-              </li>)}</ul>
-              {message.answer.citations.length > 100 && <p className="mt-2">Showing the first 100 source records. Calculations use all matching records.</p>}
-            </details>}
             {message.answer.warnings.map((warning) => <p key={warning} className="mt-2 text-xs text-amber-800 dark:text-amber-300">{warning}</p>)}
-            {message.answer.export && message.answer.kind === "table" && <button type="button" className={cn(action, "mt-2")} onClick={() => {
-              const headers = message.answer.headers ?? [];
-              const columns = headers.map((name, i) => ({ id: String(i), name, type: "text" as const, required: false, sourceHeader: null }));
-              const rows = (message.answer.rows ?? []).map((values) => ({ values: Object.fromEntries(values.map((v, i) => [String(i), v])), source: null }));
-              void import("@/core/processing/dataset-export").then(({ exportDataset }) => downloadBlob(exportDataset({ name: message.datasetName, content: { columns, rows } }, "csv"), `${message.datasetName}-answer.csv`)).catch(() => toast("The answer could not be exported. Please try again."));
-            }}>Download displayed table (CSV)</button>}
+            {message.answer.export && message.answer.kind === "table" && <button type="button" className={cn(action, "mt-2")} onClick={() => downloadAnswer(message)}>Download displayed table (CSV)</button>}
             {message.datasetId && <button type="button" onClick={() => navigate(datasetUrl(message.datasetId!))} className={cn(action, "mt-2")}>
               <Table2 className="size-4" /> Open dataset
             </button>}
@@ -218,11 +311,8 @@ function AssistantMessage({ message }: { message: Extract<ChatMessage, { role: "
 
 function UserMessage({ message }: { message: Extract<ChatMessage, { role: "user" }> }) {
   return (
-    <div className="flex gap-3">
-      <span aria-hidden="true" className="grid size-9 shrink-0 place-items-center rounded-full bg-salin-primary text-white">
-        <User className="size-[18px]" />
-      </span>
-      <div className="min-w-0 rounded-2xl rounded-tl-md bg-salin-tile px-4 py-3">
+    <div className="flex justify-end pl-10">
+      <div className="min-w-0 rounded-2xl rounded-tr-md bg-salin-primary/10 px-4 py-3 ring-1 ring-salin-primary/15">
         <p className="sr-only">You said:</p>
         {message.text && <p className="text-[15px] whitespace-pre-wrap text-salin-text">{message.text}</p>}
         {message.attachments.length > 0 && (
@@ -267,6 +357,12 @@ export function AiStudioPage() {
   const [status, setStatus] = useState<string | null>(null);
   const [chosen, setChosen] = useState<string | null>(null);
   const [documents, setDocuments] = useState<AskSource[]>([]);
+  const [cite, setCite] = useState<{ messageId: string; index: number | null } | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(true);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const setting = useAiStore((s) => s.setting);
+  const setSetting = useAiStore((s) => s.setSetting);
+  const reduced = useReducedMotion();
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const controller = useRef<AbortController | null>(null);
@@ -281,10 +377,20 @@ export function AiStudioPage() {
     return () => { active = false; };
   }, [datasets.status, chosen]);
 
-  useEffect(() => {
-    if (messages.length || status) scrollToY(document.documentElement.scrollHeight, { immediate: true });
-  }, [messages, status]);
   useEffect(() => () => controller.current?.abort(), []);
+
+  const analyses = messages.filter((m): m is Analysis => m.role === "assistant" && m.kind === "analysis");
+  // The drawer follows the reply last pointed at, else the newest one with sources.
+  const sourceMessage = analyses.find((m) => m.id === cite?.messageId) ?? [...analyses].reverse().find((m) => m.answer.citations.length > 0) ?? null;
+  const latestTable = [...analyses].reverse().find((m) => m.answer.kind === "table") ?? null;
+  const wide = () => window.matchMedia("(min-width: 64rem)").matches;
+
+  function onCite(next: Cite | null, open = false) {
+    setCite((current) => next ?? (current && { ...current, index: null }));
+    if (!open) return;
+    if (wide()) setDrawerOpen(true);
+    else setSheetOpen(true);
+  }
 
   const reply = (r: Reply) => setMessages((m) => [...m, { id: crypto.randomUUID(), role: "assistant", ...r }]);
   const canSend = !status && (draft.trim() !== "" || attachments.length > 0);
@@ -382,110 +488,189 @@ export function AiStudioPage() {
     if (rejected.length) toast(`Skipped ${rejected.length} unsupported or oversized file(s).`);
   }
 
+  const sources = sourceMessage ? (
+    <SourceList message={sourceMessage} active={cite?.messageId === sourceMessage.id ? cite.index : null} />
+  ) : (
+    <p className="text-sm text-salin-muted">Each answer's sources show here: the rows, pages and lines it was read from.</p>
+  );
+  const sourceCount = sourceMessage?.answer.citations.length ?? 0;
+  const headerButton = "press inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-salin-border-strong bg-salin-surface px-2.5 text-[13px] font-medium text-salin-text hover:bg-salin-tile disabled:opacity-50";
+
   return (
-    <PageFrame title="Ask Salin AI" description="Ask about your selected document, scan, or dataset — with sources, on this device." className="flex min-h-[70vh] flex-col">
-      <div className="flex flex-wrap items-end gap-3">
-        <label className="grid min-w-0 flex-1 basis-60 gap-1 text-xs font-medium text-salin-muted">
-          Source
-          {sourceOptions.length ? (
-            <ChoiceMenu variant="field" label="Source" heading="Ask about" value={datasetId ?? ""} options={sourceOptions} onChange={setChosen} disabled={status !== null} />
-          ) : (
-            <span className="text-sm font-normal text-salin-muted">{datasets.status === "loading" ? "Loading…" : "No documents or datasets yet."}</span>
-          )}
-        </label>
-        <p className={cn("flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold", assistant.ready ? "bg-salin-primary-soft text-salin-primary-ink" : "bg-salin-tile text-salin-muted")}>
-          <Bot className="size-3.5" /> {assistant.ready ? "Assistant ready (on this device)" : "Local document search ready"}
-        </p>
-      </div>
-
-      <section aria-labelledby="try-asking" className="mt-5">
-        <h2 id="try-asking" className="text-base font-semibold text-salin-text">Try asking</h2>
-        <div className="no-scrollbar -mx-4 mt-2.5 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0" data-lenis-prevent-horizontal="">
-          {SUGGESTIONS.map((s) => (
+    <div className="flex h-[calc(100dvh-var(--mobile-nav-h)-env(safe-area-inset-bottom))] min-h-0 nav:h-dvh">
+      <main id="main" className="flex min-w-0 flex-1 flex-col bg-salin-surface">
+        <header className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-salin-border px-4 py-2.5 sm:px-5">
+          <span aria-hidden="true" className="grid size-9 shrink-0 place-items-center rounded-xl bg-salin-primary-soft text-salin-primary">
+            <Bot className="size-5" />
+          </span>
+          <div className="min-w-0 flex-1 basis-44">
+            <h1 className="sr-only">Ask Salin AI</h1>
+            {sourceOptions.length ? (
+              <ChoiceMenu variant="cell" label="Source" heading="Ask about" value={datasetId ?? ""} options={sourceOptions} onChange={setChosen} disabled={status !== null} className="-ml-1.5 h-7 w-auto max-w-full min-w-0 rounded-lg px-1.5 text-[15px] font-semibold" />
+            ) : (
+              <p className="text-[15px] font-semibold text-salin-text">{datasets.status === "loading" ? "Loading…" : "No documents or datasets yet"}</p>
+            )}
+            <p className="flex min-w-0 items-center gap-1.5 text-xs text-salin-muted">
+              {status ? (
+                <LoaderCircle aria-hidden="true" className={cn("size-3.5 shrink-0 text-salin-primary", !reduced && "animate-spin")} />
+              ) : (
+                <span aria-hidden="true" className={cn("size-1.5 shrink-0 rounded-full", assistant.ready ? "bg-salin-primary" : "bg-salin-subtle")} />
+              )}
+              <span className="truncate">{status ?? (assistant.ready ? "Assistant ready on this device" : "Local document search ready")}</span>
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <ChoiceMenu label="AI mode" heading="AI mode" value={setting} options={MODE_OPTIONS} onChange={setSetting} disabled={status !== null} />
             <button
-              key={s}
               type="button"
-              onClick={() => {
-                setDraft(s);
-                requestAnimationFrame(() => (resize(), inputRef.current?.focus()));
-              }}
-              className="press shrink-0 rounded-xl bg-salin-tile px-3.5 py-2 text-left text-[13px] whitespace-nowrap text-salin-text hover:bg-salin-tile-hover sm:whitespace-normal"
+              onClick={() => (wide() ? setDrawerOpen((open) => !open) : setSheetOpen(true))}
+              aria-label={`Sources (${sourceCount})`}
+              title="Sources"
+              className={cn(headerButton, drawerOpen && "lg:border-salin-primary lg:bg-salin-primary-soft lg:text-salin-primary-ink")}
             >
-              “{s}”
+              <BookOpenText aria-hidden="true" className="size-4" />
+              <span className="tabular-nums">{sourceCount}</span>
             </button>
-          ))}
+            <button type="button" disabled={!latestTable} onClick={() => latestTable && downloadAnswer(latestTable)} title="Download the latest answer table (CSV)" className={headerButton}>
+              <Download aria-hidden="true" className="size-4" />
+              <span className="max-sm:sr-only">Export</span>
+            </button>
+          </div>
+        </header>
+
+        {/* column-reverse keeps the thread pinned to the newest message as it grows */}
+        <div className="flex min-h-0 flex-1 flex-col-reverse overflow-y-auto" data-lenis-prevent="">
+          <div role="log" aria-live="polite" aria-label="Conversation" className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6">
+            {messages.length === 0 && !status && (
+              <div className="my-auto flex flex-col items-center py-6 text-center">
+                <span className="grid size-14 place-items-center rounded-2xl bg-salin-primary-soft text-salin-primary">
+                  <Bot className="size-7" />
+                </span>
+                <p className="mt-3 font-semibold text-salin-text">What should we do with your data?</p>
+                <p className="mt-1 max-w-sm text-sm text-salin-muted">Choose a document, scan, or dataset and ask in English, Filipino, or Taglish. Answers include sources and calculations run on this device.</p>
+                <section aria-labelledby="try-asking" className="mt-6 w-full">
+                  <h2 id="try-asking" className="text-xs font-semibold tracking-wide text-salin-subtle uppercase">
+                    Try asking
+                  </h2>
+                  <div className="mt-2.5 flex flex-wrap justify-center gap-2">
+                    {SUGGESTIONS.map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => {
+                          setDraft(s);
+                          requestAnimationFrame(() => (resize(), inputRef.current?.focus()));
+                        }}
+                        className="press rounded-xl bg-salin-tile px-3.5 py-2 text-left text-[13px] text-salin-text hover:bg-salin-tile-hover"
+                      >
+                        “{s}”
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              </div>
+            )}
+            {messages.map((m) =>
+              m.role === "user" ? <UserMessage key={m.id} message={m} /> : <AssistantMessage key={m.id} message={m} active={cite?.messageId === m.id ? cite.index : null} onCite={onCite} />,
+            )}
+            {status && <Thinking status={status} onStop={() => controller.current?.abort()} />}
+          </div>
         </div>
-      </section>
 
-      <div role="log" aria-live="polite" aria-label="Conversation" className="mt-6 flex flex-1 flex-col gap-6">
-        {messages.length === 0 && !status && (
-          <div className="my-auto flex flex-col items-center py-8 text-center">
-            <span className="grid size-14 place-items-center rounded-2xl bg-salin-primary-soft text-salin-primary">
-              <Bot className="size-7" />
-            </span>
-            <p className="mt-3 font-semibold text-salin-text">What should we do with your data?</p>
-            <p className="mt-1 max-w-sm text-sm text-salin-muted">Choose a document, scan, or dataset and ask in English, Filipino, or Taglish. Answers include sources and calculations run on this device.</p>
-          </div>
-        )}
-        {messages.map((m) => (m.role === "user" ? <UserMessage key={m.id} message={m} /> : <AssistantMessage key={m.id} message={m} />))}
-        {status && <Thinking status={status} onStop={() => controller.current?.abort()} />}
-      </div>
-
-      {/* Composer — sticks above the mobile tab bar while the thread scrolls */}
-      <div className="sticky bottom-[calc(var(--mobile-nav-h)+env(safe-area-inset-bottom)+40px)] z-20 mt-6 -mx-1 bg-salin-surface/90 px-1 pt-2 pb-1 backdrop-blur md:bottom-4">
-        <form onSubmit={send} className="rounded-2xl bg-salin-surface p-2 shadow-[0_8px_28px_-14px_rgb(16_40_28/0.28)] ring-1 ring-salin-border focus-within:ring-2 focus-within:ring-salin-primary/50">
-          <input ref={fileRef} type="file" multiple accept={ACCEPT_ATTR} className="sr-only" tabIndex={-1} aria-hidden="true" onChange={onPick} />
-          {attachments.length > 0 && (
-            <div className="flex flex-wrap gap-2 px-1 pt-1 pb-2">
-              {attachments.map((f) => (
-                <AttachmentChip key={f.id} file={f} onRemove={() => detach(f.id)} />
-              ))}
+        {/* Composer; on phones it leaves room for the bottom bar's + button */}
+        <div className="shrink-0 border-t border-salin-border px-3 pt-3 pb-9 sm:px-6 nav:pb-3">
+          <form
+            onSubmit={send}
+            className="mx-auto max-w-3xl rounded-2xl bg-salin-surface p-1.5 shadow-[0_8px_28px_-14px_rgb(16_40_28/0.28)] ring-1 ring-salin-border transition-shadow focus-within:ring-2 focus-within:ring-salin-primary/50"
+          >
+            <input ref={fileRef} type="file" multiple accept={ACCEPT_ATTR} className="sr-only" tabIndex={-1} aria-hidden="true" onChange={onPick} />
+            {attachments.length > 0 && (
+              <div className="flex flex-wrap gap-2 px-1 pt-1 pb-2">
+                {attachments.map((f) => (
+                  <AttachmentChip key={f.id} file={f} onRemove={() => detach(f.id)} />
+                ))}
+              </div>
+            )}
+            <div className="flex items-end gap-1.5">
+              <button type="button" onClick={() => fileRef.current?.click()} aria-label="Attach files" className="grid size-11 shrink-0 place-items-center rounded-xl text-salin-muted hover:bg-salin-tile hover:text-salin-text">
+                <Paperclip className="size-5" />
+              </button>
+              <div className="relative min-w-0 flex-1">
+                <textarea
+                  id="ask-input"
+                  ref={inputRef}
+                  rows={1}
+                  value={draft}
+                  onChange={(e) => {
+                    setDraft(e.target.value);
+                    resize();
+                  }}
+                  onKeyDown={onKeyDown}
+                  maxLength={500}
+                  placeholder=" "
+                  data-lenis-prevent=""
+                  className="peer block max-h-42 min-h-11 w-full resize-none bg-transparent px-1 pt-[19px] pb-1.5 text-[15px] leading-5 text-salin-text outline-none"
+                />
+                {/* Rests in the field; lifts on focus or once there's text. */}
+                <label
+                  htmlFor="ask-input"
+                  className={cn(
+                    "pointer-events-none absolute top-3 left-1 origin-left truncate text-[15px] leading-5 text-salin-subtle",
+                    "transition-[translate,scale,color] duration-[580ms] ease-[cubic-bezier(.32,.72,0,1)] motion-reduce:transition-none",
+                    "peer-focus:-translate-y-[10px] peer-focus:scale-[0.74] peer-focus:text-salin-primary",
+                    "peer-[:not(:placeholder-shown)]:-translate-y-[10px] peer-[:not(:placeholder-shown)]:scale-[0.74] peer-[:not(:placeholder-shown)]:text-salin-primary",
+                  )}
+                >
+                  Ask Salin AI
+                </label>
+              </div>
+              <button
+                type="submit"
+                disabled={!canSend}
+                aria-label="Send"
+                className="press grid size-11 shrink-0 place-items-center rounded-full bg-salin-primary text-white shadow-[0_6px_14px_-6px_rgb(1_168_90/0.7)] hover:bg-salin-primary-strong disabled:bg-salin-tile disabled:text-salin-subtle disabled:shadow-none"
+              >
+                <SendHorizontal className="size-5" />
+              </button>
             </div>
-          )}
-          <div className="flex items-end gap-1.5">
-            <button type="button" onClick={() => fileRef.current?.click()} aria-label="Attach files" className="grid size-11 shrink-0 place-items-center rounded-xl text-salin-muted hover:bg-salin-tile hover:text-salin-text">
-              <Paperclip className="size-5" />
-            </button>
-            <label htmlFor="ask-input" className="sr-only">
-              Ask Salin AI
-            </label>
-            <textarea
-              id="ask-input"
-              ref={inputRef}
-              rows={1}
-              value={draft}
-              onChange={(e) => {
-                setDraft(e.target.value);
-                resize();
-              }}
-              onKeyDown={onKeyDown}
-              maxLength={500}
-              placeholder="Ask about the selected source or attach a file…"
-              data-lenis-prevent=""
-              className="max-h-42 min-h-11 flex-1 resize-none bg-transparent px-1 py-[11px] text-[15px] text-salin-text outline-none placeholder:text-salin-subtle"
-            />
-            <button
-              type="submit"
-              disabled={!canSend}
-              aria-label="Send"
-              className="press grid size-11 shrink-0 place-items-center rounded-full bg-salin-primary text-white shadow-[0_6px_14px_-6px_rgb(1_168_90/0.7)] hover:bg-salin-primary-strong disabled:bg-salin-tile disabled:text-salin-subtle disabled:shadow-none"
-            >
-              <SendHorizontal className="size-5" />
+          </form>
+          <ul className="mx-auto mt-2 flex max-w-3xl flex-wrap items-center justify-center gap-x-4 gap-y-1 px-1 text-[11.5px] whitespace-nowrap text-salin-muted">
+            <li className="flex items-center gap-1.5 rounded-full bg-salin-primary-soft px-2 py-0.5 font-medium text-salin-primary-ink">
+              <ShieldCheck className="size-3.5" /> Your data stays on your device
+            </li>
+            <li className="flex items-center gap-1.5">
+              <Paperclip className="size-3.5" /> Attach PDF, JPG, PNG, XLSX, CSV
+            </li>
+            <li className="flex items-center gap-1.5 max-sm:hidden">
+              <Files className="size-3.5" /> Changes open in the dataset with a preview and Undo
+            </li>
+          </ul>
+        </div>
+      </main>
+
+      {drawerOpen && (
+        <aside aria-label="Sources" className="hidden w-80 shrink-0 flex-col border-l border-salin-border bg-salin-canvas lg:flex">
+          <div className="flex h-14 shrink-0 items-center gap-2 border-b border-salin-border px-4">
+            <BookOpenText aria-hidden="true" className="size-4 text-salin-primary" />
+            <h2 className="flex-1 text-sm font-semibold text-salin-text">Sources</h2>
+            <button type="button" onClick={() => setDrawerOpen(false)} aria-label="Close sources" className="grid size-8 place-items-center rounded-lg text-salin-subtle hover:bg-salin-tile hover:text-salin-text">
+              <X className="size-4" />
             </button>
           </div>
-        </form>
-        <ul className="no-scrollbar mt-2 flex gap-4 overflow-x-auto px-1 text-[11.5px] whitespace-nowrap text-salin-muted sm:justify-center">
-          <li className="flex items-center gap-1.5">
-            <Paperclip className="size-3.5" /> Attach PDF, JPG, PNG, XLSX, CSV
-          </li>
-          <li className="flex items-center gap-1.5">
-            <Files className="size-3.5" /> Changes open in the dataset with a preview and Undo
-          </li>
-          <li className="flex items-center gap-1.5">
-            <ShieldCheck className="size-3.5" /> Runs on this device
-          </li>
-        </ul>
-      </div>
-    </PageFrame>
+          <div className="min-h-0 flex-1 overflow-y-auto p-4" data-lenis-prevent="">
+            {sources}
+          </div>
+        </aside>
+      )}
+      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+        <SheetContent side="bottom" className="max-h-[80dvh] rounded-t-3xl bg-salin-canvas p-4">
+          <SheetTitle>Sources</SheetTitle>
+          <SheetDescription className="sr-only">Where the answers were read from on this device.</SheetDescription>
+          <div className="min-h-0 overflow-y-auto" data-lenis-prevent="">
+            {sources}
+          </div>
+        </SheetContent>
+      </Sheet>
+    </div>
   );
 }

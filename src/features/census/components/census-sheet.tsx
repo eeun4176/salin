@@ -69,7 +69,7 @@ export function CensusSheet({ code, className }: { code: SheetCode; className?: 
         CITY VETERINARY OFFICE
       </text>
       <text x={PAGE.width / 2} y={23.5} fontSize={4.6} fontWeight={800} textAnchor="middle" fill={INK}>
-        DOG &amp; CAT WORKING SHEET FORM
+        DOG &amp; CAT CENSUS WORKING SHEET FORM
       </text>
 
       {layout.code.map((r, i) => (bits[i] ? <rect key={i} {...r} fill="#000" /> : <rect key={i} {...r} fill="none" stroke="#bbb" strokeWidth={0.15} />))}
@@ -79,6 +79,9 @@ export function CensusSheet({ code, className }: { code: SheetCode; className?: 
 
       {layout.frames.map((r, i) => (
         <rect key={i} {...r} rx={1.5} fill="none" stroke="#333" strokeWidth={0.3} />
+      ))}
+      {layout.rules.map((r, i) => (
+        <line key={i} x1={r.x} y1={r.y} x2={r.x + r.width} y2={r.y + r.height} stroke="#999" strokeWidth={0.2} />
       ))}
       <text x={15} y={40.6} fontSize={3} fontWeight={700} fill={INK}>
         A. CENSUS INFORMATION

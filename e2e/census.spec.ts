@@ -49,7 +49,7 @@ async function filledPhoto(browser: Browser, svg: string): Promise<SampleFile> {
       const y = Number(t.getAttribute("y")) - 3.5;
       add("path", { d: `M${x + 0.6} ${y + 2.4} L${x + 1.9} ${y + 3.9} L${x + 4} ${y + 0.5}`, stroke: "#123", "stroke-width": 0.55, fill: "none", "stroke-linecap": "round" });
     };
-    // v2: the owner's name goes on its open line (the first rounded one), written naturally.
+    // v2 and later: the owner's name goes on its open line (the first rounded one), written naturally.
     const ownerLine = svg.querySelector('rect[stroke="#8a8f8c"][rx]')!;
     const writeLine = (text: string) =>
       add("text", { x: Number(ownerLine.getAttribute("x")) + 3, y: Number(ownerLine.getAttribute("y")) + 5, "font-size": 4.6, "font-family": "Arial", "font-weight": 700, "letter-spacing": 0.6, fill: "#1a2a5a" }, text);
