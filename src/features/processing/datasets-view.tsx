@@ -5,21 +5,25 @@
  * user's documents — filtered by the search field and by review status,
  * sorted by last change, name or size. Each row shows its size, review
  * status, where it came from (file or scan) and last change, with a ⋮ menu.
+ * On desktop a row opens in the detail pane beside the list; on phones it
+ * opens the full review screen.
  * Rows stack cleanly on phones. "New dataset" opens the document picker.
  */
 
 import { useMemo, useState } from "react";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { ChevronRight, CircleCheck, House, Plus, ScanText, Table2, TriangleAlert } from "lucide-react";
 
 import { ChoiceMenu } from "@/components/common/choice-menu";
 import { DatasetActions } from "@/features/processing/components/dataset-actions";
+import { DATASET_PARAM } from "@/features/processing/components/dataset-detail";
 import { DocumentPickerDialog } from "@/features/processing/components/document-picker-dialog";
 import { useDatasets } from "@/features/processing/hooks/use-datasets";
 import { datasetUrl } from "@/features/processing/hooks/use-document-processing";
 import { useScans } from "@/features/ocr/hooks/use-scan";
 import { scanUrl } from "@/features/ocr/ocr-actions";
 import { formatDate } from "@/features/workspace/query";
+import { useDesktopLayout } from "@/hooks/use-desktop-layout";
 import { useUiStore } from "@/stores/ui-store";
 import { cn } from "@/lib/utils";
 import type { Dataset } from "@/types/processing";
@@ -54,14 +58,23 @@ function StatusBadge({ reviewed }: { reviewed: boolean }) {
 function DatasetRow({ dataset }: { dataset: Dataset }) {
   const fromScan = dataset.origin?.kind === "ocr";
   const Icon = fromScan ? ScanText : Table2;
+  const desktop = useDesktopLayout();
+  const [params] = useSearchParams();
+  const selected = desktop && params.get(DATASET_PARAM) === dataset.id;
   return (
-    <li className="relative flex items-start gap-3 px-3 py-3 transition-colors hover:bg-salin-tile has-[a:focus-visible]:bg-salin-tile sm:items-center sm:px-4">
-      <span aria-hidden="true" className="mt-0.5 grid size-10 shrink-0 place-items-center rounded-xl bg-salin-primary-soft text-salin-primary sm:mt-0">
+    <li
+      className={cn(
+        "relative flex items-start gap-3 px-3 py-3 transition-colors hover:bg-salin-tile has-[a:focus-visible]:bg-salin-tile @xl:items-center @xl:px-4",
+        selected && "bg-salin-primary/8 shadow-[inset_0_0_0_1px_var(--color-salin-primary)] hover:bg-salin-primary/10",
+      )}
+    >
+      <span aria-hidden="true" className="mt-0.5 grid size-10 shrink-0 place-items-center rounded-xl bg-salin-primary-soft text-salin-primary @xl:mt-0">
         <Icon className="size-5" />
       </span>
       <div className="min-w-0 flex-1">
         <Link
-          to={datasetUrl(dataset.id)}
+          to={desktop ? `?${DATASET_PARAM}=${dataset.id}` : datasetUrl(dataset.id)}
+          aria-current={selected ? "true" : undefined}
           className="line-clamp-2 text-sm font-semibold break-words text-salin-text outline-none after:absolute after:inset-0 after:content-[''] focus-visible:underline"
         >
           {dataset.name}
@@ -87,7 +100,7 @@ function ScansInProgress({ scans }: { scans: OcrDocument[] }) {
       <h3 id="scans-heading" className="text-sm font-semibold text-salin-text">
         Scans in progress <span className="font-normal text-salin-muted">({scans.length})</span>
       </h3>
-      <ul className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+      <ul className="mt-2 grid grid-cols-1 gap-2 @xl:grid-cols-2">
         {scans.map((scan) => (
           <li key={scan.id} className="min-w-0">
             <Link to={scanUrl(scan.id)} className="press flex items-center gap-3 rounded-2xl bg-salin-tile px-3 py-2.5 hover:bg-salin-tile-hover">
@@ -126,7 +139,7 @@ export function DatasetsView() {
 
   return (
     <div>
-      <nav aria-label="Breadcrumb" className="mt-5 md:mt-6">
+      <nav aria-label="Breadcrumb" className="mt-5 @2xl:mt-6">
         <ol className="flex items-center gap-1 text-[13px]">
           <li>
             <Link to="/" className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 font-medium text-salin-muted hover:bg-salin-tile hover:text-salin-text">
@@ -144,7 +157,7 @@ export function DatasetsView() {
 
       <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-[22px] font-semibold tracking-[-0.02em] text-salin-text md:text-2xl">Datasets</h2>
+          <h2 className="text-[22px] font-semibold tracking-[-0.02em] text-salin-text @2xl:text-2xl">Datasets</h2>
           <p className="mt-0.5 text-xs text-salin-muted">Tables extracted from your documents and scans. They stay on this device.</p>
         </div>
         <button

@@ -11,7 +11,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
 import { workbookBytes } from "../src/test/workbooks";
-import { card, openWorkspace, uploadFiles, type SampleFile } from "./helpers";
+import { card, detailPane, openWorkspace, uploadFiles, type SampleFile } from "./helpers";
 
 const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
@@ -79,7 +79,7 @@ test("previews a workbook sheet by sheet, with hidden sheets marked", async ({ p
   await openWorkspace(page);
   await uploadFiles(page, [reportWorkbook()]);
   await card(page, "Vaccination Report.xlsx").click();
-  const preview = page.getByRole("dialog");
+  const preview = detailPane(page);
   await expect(preview.getByRole("tab", { name: "October Report" })).toHaveAttribute("aria-selected", "true", { timeout: 30_000 });
   await expect(preview.getByRole("tab", { name: "Lookup (hidden)" })).toBeVisible();
   await expect(preview.getByRole("cell", { name: "Monthly Vaccination Report" })).toBeVisible();
@@ -123,7 +123,7 @@ test("guides from sheets to sections to a dataset, keeping sheet and cell refere
   // The original workbook is unchanged and still opens.
   await page.goto("/");
   await card(page, "Vaccination Report.xlsx").click();
-  await expect(page.getByRole("dialog").getByRole("cell", { name: "Total" })).toBeVisible({ timeout: 30_000 });
+  await expect(detailPane(page).getByRole("cell", { name: "Total" })).toBeVisible({ timeout: 30_000 });
 });
 
 test("shows how many datasets will be created and lets sections stay separate or combine", async ({ page }) => {

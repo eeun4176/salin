@@ -4,12 +4,13 @@
  * open folder at /folders/:folderId), Recents, Favorites or Trash. Renders
  * breadcrumbs, filters, the sorter and the items, plus loading, error,
  * empty and "folder not found" states. The top level also has the Datasets
- * card (Datasets lives inside Workspace, on phones and desktop alike).
+ * card (Datasets lives inside Workspace, on phones and desktop alike) and,
+ * on phones (where there's no sidebar), the way into Census.
  */
 
 import { useMemo } from "react";
 import { Link, useParams } from "react-router";
-import { ChevronRight, FolderOpen, FolderSearch, Heart, House, RotateCcw, RotateCcwClock, Table2, Trash, TriangleAlert } from "lucide-react";
+import { ChevronRight, ClipboardList, FolderOpen, FolderSearch, Heart, House, RotateCcw, RotateCcwClock, Table2, Trash, TriangleAlert } from "lucide-react";
 
 import { useDatasets } from "@/features/processing/hooks/use-datasets";
 import { FilterBar } from "@/features/workspace/components/filter-bar";
@@ -22,7 +23,7 @@ import { folderUrl } from "@/features/workspace/use-open-item";
 import { useUiStore, type ViewMode } from "@/stores/ui-store";
 import { startWorkspaceSync, useWorkspaceStore } from "@/stores/workspace-store";
 
-const gridCols = "grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4";
+const gridCols = "grid grid-cols-2 gap-3 @xl:grid-cols-3 @4xl:grid-cols-4";
 
 const DATE_COLUMN: Record<WorkspaceSection, string> = {
   workspace: "Date modified",
@@ -38,7 +39,7 @@ function DatasetsEntry() {
   return (
     <Link
       to="/datasets"
-      className="press mt-4 flex items-center gap-3 rounded-2xl bg-salin-primary-soft px-3.5 py-3 text-salin-text transition-colors hover:bg-salin-primary-soft/70 md:px-4"
+      className="press mt-4 flex items-center gap-3 rounded-2xl bg-salin-primary-soft px-3.5 py-3 text-salin-text transition-colors hover:bg-salin-primary-soft/70 @2xl:px-4"
     >
       <Table2 aria-hidden="true" className="size-5 shrink-0 text-salin-primary" />
       <span className="min-w-0 flex-1">
@@ -46,6 +47,20 @@ function DatasetsEntry() {
         <span className="block truncate text-xs text-salin-muted">
           {count ? `${count} saved · tables extracted from your files` : "Turn PDF, Excel, CSV or text files into tables"}
         </span>
+      </span>
+      <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-salin-muted" />
+    </Link>
+  );
+}
+
+/** Phones only: the sidebar has Census on wider screens. */
+function CensusEntry() {
+  return (
+    <Link to="/census" className="press mt-2 flex items-center gap-3 rounded-2xl bg-salin-tile px-3.5 py-3 text-salin-text transition-colors hover:bg-salin-tile-hover nav:hidden">
+      <ClipboardList aria-hidden="true" className="size-5 shrink-0 text-salin-primary" />
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold">Census</span>
+        <span className="block truncate text-xs text-salin-muted">Print working sheets, scan them, export the official workbook</span>
       </span>
       <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-salin-muted" />
     </Link>
@@ -66,7 +81,7 @@ function ItemsBlock({
   if (viewMode === "list") {
     return (
       <div role="table" aria-label="Items" className="-mx-3">
-        <div role="row" className="hidden grid-cols-[minmax(0,1fr)_9rem_6rem_auto] gap-3 px-3 pb-1 text-xs font-medium text-salin-subtle sm:grid">
+        <div role="row" className="hidden grid-cols-[minmax(0,1fr)_9rem_6rem_auto] gap-3 px-3 pb-1 text-xs font-medium text-salin-subtle @xl:grid">
           <span role="columnheader">Name</span>
           <span role="columnheader">{DATE_COLUMN[section]}</span>
           <span role="columnheader">Size</span>
@@ -146,7 +161,7 @@ function EmptyState({ section, filtered, inFolder, onClear }: { section: Workspa
 
 function LoadingState() {
   return (
-    <div role="status" aria-label="Loading workspace" className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 md:mt-6">
+    <div role="status" aria-label="Loading workspace" className="mt-5 grid grid-cols-2 gap-3 @xl:grid-cols-3 @4xl:grid-cols-4 @2xl:mt-6">
       {Array.from({ length: 4 }, (_, i) => (
         <div key={i} className="aspect-[5/4.6] animate-pulse rounded-2xl bg-salin-tile motion-reduce:animate-none" />
       ))}
@@ -173,7 +188,7 @@ function Breadcrumbs({ folderId }: { folderId: string }) {
   const folderById = useWorkspaceStore((s) => s.folderById);
   const path = folderPath(folderId, folderById);
   return (
-    <nav aria-label="Breadcrumb" className="no-scrollbar mt-5 -mb-2 overflow-x-auto md:mt-6" data-lenis-prevent-horizontal="">
+    <nav aria-label="Breadcrumb" className="no-scrollbar mt-5 -mb-2 overflow-x-auto @2xl:mt-6" data-lenis-prevent-horizontal="">
       <ol className="flex items-center gap-1 text-[13px] whitespace-nowrap">
         <li>
           <Link to="/" className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 font-medium text-salin-muted hover:bg-salin-tile hover:text-salin-text">
@@ -270,9 +285,14 @@ export function SectionView({ section }: { section: WorkspaceSection }) {
   return (
     <div>
       {folderId !== null && <Breadcrumbs folderId={folderId} />}
-      <div className="mt-5 md:mt-6">
+      <div className="mt-5 @2xl:mt-6">
         <FilterBar section={section} folderId={folderId} />
-        {section === "workspace" && folderId === null && <DatasetsEntry />}
+        {section === "workspace" && folderId === null && (
+          <>
+            <DatasetsEntry />
+            <CensusEntry />
+          </>
+        )}
 
         {section !== "recents" && (
           <div className="mt-4 flex flex-wrap items-center justify-between gap-2">

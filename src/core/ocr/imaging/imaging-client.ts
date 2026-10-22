@@ -6,7 +6,7 @@
  * worker fails to start). Requests can be cancelled with an AbortSignal.
  */
 
-import type { ImagingRequest, PreparedImage, PreviewImage } from "@/core/ocr/imaging/imaging-ops";
+import type { CensusImage, ImagingRequest, PreparedImage, PreviewImage } from "@/core/ocr/imaging/imaging-ops";
 import { canUseOffscreen, UnreadableImageError } from "@/core/ocr/imaging/image-io";
 import type { OcrProfileId, PageEdits, Quad, QuarterTurn } from "@/types/ocr";
 
@@ -86,6 +86,11 @@ export function prepareImage(blob: Blob, edits: PageEdits, profile: OcrProfileId
 /** A quick, screen-sized preview of what the edits will produce. */
 export function previewImage(blob: Blob, edits: PageEdits, signal?: AbortSignal) {
   return run<PreviewImage>({ op: "preview", blob, edits }, signal);
+}
+
+/** Reads a printed census sheet in the photo, or `null` when it isn't one (no markers or no valid code strip). */
+export async function readCensusSheet(blob: Blob, rotation: QuarterTurn, signal?: AbortSignal) {
+  return (await run<{ census: CensusImage | null }>({ op: "census", blob, rotation }, signal)).census;
 }
 
 /** Finds the page's corners in a photo, or `null` if no clear page edge is visible. */

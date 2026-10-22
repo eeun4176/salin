@@ -5,10 +5,12 @@
  * "Open" fallback on phones), the first rows of CSV files, the start of text
  * files, and Excel workbooks sheet by sheet. Files Salin can read have an
  * "Extract data" button; photos and PDFs also have "Read text" (OCR).
+ * On the desktop workspace the same body and actions show in the detail
+ * pane (file-detail.tsx) instead of this dialog.
  */
 
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router";
+import { useLocation, useSearchParams } from "react-router";
 import { Download, ExternalLink, FileWarning, LoaderCircle, ScanText, Table2, X } from "lucide-react";
 
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -22,9 +24,11 @@ import { OCR_KINDS } from "@/features/ocr/ocr-actions";
 import { useExtractData } from "@/features/processing/hooks/use-document-processing";
 import { ExcelPreview } from "@/features/workspace/components/excel-preview";
 import { formatBytes, formatDate } from "@/features/workspace/query";
+import { isWorkspaceRoute } from "@/features/workspace/section-links";
 import { PREVIEW_PARAM, useClosePreview } from "@/features/workspace/use-open-item";
 import { downloadItem } from "@/features/workspace/workspace-actions";
 import { fileToItem } from "@/features/workspace/mappers";
+import { useDesktopLayout } from "@/hooks/use-desktop-layout";
 import { parseCsvPreview, type CsvPreview } from "@/lib/csv";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import type { WorkspaceFile } from "@/types/domain";
@@ -147,22 +151,77 @@ function PreviewContent({ file }: { file: WorkspaceFile }) {
   );
 }
 
-export function FilePreview() {
+/** Extract data, Read text and Download for one file — in the preview header and the detail pane. */
+export function FileActions({ file }: { file: WorkspaceFile }) {
   const extract = useExtractData();
   const startScan = useStartScan();
+  return (
+    <>
+      {file.deletedAt === null && isProcessable(file.kind) && (
+        <button
+          type="button"
+          aria-label="Extract data"
+          onClick={() => extract([file.id])}
+          className="press inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-salin-primary px-3 text-[13px] font-semibold text-white hover:bg-salin-primary-strong"
+        >
+          <Table2 className="size-4" /> <span className="hidden sm:inline">Extract data</span>
+        </button>
+      )}
+      {file.deletedAt === null && OCR_KINDS.has(file.kind) && (
+        <button
+          type="button"
+          aria-label="Read text"
+          onClick={() => void startScan([file.id])}
+          className={
+            file.kind === "pdf"
+              ? "press inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg px-3 text-[13px] font-semibold text-salin-text ring-1 ring-salin-border hover:bg-salin-tile"
+              : "press inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-salin-primary px-3 text-[13px] font-semibold text-white hover:bg-salin-primary-strong"
+          }
+        >
+          <ScanText className="size-4" /> <span className="hidden sm:inline">Read text</span>
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={() => void downloadItem(fileToItem(file))}
+        className="press inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg px-3 text-[13px] font-semibold text-salin-text ring-1 ring-salin-border hover:bg-salin-tile"
+      >
+        <Download className="size-4" /> <span className="hidden sm:inline">Download</span>
+      </button>
+    </>
+  );
+}
+
+/** What the file looks like inside, or why it can't be shown. */
+export function PreviewBody({ file }: { file: WorkspaceFile | undefined }) {
+  if (!file || file.deletedAt !== null) {
+    return (
+      <div className="grid h-full place-items-center px-6 text-center text-sm text-salin-muted">
+        {file ? "This file is in Trash. Restore it to open it." : "This file isn't in your workspace anymore."}
+      </div>
+    );
+  }
+  return file.kind === "xlsx" ? <ExcelPreview key={file.id} fileId={file.id} /> : <PreviewContent key={file.id} file={file} />;
+}
+
+export function FilePreview() {
   const [params] = useSearchParams();
   const previewId = params.get(PREVIEW_PARAM);
   const closePreview = useClosePreview();
   const status = useWorkspaceStore((s) => s.status);
   const file = useWorkspaceStore((s) => (previewId ? s.files.find((f) => f.id === previewId) : undefined));
-  const open = previewId !== null && status === "ready";
+  // The desktop workspace shows the file in its detail pane instead.
+  const desktop = useDesktopLayout();
+  const { pathname } = useLocation();
+  const inPane = desktop && isWorkspaceRoute(pathname);
+  const open = previewId !== null && status === "ready" && !inPane;
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && closePreview()}>
       {open && (
         <DialogContent
           aria-describedby={file ? "preview-meta" : undefined}
-          className="flex h-dvh max-h-none w-full max-w-none flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-[88vh] sm:w-[calc(100%-3rem)] sm:max-w-5xl sm:rounded-2xl"
+          className="flex h-dvh max-h-none w-full max-w-none flex-col gap-0 overflow-hidden rounded-none p-0 max-sm:data-open:slide-in-from-right-1/3 max-sm:data-open:zoom-in-100 sm:h-[88vh] sm:w-[calc(100%-3rem)] sm:max-w-5xl sm:rounded-2xl"
         >
           <header className="flex items-center gap-3 border-b border-salin-border px-3 py-2.5 pt-[max(0.625rem,env(safe-area-inset-top))] sm:px-4">
             {file && <FileTypeIcon kind={file.kind} showLabel={false} className="size-9" />}
@@ -172,55 +231,13 @@ export function FilePreview() {
                 {file ? `${FILE_KIND_META[file.kind].name} · ${formatBytes(file.size)} · Modified ${formatDate(file.updatedAt)}` : "It may have been deleted."}
               </DialogDescription>
             </div>
-            {file && file.deletedAt === null && isProcessable(file.kind) && (
-              <button
-                type="button"
-                aria-label="Extract data"
-                onClick={() => extract([file.id])}
-                className="press inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-salin-primary px-3 text-[13px] font-semibold text-white hover:bg-salin-primary-strong"
-              >
-                <Table2 className="size-4" /> <span className="hidden sm:inline">Extract data</span>
-              </button>
-            )}
-            {file && file.deletedAt === null && OCR_KINDS.has(file.kind) && (
-              <button
-                type="button"
-                aria-label="Read text"
-                onClick={() => void startScan([file.id])}
-                className={
-                  file.kind === "pdf"
-                    ? "press inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg px-3 text-[13px] font-semibold text-salin-text ring-1 ring-salin-border hover:bg-salin-tile"
-                    : "press inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-salin-primary px-3 text-[13px] font-semibold text-white hover:bg-salin-primary-strong"
-                }
-              >
-                <ScanText className="size-4" /> <span className="hidden sm:inline">Read text</span>
-              </button>
-            )}
-            {file && (
-              <button
-                type="button"
-                onClick={() => void downloadItem(fileToItem(file))}
-                className="press inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg px-3 text-[13px] font-semibold text-salin-text ring-1 ring-salin-border hover:bg-salin-tile"
-              >
-                <Download className="size-4" /> <span className="hidden sm:inline">Download</span>
-              </button>
-            )}
+            {file && <FileActions file={file} />}
             <DialogClose aria-label="Close preview" className="grid size-9 shrink-0 place-items-center rounded-lg text-salin-muted hover:bg-salin-tile hover:text-salin-text">
               <X className="size-5" />
             </DialogClose>
           </header>
           <div className="min-h-0 flex-1 bg-salin-surface">
-            {file && file.deletedAt === null ? (
-              file.kind === "xlsx" ? (
-                <ExcelPreview key={file.id} fileId={file.id} />
-              ) : (
-                <PreviewContent key={file.id} file={file} />
-              )
-            ) : (
-              <div className="grid h-full place-items-center px-6 text-center text-sm text-salin-muted">
-                {file ? "This file is in Trash. Restore it to open it." : "This file isn't in your workspace anymore."}
-              </div>
-            )}
+            <PreviewBody file={file} />
           </div>
         </DialogContent>
       )}

@@ -6,11 +6,16 @@
  * originals are kept), resume an unfinished scan of the same files, find
  * photo page edges before reading, build the extraction for review (or an
  * empty one for typing values by hand when OCR isn't available), switch to
- * a template that clearly fits, extract just the columns the user asks for,
- * save a template from a corrected scan, and create the datasets.
+ * a template that clearly fits (printed census sheets are recognised by
+ * their corner markers and code strip), extract just the columns the user
+ * asks for, save a template from a corrected scan, and create the datasets
+ * — census sheets go into their barangay-and-date census records instead.
  */
 
 import { ruleSuggestions, templateRules } from "@/core/ai/suggestions";
+import { CENSUS_TEMPLATE, CENSUS_TEMPLATE_ID, censusExtraction, type CensusPage } from "@/core/census/census-extraction";
+import { censusGroups } from "@/core/census/census-records";
+import { findScannedSheets, saveCensusGroups } from "@/core/storage/repositories/census.repository";
 import { errorMessage } from "@/core/storage/errors";
 import { getFileWithBlob, importFiles } from "@/core/storage/repositories/file-repository";
 import { createOcrDocument, findOcrDocumentsForFile, getOcrDocumentOrThrow, getOcrPages, listSavedTemplates, saveOcrDatasets, saveTemplate, updateOcrDocument, updateOcrPage, type NewPage } from "@/core/storage/repositories/ocr.repository";
@@ -44,6 +49,8 @@ export async function allTemplates(): Promise<DocumentTemplateDef[]> {
 
 export async function templateById(id: string) {
   if (id === GENERIC_TEMPLATE_ID) return null;
+  // Not offered in the template list: census sheets are recognised from their markers.
+  if (id === CENSUS_TEMPLATE_ID) return CENSUS_TEMPLATE;
   return (await allTemplates()).find((t) => t.id === id) ?? null;
 }
 
@@ -107,8 +114,20 @@ export async function startScanFromIntake(intake: IntakeFile[], folderId: string
 
 const pageNumbers = (pages: OcrPage[]) => pages.map((p, i) => ({ page: i + 1, width: p.width || 1, height: p.height || 1, layout: p.layout, result: p.result }));
 
+/** Read pages that are printed census sheets. */
+function censusPages(pages: OcrPage[]): CensusPage[] {
+  return pages.flatMap((p, i) => (p.census && p.result ? [{ page: i + 1, read: p.census, lines: p.result.lines }] : []));
+}
+
 /** Maps the read pages onto the scan's template, with rule-based suggestions (standard forms, OCR slips) for review. */
 export async function buildExtraction(doc: OcrDocument, pages: OcrPage[]): Promise<Extraction> {
+  const sheets = censusPages(pages);
+  if (doc.templateId === CENSUS_TEMPLATE_ID || (doc.templateId === GENERIC_TEMPLATE_ID && sheets.length)) {
+    const extraction = censusExtraction(sheets);
+    const skipped = pages.filter((p) => p.state === "done" && !p.census).length;
+    if (skipped) extraction.warnings.push(`${skipped} page${skipped === 1 ? " isn't a census sheet and was" : "s aren't census sheets and were"} left out.`);
+    return { ...extraction, id: crypto.randomUUID(), templateVersion: CENSUS_TEMPLATE.version, suggestions: [] };
+  }
   const template = await templateById(doc.templateId);
   const extraction = template && isRequested(template) ? extractRequested(template, pageNumbers(pages)) : extractDocument(template, pageNumbers(pages));
   return { ...extraction, templateVersion: template?.version, suggestions: ruleSuggestions(extraction, templateRules(template, extraction)) };
@@ -128,6 +147,10 @@ export async function autoCropPhotos(pages: OcrPage[]) {
 /** After a first read in generic mode: switches to a template that clearly fits (a saved one, or a built-in form). */
 export async function applyClearMatch(doc: OcrDocument, pages: OcrPage[]) {
   if (doc.templateId !== GENERIC_TEMPLATE_ID) return;
+  if (censusPages(pages).length) {
+    await updateOcrDocument(doc.id, { templateId: CENSUS_TEMPLATE_ID });
+    return;
+  }
   const match = await templateSuggestion(doc, pages);
   if (match && match.score >= 0.6) await switchTemplate(doc, pages, match.template.id);
 }
@@ -267,6 +290,35 @@ export async function createScanDatasets(documentId: string, names?: Record<stri
     toast(errorMessage(error, error instanceof Error ? error.message : "The datasets couldn't be created."));
     return [];
   }
+}
+
+/** Census sheets of this scan that are already in their census records (to ask before counting them twice). */
+export async function scannedCensusSheets(documentId: string) {
+  try {
+    const doc = await getOcrDocumentOrThrow(documentId);
+    if (!doc.extraction) return [];
+    return await findScannedSheets(censusGroups(doc.extraction, doc.id, await pageRefs(documentId)));
+  } catch {
+    return [];
+  }
+}
+
+/** Adds a reviewed census scan to its barangay-and-date census records. Resolves to the dataset ids (empty after a reported failure). */
+export async function saveCensusScan(documentId: string): Promise<string[]> {
+  try {
+    const doc = await getOcrDocumentOrThrow(documentId);
+    if (!doc.extraction) throw new Error("Nothing has been read from this scan yet.");
+    const groups = censusGroups(doc.extraction, doc.id, await pageRefs(documentId));
+    if (!groups.length) throw new Error("No pets were found on these sheets.");
+    return await saveCensusGroups(documentId, groups);
+  } catch (error) {
+    toast(errorMessage(error, error instanceof Error ? error.message : "The census records couldn't be saved."));
+    return [];
+  }
+}
+
+async function pageRefs(documentId: string) {
+  return (await getOcrPages(documentId)).map((p, i) => ({ page: i + 1, fileId: p.fileId, pdfPage: p.pdfPage, width: p.width || 1, height: p.height || 1 }));
 }
 
 export async function renameScan(documentId: string, name: string) {

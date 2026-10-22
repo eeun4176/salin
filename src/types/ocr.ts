@@ -8,6 +8,7 @@
  * and review flags) that becomes a Phase 3 dataset. Stored in IndexedDB.
  */
 
+import type { CensusSheetRead } from "@/core/census/omr/read-sheet";
 import type { ID, Timestamp } from "./domain";
 
 /* ------------------------------------------------------------------
@@ -209,7 +210,9 @@ export type ValueFlag =
   | "possibly-handwritten"
   | "count-mismatch"
   /** Handwriting recognition couldn't read it reliably: type it from the close-up. */
-  | "illegible";
+  | "illegible"
+  /** More than one box is marked where one answer is expected (census sheets). */
+  | "multiple-marks";
 
 /** One extracted value with everything needed to review it against the page. */
 export interface ExtractedValue {
@@ -368,6 +371,8 @@ export interface OcrPage {
   layout: PageLayout | null;
   state: OcrPageState;
   error: string | null;
+  /** What was marked on a printed census sheet (the processed image is then the flattened sheet). */
+  census?: CensusSheetRead | null;
 }
 
 /** A saved, reusable template (built-in templates live in code). */

@@ -81,7 +81,7 @@ export function MobileNav() {
   const [left, right] = [SECTION_LINKS.slice(0, 2), SECTION_LINKS.slice(2)];
 
   return (
-    <div className="md:hidden">
+    <div className="nav:hidden">
       {/* 72% white scrim under the menu; tapping it closes the actions */}
       <div
         aria-hidden="true"

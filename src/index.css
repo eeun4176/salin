@@ -18,6 +18,9 @@
    token is also emitted as a CSS variable on :root.
 ---------------------------------------------------------------- */
 @theme {
+  /* Phones below this get the bottom bar; wider screens get the sidebar dashboard. */
+  --breakpoint-nav: 47.5rem;
+
   --color-salin-primary: #01a85a;
   --color-salin-primary-strong: #018a4a;
   --color-salin-primary-soft: #e6f6ee;
@@ -45,6 +48,60 @@
   --animate-flash: flash 450ms ease-out forwards;
   --animate-scan: scan 2.8s ease-in-out infinite alternate;
   --animate-typing: typing 1.2s ease-in-out infinite;
+  --animate-shake: shake 380ms ease-in-out;
+  --animate-sheen: sheen 1.1s ease-in-out infinite;
+  --animate-draw: draw 520ms var(--ease-out-soft) both;
+  --animate-fill-progress: fill-progress 1.4s var(--ease-out-soft) both;
+  --animate-detail-in: detail-in 560ms var(--ease-out-soft) both;
+
+  @keyframes detail-in {
+    from {
+      opacity: 0;
+      transform: translateX(34px);
+    }
+  }
+
+  @keyframes shake {
+    0%,
+    100% {
+      transform: translateX(0);
+    }
+    20%,
+    60% {
+      transform: translateX(-6px);
+    }
+    40%,
+    80% {
+      transform: translateX(6px);
+    }
+  }
+
+  @keyframes sheen {
+    to {
+      transform: translateX(300%);
+    }
+  }
+
+  /* SVG paths drawn with pathLength="1". */
+  @keyframes draw {
+    from {
+      stroke-dasharray: 1;
+      stroke-dashoffset: 1;
+    }
+    to {
+      stroke-dasharray: 1;
+      stroke-dashoffset: 0;
+    }
+  }
+
+  @keyframes fill-progress {
+    from {
+      transform: scaleX(0);
+    }
+    to {
+      transform: scaleX(1);
+    }
+  }
 
   @keyframes flash {
     from {
@@ -291,7 +348,7 @@
 /* Padding that clears the fixed mobile tab bar + iOS home indicator */
 @utility pb-mobile-nav {
   padding-bottom: calc(var(--mobile-nav-h) + env(safe-area-inset-bottom) + 44px);
-  @media (width >= 48rem) {
+  @media (width >= 47.5rem) {
     padding-bottom: 3rem;
   }
 }
@@ -301,5 +358,12 @@
   .press:active {
     transition: none;
     transform: none;
+  }
+
+  .animate-shake,
+  .animate-sheen,
+  .animate-draw,
+  .animate-fill-progress {
+    animation: none;
   }
 }

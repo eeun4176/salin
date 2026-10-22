@@ -1,13 +1,11 @@
 /**
  * Workspace Toolbar
- * Top row of the workspace card: the Workspace / Recents / Favorites /
- * Trash tab switcher (desktop — the same four tabs as the phone's bottom
- * bar; Datasets opens from a card inside Workspace), the search field, and
- * the quick backup & restore button.
+ * Top row of the workspace list: the search field and the quick backup &
+ * restore button. Moving between Workspace, Recents, Favorites and Trash is
+ * the sidebar's job on desktop and the bottom bar's on phones.
  */
 
-import { useLayoutEffect, useRef } from "react";
-import { Link, useLocation } from "react-router";
+import { useLocation } from "react-router";
 import { ArchiveRestore, DatabaseBackup, Download, Search, X } from "lucide-react";
 
 import {
@@ -20,67 +18,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { exportWorkspaceBackup } from "@/features/backup/backup-actions";
 import { useRestoreBackup } from "@/features/backup/use-restore-backup";
-import { DATASETS_LINK, SECTION_LINKS, isSectionActive } from "@/features/workspace/section-links";
+import { DATASETS_LINK, isSectionActive } from "@/features/workspace/section-links";
 import { useUiStore } from "@/stores/ui-store";
-import { cn } from "@/lib/utils";
-
-/** Segmented switcher with a sliding white pill behind the active tab. */
-function SectionTabs() {
-  const { pathname } = useLocation();
-  const listRef = useRef<HTMLDivElement>(null);
-  const pillRef = useRef<HTMLSpanElement>(null);
-
-  useLayoutEffect(() => {
-    const list = listRef.current;
-    const pill = pillRef.current;
-    if (!list || !pill) return;
-
-    const place = () => {
-      const active = list.querySelector<HTMLElement>("[aria-current='page']");
-      if (!active) {
-        pill.style.opacity = "0";
-        return;
-      }
-      pill.style.opacity = "1";
-      pill.style.width = `${active.offsetWidth}px`;
-      pill.style.transform = `translateX(${active.offsetLeft}px)`;
-    };
-
-    place();
-    const observer = new ResizeObserver(place);
-    observer.observe(list);
-    return () => observer.disconnect();
-  }, [pathname]);
-
-  return (
-    <nav aria-label="Workspace sections" className="hidden md:block">
-      <div ref={listRef} className="relative flex rounded-2xl bg-salin-tile p-1.5">
-        <span
-          ref={pillRef}
-          aria-hidden="true"
-          className="absolute top-1.5 bottom-1.5 left-0 rounded-xl bg-salin-surface shadow-[0_1px_2px_rgb(0_0_0/0.06)] transition-[transform,width] duration-500 ease-spring motion-reduce:transition-none"
-        />
-        {SECTION_LINKS.map(({ to, label, icon: Icon }) => {
-          const isActive = isSectionActive(to, pathname);
-          return (
-            <Link
-              key={to}
-              to={to}
-              aria-current={isActive ? "page" : undefined}
-              className={cn(
-                "relative z-10 flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-medium transition-colors lg:px-5",
-                isActive ? "text-salin-primary" : "text-salin-muted hover:text-salin-text",
-              )}
-            >
-              <Icon className="size-[18px]" strokeWidth={1.9} />
-              {label}
-            </Link>
-          );
-        })}
-      </div>
-    </nav>
-  );
-}
 
 function SearchField() {
   const query = useUiStore((s) => s.query);
@@ -150,12 +89,9 @@ function BackupMenu() {
 
 export function WorkspaceToolbar() {
   return (
-    <div className="flex items-center gap-3 md:gap-4">
-      <SectionTabs />
-      <div className="flex min-w-0 flex-1 items-center gap-2">
-        <SearchField />
-        <BackupMenu />
-      </div>
+    <div className="flex min-w-0 items-center gap-2">
+      <SearchField />
+      <BackupMenu />
     </div>
   );
 }

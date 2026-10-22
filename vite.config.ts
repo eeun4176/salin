@@ -44,8 +44,8 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // mjs: the pdf.js worker, so PDFs can be read offline.
-        globPatterns: ["**/*.{js,mjs,css,html,svg,png,woff2,webmanifest}"],
+        // mjs: the pdf.js worker, so PDFs can be read offline. jpg/xlsx: the census sheet's logo and the office's workbook template.
+        globPatterns: ["**/*.{js,mjs,css,html,svg,png,jpg,xlsx,woff2,webmanifest}"],
         // OCR engine builds: downloaded on demand by the model manager, not by every visitor.
         globIgnores: ["**/tesseract-core-*", "**/web-llm-*"],
         // Any in-app URL (e.g. /folders/…) opens from the cached app shell when offline.

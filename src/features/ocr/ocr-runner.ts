@@ -6,11 +6,14 @@
  * engine's worker, analyses the layout, and saves the results — so pages
  * already read aren't read again. Supports progress, cancellation (stops at
  * once) and retrying only failed pages; a page that fails doesn't stop the
- * others. A scan can't be read twice at the same time.
+ * others. A scan can't be read twice at the same time. A printed census
+ * sheet is recognised first by its corner markers: it's flattened to the
+ * sheet layout, its boxes are read by OMR, and OCR reads only the
+ * handwriting in its letter boxes.
  */
 
-import { prepareImage } from "@/core/ocr/imaging/imaging-client";
-import type { PreparedImage } from "@/core/ocr/imaging/imaging-ops";
+import { prepareImage, readCensusSheet } from "@/core/ocr/imaging/imaging-client";
+import type { CensusImage, PreparedImage } from "@/core/ocr/imaging/imaging-ops";
 import { UnreadableImageError } from "@/core/ocr/imaging/image-io";
 import { aiRuntime } from "@/core/ai/ai-runtime";
 import { ocrRuntime } from "@/core/ocr/engine/ocr-runtime";
@@ -20,7 +23,7 @@ import { ModelError } from "@/core/ocr/models/model-manager";
 import { errorMessage } from "@/core/storage/errors";
 import { getOcrPages, updateOcrPage } from "@/core/storage/repositories/ocr.repository";
 import { pageSource, sourceKey } from "@/features/ocr/page-sources";
-import type { OcrPage, OcrPageResult, OcrProfileId, PageEdits, QuarterTurn } from "@/types/ocr";
+import type { OcrPage, OcrPageResult, OcrProfileId, PageEdits, PageMarks, QuarterTurn } from "@/types/ocr";
 
 export type ReadStage = "preparing" | "starting" | "reading" | "analysing";
 
@@ -70,6 +73,7 @@ function rotate(edits: PageEdits, turns: QuarterTurn): PageEdits {
 }
 
 const processedKeyOf = (source: string, edits: PageEdits, profile: OcrProfileId) => `${source}|${profile}|${JSON.stringify(edits)}`;
+const CENSUS_KEY = "census|";
 const resultKeyOf = (processedKey: string, config: EngineConfig) => `${processedKey}|${config.core.id}|${[...config.languages].sort().join("+")}`;
 
 /** The page's prepared image for these edits (reused when it's up to date). */
@@ -80,12 +84,44 @@ async function prepared(page: OcrPage, source: Blob, key: string, edits: PageEdi
 
 const score = (r: Pick<OcrPageResult, "confidence" | "lines">) => r.confidence * r.lines.reduce((n, l) => n + l.words.length, 0);
 
+/** A census sheet: OCR reads the handwriting-only copy; the flattened sheet is what review shows. */
+async function readCensusPage(page: OcrPage, census: CensusImage, key: string, options: ReadOptions, signal: AbortSignal, report: (stage: ReadStage, fraction: number, detail?: string) => void) {
+  const marks: PageMarks = { horizontal: [], vertical: [], checkboxes: [], inkRatio: 1, skew: 0, sideways: false };
+  const result = await ocrRuntime.readPage(census.handwriting, marks, options.config, {
+    signal,
+    onStatus: (status, p) => report("starting", 0.2, `${status} ${Math.round(p * 100)}%`),
+    onProgress: (f) => report("reading", 0.2 + f * 0.7),
+  });
+  report("analysing", 0.95);
+  const { width, height } = census;
+  await updateOcrPage(page.id, {
+    processed: census.sheet,
+    processedKey: key,
+    width,
+    height,
+    marks,
+    result: { ...result, width, height, autoRotated: 0 },
+    resultKey: resultKeyOf(key, options.config),
+    layout: analyzeLayout({ width, height, lines: result.lines, marks }),
+    census: census.read,
+    state: "done",
+    error: null,
+  });
+}
+
 async function readOne(page: OcrPage, options: ReadOptions, signal: AbortSignal, report: (stage: ReadStage, fraction: number, detail?: string) => void) {
   const { config } = options;
   const profile = config.profile;
   report("preparing", 0);
   const source = await pageSource(page);
   const sKey = await sourceKey(page);
+  // Printed census sheets first: their markers say exactly where every box is.
+  const census = await readCensusSheet(source, page.edits.rotation, signal).catch((error: unknown) => {
+    if (signal.aborted) throw error;
+    return null;
+  });
+  if (census) return readCensusPage(page, census, CENSUS_KEY + processedKeyOf(sKey, page.edits, profile), options, signal, report);
+
   let edits = page.edits;
   let key = processedKeyOf(sKey, edits, profile);
   let image = await prepared(page, source, key, edits, profile, signal);
@@ -121,6 +157,7 @@ async function readOne(page: OcrPage, options: ReadOptions, signal: AbortSignal,
   const layout = analyzeLayout({ width: image.width, height: image.height, lines: result.lines, marks: image.marks });
   await updateOcrPage(page.id, {
     edits,
+    census: null,
     processed: image.blob,
     processedKey: key,
     width: image.width,
@@ -139,7 +176,7 @@ async function upToDate(page: OcrPage, config: EngineConfig) {
   if (page.state !== "done" || !page.result || !page.resultKey) return false;
   // Pages turned automatically keep their result (its key includes the turned edits).
   const key = processedKeyOf(await sourceKey(page), page.edits, config.profile);
-  return page.resultKey === resultKeyOf(key, config);
+  return page.resultKey === resultKeyOf(key, config) || page.resultKey === resultKeyOf(CENSUS_KEY + key, config);
 }
 
 /**
@@ -208,6 +245,12 @@ export async function ensureProcessed(page: OcrPage): Promise<Blob | null> {
   if (page.processed) return page.processed;
   if (!page.result) return null;
   const source = await pageSource(page);
+  if (page.census) {
+    const census = await readCensusSheet(source, page.edits.rotation);
+    if (!census) return null;
+    await updateOcrPage(page.id, { processed: census.sheet, width: census.width, height: census.height });
+    return census.sheet;
+  }
   const image = await prepareImage(source, page.edits, page.result.profile);
   await updateOcrPage(page.id, { processed: image.blob, width: image.width, height: image.height });
   return image.blob;

@@ -63,7 +63,7 @@ function SectionMenu({ section, folderId }: { section: WorkspaceSection; folderI
     <>
       {inputs}
       <DropdownMenu modal={false}>
-        <DropdownMenuTrigger data-testid="section-menu" className="press -ml-1.5 inline-flex h-10 max-w-full min-w-0 items-center gap-1.5 rounded-xl px-1.5 text-[22px] font-semibold tracking-[-0.02em] text-salin-text outline-none hover:bg-salin-tile md:text-2xl">
+        <DropdownMenuTrigger data-testid="section-menu" className="press -ml-1.5 inline-flex h-10 max-w-full min-w-0 items-center gap-1.5 rounded-xl px-1.5 text-[22px] font-semibold tracking-[-0.02em] text-salin-text outline-none hover:bg-salin-tile @2xl:text-2xl">
           <span className="truncate">{title}</span>
           <ChevronDown className="size-5 shrink-0" strokeWidth={2.2} />
         </DropdownMenuTrigger>
@@ -159,8 +159,8 @@ export function FilterBar({ section, folderId }: { section: WorkspaceSection; fo
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-3">
       <SectionMenu section={section} folderId={folderId} />
-      <span aria-hidden="true" className="hidden h-5 w-px bg-salin-border-strong sm:block" />
-      <div className="order-last flex w-full gap-2 sm:order-none sm:w-auto">
+      <span aria-hidden="true" className="hidden h-5 w-px bg-salin-border-strong @xl:block" />
+      <div className="order-last flex w-full gap-2 @xl:order-none @xl:w-auto">
         <ChoiceMenu heading="Type" label="Type" active={type !== "any"} value={type} options={TYPE_OPTIONS} onChange={setType} />
         <ChoiceMenu heading="Modified" label="Modified" active={modified !== "any"} value={modified} options={MODIFIED_OPTIONS} onChange={setModified} />
       </div>

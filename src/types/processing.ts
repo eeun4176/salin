@@ -181,11 +181,10 @@ export interface OcrSourceReference {
 }
 
 /** How a dataset was made, beyond its source files. */
-export interface DatasetOrigin {
-  kind: "ocr";
-  documentId: ID;
-  templateId: string;
-}
+export type DatasetOrigin =
+  | { kind: "ocr"; documentId: ID; templateId: string }
+  /** Census records for one barangay and census date, gathered from many scanned sheets. */
+  | { kind: "census"; barangay: string; censusDate: string };
 
 export type DatasetStatus = "needs_review" | "reviewed";
 

@@ -191,6 +191,9 @@ test("rule suggestions, Transform with preview, filter and undo work without any
     await page.getByRole("link", { name: /Animals/ }).click();
   });
   await expect(page.getByRole("textbox", { name: "Owner, row 3" })).toHaveValue("Cara Lim", { timeout: 30_000 });
+  // On the desktop dashboard the dataset opens beside the list; the tools are on the full review screen.
+  const fullReview = page.getByRole("link", { name: "Open full review" });
+  if (await fullReview.isVisible()) await fullReview.click();
 
   // Without the assistant, plain-language requests point to the manual tools.
   await expect(page.getByText(/Want to ask in plain words\?/)).toBeVisible();

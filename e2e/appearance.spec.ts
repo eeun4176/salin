@@ -69,8 +69,8 @@ test("file cards show each file's real content", async ({ page }) => {
 
 test("Datasets lives inside Workspace, and Appearance comes after Privacy in Settings", async ({ page }) => {
   await openWorkspace(page);
-  const tabs = page.getByRole("navigation", { name: "Workspace sections" }).getByRole("link");
-  await expect(tabs).toHaveText(["Workspace", "Recents", "Favorites", "Trash"]);
+  const tabs = page.getByRole("navigation", { name: "Primary" }).getByRole("link");
+  await expect(tabs).toHaveText([/^Workspace/, /^Recents/, /^Favorites/, /^Trash/, "Census", "AI Studio", "Settings"]);
   await page.getByRole("link", { name: /^Datasets/ }).click();
   await expect(page).toHaveURL(/\/datasets$/);
   // Still inside Workspace: its tab stays selected, and the breadcrumb leads back.

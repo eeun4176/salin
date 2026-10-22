@@ -2,7 +2,7 @@
  * E2E Helpers
  * Shared steps for the Playwright tests: sample files (including real
  * text PDFs and Excel workbooks), uploading through the workspace menu,
- * creating folders, using an item's ⋮ menu, reading downloads, and waiting
+ * creating folders, the temporary sign-in account, using an item's ⋮ menu, reading downloads, and waiting
  * until the app works offline.
  */
 
@@ -53,6 +53,14 @@ export const sample = {
     buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", "base64"),
   }),
 };
+
+/** The desktop dashboard's detail pane, where a file picked in the workspace list opens (phones use a full-screen dialog). */
+export function detailPane(page: Page) {
+  return page.getByRole("region", { name: "Document details" });
+}
+
+/** The temporary paravet account (see src/core/auth/local-auth.ts). */
+export const ACCOUNT = { key: "PV2026-TMP001-3023", password: "changeme123" };
 
 /** Opens the app and waits until the workspace has loaded from IndexedDB. */
 export async function openWorkspace(page: Page, path = "/") {

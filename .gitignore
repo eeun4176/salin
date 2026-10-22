@@ -30,3 +30,6 @@ blob-report
 
 # Model files the AI e2e tests serve locally (downloaded once)
 e2e/.models
+
+# Signed-in browser state the e2e setup saves
+e2e/.auth

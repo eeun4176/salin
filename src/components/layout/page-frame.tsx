@@ -37,7 +37,7 @@ export function PageFrame({ title, description, aside, back = { to: "/", label: 
         />
         <SpotlightGrid />
         <div className="relative mx-auto max-w-5xl px-4 pt-5 pb-16 sm:px-6 md:pt-7 md:pb-20">
-          <AppHeader />
+          <AppHeader className="nav:hidden" />
           <div className="mt-8 flex flex-wrap items-end justify-between gap-4 md:mt-10">
             <div>
               <Link

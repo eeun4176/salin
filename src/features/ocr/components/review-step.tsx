@@ -23,7 +23,9 @@ import { ArrowLeft, BookmarkPlus, Crop, Info, LoaderCircle, Save, TriangleAlert 
 
 import { ColumnsBar, type ColumnSet } from "@/components/common/columns-bar";
 import { primaryButton, secondaryButton, StepFooter } from "@/components/common/step-footer";
+import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { NameDialog } from "@/components/common/name-dialog";
+import { CENSUS_TEMPLATE_ID } from "@/core/census/census-extraction";
 import { phrases, tableFromRegion } from "@/core/ocr/layout/layout-analysis";
 import { extractionToDatasets } from "@/core/ocr/review/to-dataset";
 import { addRow, confirmValue, editValue, reassignValue, refKey, removeRow, reviewItems, splitCellId, stateCounts, unresolvedCritical, valueState, type ValueRef } from "@/core/ocr/review/review-state";
@@ -40,7 +42,7 @@ import { useAiRun } from "@/features/ai/use-ai-run";
 import { TemplateHint } from "@/features/ocr/components/template-hint";
 import { acceptSuggestion, pendingSuggestions, refLabel, rejectSuggestion } from "@/core/ai/suggestions";
 import { useObjectUrls } from "@/features/ocr/hooks/use-scan";
-import { createScanDatasets, extractColumns, pageHints, recentColumnSets, saveTemplateFromScan, templateById } from "@/features/ocr/ocr-actions";
+import { createScanDatasets, extractColumns, pageHints, recentColumnSets, saveCensusScan, saveTemplateFromScan, scannedCensusSheets, templateById } from "@/features/ocr/ocr-actions";
 import { ensureProcessed } from "@/features/ocr/ocr-runner";
 import { datasetUrl } from "@/features/processing/hooks/use-document-processing";
 import { useAiFeature } from "@/stores/ai-store";
@@ -76,6 +78,8 @@ export function ReviewStep({ doc, pages, onBack, onFixPages }: ReviewStepProps) 
   const [showProblems, setShowProblems] = useState(false);
   const [naming, setNaming] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Census sheets already in the records: asked about before they're replaced.
+  const [rescanned, setRescanned] = useState<{ sheet: number; datasetName: string; updatedAt: number }[] | null>(null);
   const navigate = useNavigate();
 
   // Save corrections shortly after each change (and right away when leaving).
@@ -228,7 +232,29 @@ export function ReviewStep({ doc, pages, onBack, onFixPages }: ReviewStepProps) 
     }
   }
 
+  const census = extraction.templateId === CENSUS_TEMPLATE_ID;
+  const censusPets = census ? (extraction.tables[0]?.rows.length ?? 0) : 0;
+
+  /** Census sheets: unresolved values don't block saving — those pets are kept as Pending and not counted. */
+  async function saveCensus(replace: boolean) {
+    setSaving(true);
+    await flush();
+    const already = replace ? [] : await scannedCensusSheets(doc.id);
+    if (already.length) {
+      setSaving(false);
+      setRescanned(already);
+      return;
+    }
+    const ids = await saveCensusScan(doc.id);
+    setSaving(false);
+    if (ids.length) {
+      toast(`Saved ${censusPets} pet${censusPets === 1 ? "" : "s"} to the census records.`);
+      navigate("/census");
+    }
+  }
+
   async function save() {
+    if (census) return saveCensus(false);
     if (critical.length) {
       setShowProblems(true);
       setAttentionOnly(true);
@@ -480,7 +506,7 @@ export function ReviewStep({ doc, pages, onBack, onFixPages }: ReviewStepProps) 
             </section>
           )}
 
-          {(extraction.forms.length > 0 || extraction.templateId === "generic") && (
+          {!census && (extraction.forms.length > 0 || extraction.templateId === "generic") && (
             <button type="button" onClick={() => setNaming(true)} className="press inline-flex h-10 items-center gap-2 rounded-xl px-3 text-sm font-semibold text-salin-text ring-1 ring-salin-border hover:bg-salin-tile">
               <BookmarkPlus className="size-4" /> Save as a template
             </button>
@@ -490,7 +516,13 @@ export function ReviewStep({ doc, pages, onBack, onFixPages }: ReviewStepProps) 
 
       <StepFooter
         message={
-          critical.length > 0 ? (
+          census ? (
+            <span className="text-salin-muted">
+              {counts.needs_review + counts.unreadable + counts.missing > 0
+                ? "Pets with unchecked values are saved as Pending and left out of the official counts until they're fixed."
+                : "Everything has been checked — every pet will count as validated."}
+            </span>
+          ) : critical.length > 0 ? (
             <span className={showProblems ? "font-medium text-destructive" : "text-salin-muted"}>
               {critical.length} required value{critical.length === 1 ? " needs" : "s need"} attention — fill {critical.length === 1 ? "it" : "them"} in or mark as checked.
             </span>
@@ -506,10 +538,27 @@ export function ReviewStep({ doc, pages, onBack, onFixPages }: ReviewStepProps) 
         <button type="button" onClick={back} className={secondaryButton}>
           <ArrowLeft className="size-4" /> Back
         </button>
-        <button type="button" onClick={() => void save()} disabled={saving || drafts === 0} className={primaryButton}>
-          {saving ? <LoaderCircle className="size-4 animate-spin" /> : <Save className="size-4" />} {drafts > 1 ? `Save ${drafts} datasets` : "Save dataset"}
+        <button type="button" onClick={() => void save()} disabled={saving || (census ? censusPets === 0 : drafts === 0)} className={primaryButton}>
+          {saving ? <LoaderCircle className="size-4 animate-spin" /> : <Save className="size-4" />} {census ? "Save to census records" : drafts > 1 ? `Save ${drafts} datasets` : "Save dataset"}
         </button>
       </StepFooter>
+
+      <ConfirmDialog
+        open={rescanned !== null}
+        onOpenChange={(open) => !open && setRescanned(null)}
+        title="Already scanned"
+        description={
+          <ul className="list-disc space-y-1 pl-5">
+            {(rescanned ?? []).map((r) => (
+              <li key={r.sheet}>
+                Sheet {r.sheet} is already in “{r.datasetName}” (last saved {new Date(r.updatedAt).toLocaleString()}). Replacing it removes the earlier reading of that sheet, so it isn't counted twice.
+              </li>
+            ))}
+          </ul>
+        }
+        confirmLabel="Replace"
+        onConfirm={() => saveCensus(true)}
+      />
 
       <NameDialog
         open={naming}

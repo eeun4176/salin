@@ -20,8 +20,8 @@ export function valueState(value: ExtractedValue, spec: Pick<FieldSpec, "require
   const resolved = value.edited || value.confirmed;
   if (!value.text.trim()) {
     if (resolved && !spec.required) return "ready";
-    // A region that holds marks OCR couldn't turn into text.
-    if (!resolved && value.ocrText !== null && value.ocrText.trim() === "" && value.box && value.flags.includes("checkbox-unclear")) return "unreadable";
+    // A region that holds marks or writing that couldn't be turned into text.
+    if (!resolved && value.ocrText !== null && value.ocrText.trim() === "" && value.box && value.flags.some((f) => f === "checkbox-unclear" || f === "multiple-marks" || f === "illegible")) return "unreadable";
     return spec.required ? "missing" : "ready";
   }
   if (resolved) return "ready";
@@ -45,6 +45,7 @@ export const FLAG_TEXT: Record<ValueFlag, string> = {
   "possibly-handwritten": "Possibly handwritten — handwriting recognition is experimental.",
   "count-mismatch": "Doesn't match the number of records read.",
   illegible: "Handwriting couldn't be read reliably — type what you see in the close-up.",
+  "multiple-marks": "More than one box is marked — pick the right answer.",
 };
 
 export function describeFlags(value: ExtractedValue) {

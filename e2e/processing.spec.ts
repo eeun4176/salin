@@ -10,7 +10,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import * as XLSX from "xlsx";
 
-import { card, downloadBytes, downloadText, itemAction, openWorkspace, sample, uploadFiles, waitForOfflineReady } from "./helpers";
+import { card, detailPane, downloadBytes, downloadText, itemAction, openWorkspace, sample, uploadFiles, waitForOfflineReady } from "./helpers";
 
 async function expectReview(page: Page, name: string) {
   // Extraction runs on the device; on a busy test machine it can take a while.
@@ -99,7 +99,7 @@ test("Excel workbooks and text PDFs are read on the device, with links back to t
 
   // Extract from the file preview; a workbook goes through the guided steps first.
   await card(page, "Census.xlsx").click();
-  await page.getByRole("dialog").getByRole("button", { name: "Extract data" }).click();
+  await detailPane(page).getByRole("button", { name: "Extract data" }).click();
   await expect(page.getByRole("heading", { name: "Extract from Excel" })).toBeVisible();
   await page.getByRole("button", { name: "Next: pick sections" }).click({ timeout: 30_000 });
   await page.getByRole("button", { name: "Next sheet" }).click();

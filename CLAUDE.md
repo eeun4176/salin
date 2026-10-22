@@ -1,14 +1,14 @@
 # CLAUDE.md — Salin AI
 
 **Salin AI** — *Mula dokumento, tungo sa datos.* (From documents to data.)
-A mobile-first, local-first, account-free PWA that turns paper forms, PDFs and spreadsheets into reviewed, structured, exportable data.
+A mobile-first, local-first PWA for City Vet paravets that turns paper forms, PDFs and spreadsheets into reviewed, structured, exportable data.
 Workflow: **capture/import → parse/extract → structure → review → save → organize → search → export** (XLSX / CSV / JSON).
 
 Full product spec: `d:\MyProgrammingDictionary\SALIN Project Documentation\SALIN AI.md` (outside the repo). Phase specs live in `d:\MyProgrammingDictionary\`.
 
 ## Product rules (never break these)
 
-- **Local-first, no uploads.** Documents, drafts and datasets stay on the device (IndexedDB). No backend, no accounts, no analytics with document text, no cloud AI. Supabase / City Vet integration is a *future* phase — don't build it.
+- **Local-first, no uploads.** Documents, drafts and datasets stay on the device (IndexedDB). No backend, no analytics with document text, no cloud AI. Sign-in is checked on the device (`src/core/auth/local-auth.ts`, one temporary account) until the City Vet admin system exists; sending datasets to it is a later step — build only its UI, never a real upload.
 - **AI proposes, validation checks, the user approves.** AI output is a suggestion with a source (`rule` / `handwriting` / `ai`), never written silently into a dataset. Values not found on the page are flagged "Not found on page".
 - **AI never runs code.** Natural-language requests become a zod-validated command from a fixed list (`src/core/processing/dataset-commands.ts`): filter, sort, rename_column, change_type, summarize, normalize, set_value, find_duplicates, delete_rows, keep_columns. TypeScript executes them, after a preview, with Undo.
 - **Progressive enhancement.** Workspace, imports, exports and rule-based extraction must work with no model downloaded and on devices without WebGPU. Show "unsupported on this device" instead of failing.
@@ -53,14 +53,16 @@ src/
     processing/   parsers/, excel/, dataset-*.ts (inference, validation, transform, export, commands), value-normalizers, column-naming
     ocr/          imaging/, layout/, engine/ (Tesseract), models/ (capabilities, model-assets, model-manager), templates/, review/, benchmark/
     ai/           ai-models (pinned catalog), ai.worker, ai-runtime, handwriting, llm-tasks, grounding, suggestions
-  features/       UI per area: home, workspace, import, capture, ocr (scan workflow), processing (dataset review), ai (review assist), ai-studio, settings, backup
+    auth/         local-auth (on-device sign-in, session in the settings table)
+    census/       census-layout (CVO-CENSUS v1 sheet geometry), code-strip, omr/ (markers, OMR), census-extraction, census-records, summary-workbook, xlsx-patch
+  features/       UI per area: auth (login), home, workspace, import, capture, ocr (scan workflow), processing (dataset review), census (records, print forms), ai (review assist), ai-studio, settings, backup
   stores/         zustand stores (workspace, ocr, ai, ui, toast…)
   types/          shared domain types
 e2e/              Playwright specs
-docs/             PHASE4_OCR.md, PHASE5_AI.md, OCR_BENCHMARKS.md, benchmarks/*.json
+docs/             PHASE4_OCR.md, PHASE5_AI.md, OCR_BENCHMARKS.md, CENSUS_FORM.md, benchmarks/*.json
 ```
 
-Navigation: Home, My Workspace, AI Studio, Recents (desktop sidebar / mobile bottom nav); Favorites, Trash, Settings (sidebar / More menu); Search in header. Recents/Favorites/Trash are query views over metadata, not copies.
+Navigation: from 760px (Tailwind `nav:` breakpoint, `useDesktopLayout`) a dashboard — sidebar (`components/layout/sidebar.tsx`: New Document, Workspace/Recents/Favorites/Trash with counts, Census, AI Studio, Settings, storage, account) | list pane (340px, `@container` queries) | detail pane (`file-detail.tsx` for `?preview=`, `dataset-detail.tsx` for `?dataset=` on /datasets). Phones keep the hero, bottom nav and full-screen preview dialog. Recents/Favorites/Trash are query views over metadata, not copies. Everything but /login sits behind `RequireSession`; e2e signs in once in `e2e/auth.setup.ts`.
 
 ## On-device AI (Phase 4–5) — how it fits together
 
@@ -96,4 +98,5 @@ Navigation: Home, My Workspace, AI Studio, Recents (desktop sidebar / mobile bot
 | 1 Foundation, 2 Workspace, 3 Data processing | done |
 | 4 On-device OCR (Tesseract, capture, templates, review) | committed ("Initial Phase 4") |
 | 5 Intelligent tools & offline AI | implemented on `func/phase5`, not yet committed. Still pending: Android benchmarks, installed-PWA offline check, real handwritten forms |
-| Future | Supabase auth/sync, org integrations (City Vet) — out of scope |
+| 6 Login, dashboard workspace, CVO census OCR/OMR sheet | on `func/phase6`, not yet committed. Pending: real printed sheets on Android phones, confirm the Summary field mapping with City Vet, the send-to-admin UI |
+| Future | City Vet admin integration (real accounts, sending datasets) — build only the UI until the admin system exists |

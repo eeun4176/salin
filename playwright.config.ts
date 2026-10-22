@@ -4,12 +4,14 @@
  * `vite preview`, so the service worker and offline behaviour are the real
  * thing. Uses the installed Google Chrome by default; set PW_CHROMIUM=1 to
  * use Playwright's bundled Chromium instead (after `npx playwright install chromium`).
+ * A setup project signs in once and every other test starts from that state.
  */
 
 import { defineConfig, devices } from "@playwright/test";
 
 const PORT = 4173;
 const channel = process.env.PW_CHROMIUM ? undefined : "chrome";
+const storageState = "e2e/.auth/session.json";
 
 export default defineConfig({
   testDir: "e2e",
@@ -24,8 +26,9 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   projects: [
-    { name: "desktop", use: { ...devices["Desktop Chrome"], channel }, testIgnore: /mobile\.spec\.ts/ },
-    { name: "mobile", use: { ...devices["Pixel 7"], channel }, testMatch: /mobile\.spec\.ts/ },
+    { name: "setup", use: { ...devices["Desktop Chrome"], channel }, testMatch: /auth\.setup\.ts/ },
+    { name: "desktop", use: { ...devices["Desktop Chrome"], channel, storageState }, testIgnore: /mobile\.spec\.ts/, dependencies: ["setup"] },
+    { name: "mobile", use: { ...devices["Pixel 7"], channel, storageState }, testMatch: /mobile\.spec\.ts/, dependencies: ["setup"] },
   ],
   webServer: {
     command: `npx vite build && npx vite preview --port ${PORT} --strictPort`,

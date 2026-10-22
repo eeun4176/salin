@@ -12,7 +12,7 @@ import { join } from "node:path";
 
 import { expect, test } from "@playwright/test";
 
-import { card, createFolder, downloadText, itemAction, openWorkspace, sample, uploadFiles } from "./helpers";
+import { card, createFolder, detailPane, downloadText, itemAction, openWorkspace, sample, uploadFiles } from "./helpers";
 
 test("imported files are saved and still there after a reload", async ({ page }) => {
   await openWorkspace(page);
@@ -113,7 +113,7 @@ test("files open in a preview and download as the original bytes", async ({ page
   await uploadFiles(page, [csv, sample.png()]);
 
   await card(page, "Vaccination Log.csv").click();
-  const preview = page.getByRole("dialog");
+  const preview = detailPane(page);
   await expect(preview.getByRole("cell", { name: "Bantay" })).toBeVisible();
   const [download] = await Promise.all([page.waitForEvent("download"), preview.getByRole("button", { name: "Download" }).click()]);
   expect(download.suggestedFilename()).toBe("Vaccination Log.csv");
@@ -121,10 +121,10 @@ test("files open in a preview and download as the original bytes", async ({ page
 
   // Back closes the preview (it's part of browser history).
   await page.goBack();
-  await expect(preview).toBeHidden();
+  await expect(preview.getByText("Select a document")).toBeVisible();
 
   await card(page, "Receipt.png").click();
-  await expect(page.getByRole("dialog").getByRole("img", { name: "Receipt.png" })).toBeVisible();
+  await expect(preview.getByRole("img", { name: "Receipt.png" })).toBeVisible();
   await page.getByRole("button", { name: "Close preview" }).click();
 
   // Opening a file puts it in Recents.
@@ -159,7 +159,7 @@ test("backup, delete everything, then restore the full workspace", async ({ page
   await expect(card(page, "Census Form.pdf")).toBeVisible();
   await card(page, "Pet Registration").click();
   await card(page, "dogs.csv").click();
-  await expect(page.getByRole("dialog").getByRole("cell", { name: "Bantay" })).toBeVisible();
+  await expect(detailPane(page).getByRole("cell", { name: "Bantay" })).toBeVisible();
 });
 
 test("a damaged backup is refused and the workspace is kept", async ({ page }) => {

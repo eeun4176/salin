@@ -259,8 +259,8 @@ export function findRulingLines(mask: Uint8Array, width: number, height: number)
 ------------------------------------------------------------------- */
 
 /** Fill share above which a box counts as ticked, and below which as empty. */
-const CHECKED_FILL = 0.1;
-const EMPTY_FILL = 0.035;
+export const CHECKED_FILL = 0.1;
+export const EMPTY_FILL = 0.035;
 
 /**
  * Finds square, hollow outlines the size of a checkbox and measures how

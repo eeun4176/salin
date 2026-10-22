@@ -112,6 +112,8 @@ const ocrPageSchema = z.object({
   result: z.record(z.string(), z.unknown()).nullable(),
   resultKey: z.string().max(400).nullable(),
   layout: z.record(z.string(), z.unknown()).nullable(),
+  // What a census sheet's boxes said (kept: the flattened image is rebuilt from it).
+  census: z.record(z.string(), z.unknown()).nullable().optional(),
   state: z.enum(["pending", "done", "failed", "cancelled"]),
   error: z.string().max(2000).nullable(),
 });

@@ -66,7 +66,12 @@ export const datasetSchema = z.object({
   createdAt: timestamp,
   updatedAt: timestamp,
   lastExportedAt: timestamp.nullable(),
-  origin: z.object({ kind: z.literal("ocr"), documentId: id, templateId: z.string().min(1).max(100) }).optional(),
+  origin: z
+    .discriminatedUnion("kind", [
+      z.object({ kind: z.literal("ocr"), documentId: id, templateId: z.string().min(1).max(100) }),
+      z.object({ kind: z.literal("census"), barangay: z.string().min(1).max(100), censusDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }),
+    ])
+    .optional(),
 });
 
 export const datasetRowSchema = z.object({

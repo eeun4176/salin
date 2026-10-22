@@ -128,7 +128,7 @@ describe("datasets from scans", () => {
     expect((await getOcrDocumentOrThrow(doc.id)).extraction?.forms[0].fields.find((f) => f.key === "owner_name")?.value.text).toBe("Juan Dela Cruz");
     expect((await listSavedTemplates()).map((t) => t.id)).toEqual(["my-form"]);
     const restored = await getDatasetWithRows(dataset.id);
-    expect(restored.dataset.origin?.documentId).toBe(doc.id);
+    expect(restored.dataset.origin).toMatchObject({ kind: "ocr", documentId: doc.id });
     expect(restored.rows[0].source?.ocr?.cells).toEqual(reopened.rows[0].source?.ocr?.cells);
   });
 });

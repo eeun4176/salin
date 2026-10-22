@@ -48,7 +48,7 @@ import type { SourceReference } from "@/types/processing";
 const secondaryButton =
   "press inline-flex h-10 items-center gap-2 rounded-xl px-3.5 text-sm font-semibold text-salin-text ring-1 ring-salin-border hover:bg-salin-tile disabled:opacity-50";
 
-function SaveIndicator({ save, onRetry }: { save: SaveState; onRetry: () => void }) {
+export function SaveIndicator({ save, onRetry }: { save: SaveState; onRetry: () => void }) {
   if (save.status === "error") {
     const conflict = save.message.includes("changed somewhere else");
     return (
@@ -75,7 +75,7 @@ function SaveIndicator({ save, onRetry }: { save: SaveState; onRetry: () => void
   );
 }
 
-function ExportMenu({ onExport }: { onExport: (format: ExportFormat) => void }) {
+export function ExportMenu({ onExport }: { onExport: (format: ExportFormat) => void }) {
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger className={cn(secondaryButton, "data-[state=open]:ring-salin-primary")}>
