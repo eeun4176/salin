@@ -12,6 +12,7 @@
  */
 
 import { aiRuntime, type AiCallOptions } from "@/core/ai/ai-runtime";
+import { CENSUS_LETTER_FIELDS, CENSUS_TEMPLATE_ID, censusLetterRows, joinLetterRows, tidyCensusReading } from "@/core/census/census-extraction";
 import { runQuery } from "@/core/ai/data-query";
 import { parseQuestion, type ParsedQuestion } from "@/core/ai/question-parser";
 import type { AiModelVariant } from "@/core/ai/ai-models";
@@ -23,7 +24,8 @@ import { correctionSuggestions, fieldSuggestion, mergeSuggestions, withHandwriti
 import { refKey, reviewItems } from "@/core/ocr/review/review-state";
 import { makeValue } from "@/core/ocr/templates/field-mapping";
 import { keyFromLabel } from "@/core/ocr/templates/template-schema";
-import { cropLines } from "@/features/ai/line-crops";
+import { readOnCityVetServer, type ServerRow } from "@/core/census/city-vet-reader";
+import { cropImages, cropLines } from "@/features/ai/line-crops";
 import { ensureProcessed } from "@/features/ocr/ocr-runner";
 import type { Extraction, ExtractedField, FieldSpec, OcrPage, Suggestion, ValueRef } from "@/types/ocr";
 import type { DatasetColumn, DatasetRow } from "@/types/processing";
@@ -194,8 +196,16 @@ const HARD_FLAGS = new Set(["possibly-handwritten", "low-confidence", "unclear-c
 
 /** Values worth reading as handwriting: hard-to-read or empty boxes (template fields and table cells) not yet checked by the reviewer. */
 export function handwritingTargets(extraction: Extraction) {
+  // On census sheets every letter-box value is handwriting: printed-text OCR can be confidently wrong there.
+  const census = extraction.templateId === CENSUS_TEMPLATE_ID;
   return reviewItems(extraction).filter(
-    ({ value, spec }) => value.box && value.page && READABLE_TYPES.has(spec.type) && !value.edited && !value.confirmed && (!value.text.trim() || value.flags.some((f) => HARD_FLAGS.has(f))),
+    ({ value, spec }) =>
+      value.box &&
+      value.page &&
+      READABLE_TYPES.has(spec.type) &&
+      !value.edited &&
+      !value.confirmed &&
+      (census ? CENSUS_LETTER_FIELDS.has(spec.key) : !value.text.trim() || value.flags.some((f) => HARD_FLAGS.has(f))),
   );
 }
 
@@ -215,15 +225,62 @@ export async function readHandwriting(extraction: Extraction, pages: OcrPage[], 
   let done = 0;
   for (const [pageNumber, items] of byPage) {
     const page = pages[pageNumber - 1];
-    const blob = page ? await ensureProcessed(page) : null;
+    // Census sheets keep a copy without box lines, which the reader would take for 1s and Is.
+    const blob = page ? (page.handwriting ?? (await ensureProcessed(page))) : null;
     if (!blob) continue;
-    const crops = await cropLines(blob, items.map((i) => i.value.box!));
+    // Census letter boxes are read row by row, one character per written box; other values as one line.
+    const plans = items.map((item) => censusLetterRows(extraction, pages, item.ref) ?? [{ box: item.value.box!, slots: undefined, allowed: undefined }]);
+    const rows = plans.flat();
+    const crops = await cropLines(blob, rows.map((r) => r.box), rows.map((r) => r.slots), rows.map((r) => r.allowed), rows.map((r) => ("gaps" in r ? r.gaps : undefined)));
     const results = await aiRuntime.readLines(crops, {
       ...options,
       onProgress: (p) => options.onProgress?.({ ...p, fraction: (done + (p.fraction ?? 0) * items.length) / targets.length }),
     });
     done += items.length;
-    results.forEach((r, i) => !r.empty && readings.push({ ref: items[i].ref, text: r.text, confidence: r.confidence }));
+    let at = 0;
+    plans.forEach((plan, i) => {
+      const parts = results.slice(at, (at += plan.length));
+      if (parts.every((r) => r.empty)) return;
+      const read = parts.filter((r) => !r.empty);
+      const text = plan[0].slots ? joinLetterRows(extraction, pages, items[i].ref, read.map((r) => r.text)) : tidyCensusReading(extraction, pages, items[i].ref, read[0].text);
+      readings.push({ ref: items[i].ref, text, confidence: Math.min(...read.map((r) => r.confidence)) });
+    });
+  }
+  const offered = (withHandwritingReadings(extraction, readings).suggestions ?? []).filter((s) => s.source === "handwriting" && s.status === "pending").length;
+  return { apply: (current) => withHandwritingReadings(current, readings), read: readings.length, offered };
+}
+
+/**
+ * Census sheets, online: sends only the written letter-box rows to the City
+ * Vet server's reader (see city-vet-reader.ts). Readings that fit their boxes
+ * come back as suggestions, like the on-device reader's.
+ */
+export async function readOnCityVet(extraction: Extraction, pages: OcrPage[], options: AiCallOptions = {}): Promise<AiResult & { read: number }> {
+  const rows: ServerRow[] = [];
+  const plans = new Map<string, { ref: ValueRef; slots: { spaceBefore: boolean }[][] }>();
+  for (const item of handwritingTargets(extraction)) {
+    const plan = censusLetterRows(extraction, pages, item.ref);
+    const page = pages[item.value.page! - 1];
+    const blob = page ? (page.handwriting ?? (await ensureProcessed(page))) : null;
+    if (!plan?.length || !blob) continue;
+    const images = await cropImages(blob, plan.map((r) => r.box));
+    const key = refKey(item.ref);
+    // Letter boxes: the reading must have one character per written box. Open lines: any length (boxes 0).
+    plan.forEach((row, k) => rows.push({ id: `${key}#${k}`, image: images[k], boxes: row.slots.length, allowed: row.allowed }));
+    plans.set(key, { ref: item.ref, slots: plan.map((r) => r.slots) });
+  }
+  const results = new Map((await readOnCityVetServer(rows, { signal: options.signal })).map((r) => [r.id, r]));
+  const readings: HandwritingReading[] = [];
+  for (const [key, { ref, slots }] of plans) {
+    const parts = slots.map((_, k) => results.get(`${key}#${k}`));
+    if (parts.some((p) => !p)) continue;
+    // Spaces where the sheet has empty boxes, whatever spacing the server used.
+    const texts = parts.map((p, k) => {
+      if (!slots[k].length) return p!.text.replace(/\s+/g, " ").trim();
+      const chars = [...p!.text.replace(/\s+/g, "")];
+      return slots[k].map((slot, i) => (slot.spaceBefore ? " " : "") + chars[i]).join("");
+    });
+    readings.push({ ref, text: joinLetterRows(extraction, pages, ref, texts), confidence: Math.min(...parts.map((p) => p!.confidence)) });
   }
   const offered = (withHandwritingReadings(extraction, readings).suggestions ?? []).filter((s) => s.source === "handwriting" && s.status === "pending").length;
   return { apply: (current) => withHandwritingReadings(current, readings), read: readings.length, offered };

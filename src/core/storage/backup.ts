@@ -183,7 +183,7 @@ export async function createBackupArchive(now = new Date()): Promise<Blob> {
     // Results, layouts and reviews are validated loosely (shape, not every field) on restore.
     ocrDocuments: ocrDocuments as BackupManifest["ocrDocuments"],
     // Images are dropped (undefined isn't written to JSON): they're rebuilt from the originals.
-    ocrPages: ocrPages.map((page) => ({ ...page, source: undefined, processed: undefined })) as BackupManifest["ocrPages"],
+    ocrPages: ocrPages.map((page) => ({ ...page, source: undefined, processed: undefined, handwriting: undefined })) as BackupManifest["ocrPages"],
     templates,
   };
 

@@ -9,7 +9,6 @@ import { describe, expect, it } from "vitest";
 
 import { censusExtraction } from "@/core/census/census-extraction";
 import { censusGroups } from "@/core/census/census-records";
-import { FORM_VERSION } from "@/core/census/code-strip";
 import { readFlatSheet, SHEET_SCALE } from "@/core/census/omr/read-sheet";
 import { createOcrDocument, getOcrDocumentOrThrow } from "@/core/storage/repositories/ocr.repository";
 import { getDatasetWithRows } from "@/core/storage/repositories/dataset.repository";
@@ -20,7 +19,7 @@ import { findScannedSheets, listCensusDatasets, saveCensusGroups } from "./censu
 const pages = [{ page: 1, fileId: "f1", pdfPage: null, width: 216 * SHEET_SCALE, height: 330 * SHEET_SCALE }];
 
 function groupsFor(sheetNumber: number) {
-  const read = readFlatSheet(drawSheet({ code: { version: FORM_VERSION, continuation: false, barangay: 0, censusDate: "2026-10-22", sheetNumber }, answers: { "pet0.type": "CAT", "pet0.sex": "FEMALE" } }))!;
+  const read = readFlatSheet(drawSheet({ code: { version: 1, continuation: false, barangay: 0, censusDate: "2026-10-22", sheetNumber }, answers: { "pet0.type": "CAT", "pet0.sex": "FEMALE" } }))!;
   return censusGroups(censusExtraction([{ page: 1, read, lines: [] }]), "doc", pages);
 }
 

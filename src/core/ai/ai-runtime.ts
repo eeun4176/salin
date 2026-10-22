@@ -20,6 +20,8 @@ import { keyOf, MODEL_CACHE } from "@/core/ocr/models/model-manager";
 export type { LineCrop };
 
 const IDLE_SHUTDOWN_MS = 60_000;
+/** A handwriting read whose worker says nothing for this long has stalled (it reports after every line). */
+export const READ_STALL_MS = 45_000;
 
 /** A worker request before it gets its id. */
 type Request = AiWorkerRequest extends infer R ? (R extends unknown ? Omit<R, "id"> : never) : never;
@@ -113,16 +115,27 @@ export function createAiRuntime(makeWorker: () => WorkerLike = defaultWorker, be
     }, IDLE_SHUTDOWN_MS);
   }
 
-  /** Sends one request after any request already running; cancelling stops the worker. */
-  function call<T>(request: Request, options: AiCallOptions = {}): Promise<T> {
+  /**
+   * Sends one request after any request already running; cancelling stops the
+   * worker. With `stallMs`, a worker that goes silent that long (no progress,
+   * no answer) is stopped and the request fails, rather than waiting forever.
+   */
+  function call<T>(request: Request, options: AiCallOptions = {}, stallMs?: number): Promise<T> {
     const task = () =>
       new Promise<T>((resolve, reject) => {
         const { signal } = options;
         if (signal?.aborted) return reject(signal.reason ?? new DOMException("Aborted", "AbortError"));
         const id = nextId++;
         running++;
+        let stall: ReturnType<typeof setTimeout> | null = null;
+        const watch = () => {
+          if (!stallMs) return;
+          if (stall) clearTimeout(stall);
+          stall = setTimeout(() => stop(new AiError("failed", MESSAGES.failed)), stallMs);
+        };
         const done = () => {
           running--;
+          if (stall) clearTimeout(stall);
           signal?.removeEventListener("abort", onAbort);
           scheduleShutdown();
         };
@@ -131,8 +144,9 @@ export function createAiRuntime(makeWorker: () => WorkerLike = defaultWorker, be
         pending.set(id, {
           resolve: (value) => (done(), resolve(value as T)),
           reject: (error) => (done(), reject(error)),
-          onProgress: options.onProgress,
+          onProgress: (progress) => (watch(), options.onProgress?.(progress)),
         });
+        watch();
         try {
           getWorker().postMessage({ ...request, id } as AiWorkerRequest, request.type === "read-lines" ? request.crops.map((c) => c.pixels.buffer as ArrayBuffer) : []);
         } catch (error) {
@@ -152,7 +166,7 @@ export function createAiRuntime(makeWorker: () => WorkerLike = defaultWorker, be
     id: "transformers.js",
     label: "Transformers.js + ONNX Runtime Web",
     readLines: (crops, options) =>
-      call({ type: "read-lines", cacheName: MODEL_CACHE, runtimeKey: runtimeKeyOf(handwriting), modelKey: keyOf(handwriting.assets.find((a) => a.id !== "ai-runtime")!), crops }, options),
+      call({ type: "read-lines", cacheName: MODEL_CACHE, runtimeKey: runtimeKeyOf(handwriting), modelKey: keyOf(handwriting.assets.find((a) => a.id !== "ai-runtime")!), crops }, options, READ_STALL_MS),
     generate: async (messages, variant, options = {}) => {
       await beforeAssistant();
       if (variant.webllm) {

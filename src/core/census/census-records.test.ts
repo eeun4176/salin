@@ -8,17 +8,18 @@
 
 import { describe, expect, it } from "vitest";
 
-import { CENSUS_LAYOUT } from "@/core/census/census-layout";
-import { FORM_VERSION, type SheetCode } from "@/core/census/code-strip";
+import { layoutFor } from "@/core/census/census-layout";
+import type { SheetCode } from "@/core/census/code-strip";
 import { readFlatSheet, SHEET_SCALE } from "@/core/census/omr/read-sheet";
 import { confirmValue } from "@/core/ocr/review/review-state";
 import { drawSheet, type SheetFill } from "@/test/census-fixtures";
 import type { OcrLine } from "@/types/ocr";
 
-import { censusExtraction, letterBoxText } from "./census-extraction";
+import { censusExtraction, censusLetterRows, letterBoxText, tidyCensusReading } from "./census-extraction";
 import { censusDatasetName, censusGroups, COLUMN, mergeCensusContent } from "./census-records";
 
-const code: SheetCode = { version: FORM_VERSION, continuation: false, barangay: 6, censusDate: "2026-10-22", sheetNumber: 7 };
+const CENSUS_LAYOUT = layoutFor(1);
+const code: SheetCode = { version: 1, continuation: false, barangay: 6, censusDate: "2026-10-22", sheetNumber: 7 };
 const pages = [{ page: 1, fileId: "f1", pdfPage: null, width: 216 * SHEET_SCALE, height: 330 * SHEET_SCALE }];
 
 /** OCR "words" sitting in the first row of a letter-box field. */
@@ -45,6 +46,16 @@ describe("letterBoxText", () => {
     // Letters and boxes disagree: keep the recognised words as they are.
     expect(letterBoxText(["JUAN", "D3LA!"], inked, false)).toBe("JUAN D3LA");
     expect(letterBoxText(["O9I7-555-I234"], [], true)).toBe("09175551234");
+  });
+});
+
+describe("tidyCensusReading", () => {
+  it("spaces and formats handwriting readings by the sheet's written-in boxes", () => {
+    const read = readFlatSheet(drawSheet({ code, answers: pet0, writing: { "owner.owner_name": [0, 1, 2, 4, 5, 6], "owner.contact": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] } }))!;
+    const extraction = censusExtraction([{ page: 1, read, lines: [] }]);
+    const tidy = (id: string, text: string) => tidyCensusReading(extraction, [{ census: read }], { kind: "form", group: 0, id }, text);
+    expect(tidy("owner_name", "iancar")).toBe("IAN CAR");
+    expect(tidy("contact", "0 9 3 0 7 81 06 12")).toBe("0930-781-0612");
   });
 });
 
@@ -124,5 +135,42 @@ describe("census records", () => {
     // Scanning sheet 7 again replaces its row instead of adding a second one.
     merged = mergeCensusContent(merged, main);
     expect(merged.rows).toHaveLength(2);
+  });
+});
+
+describe("v2 sheets", () => {
+  const v2: SheetCode = { ...code, version: 2 };
+  const layout = layoutFor(2);
+  /** An OCR word anywhere on an open line (sheet px). */
+  const onLine = (row: { x: number; y: number; width: number; height: number }, text: string, at: number): OcrLine => {
+    const box = { x: (row.x + 2 + at * 4.5) * SHEET_SCALE, y: row.y * SHEET_SCALE, width: text.length * 4.5 * SHEET_SCALE, height: row.height * SHEET_SCALE };
+    return { text, confidence: 92, box, block: 0, words: [{ text, confidence: 92, box, unclear: "" }] };
+  };
+
+  it("reads open lines as written, and color and registered year from tick boxes", () => {
+    const read = readFlatSheet(
+      drawSheet({ code: v2, answers: { ...pet0, "pet0.color": "MIXED/SPOTTED", "pet0.registered": "YEAR-2" }, writing: { "owner.owner_name": [0, 1, 2, 3, 5, 6, 7, 8], "pet0.pet_name": [0, 1, 2, 3, 4, 5] } }),
+    )!;
+    const ownerLine = layout.owner[0].rows[0][0];
+    const petLine = layout.pets[0].writeIns[0].rows[0][0];
+    const extraction = censusExtraction([{ page: 1, read, lines: [onLine(ownerLine, "juan", 0), onLine(ownerLine, "DELA", 5), onLine(petLine, "BANTAY", 0)] }]);
+    expect(extraction.forms[0].fields.find((f) => f.key === "owner_name")?.value.text).toBe("JUAN DELA");
+    const pet = extraction.tables[0].rows[0].cells;
+    expect([pet.pet_name.text, pet.color.text, pet.registered.text, pet.age_years.text]).toEqual(["BANTAY", "Mixed/spotted", "2024", "2"]);
+  });
+
+  it("reads 'Earlier' and 'Not yet' as words, not years", () => {
+    const earlier = censusExtraction([{ page: 1, read: readFlatSheet(drawSheet({ code: v2, answers: { ...pet0, "pet0.registered": "EARLIER" } }))!, lines: [] }]);
+    expect(earlier.tables[0].rows[0].cells.registered.text).toBe("Before 2019");
+    const notYet = censusExtraction([{ page: 1, read: readFlatSheet(drawSheet({ code: v2, answers: { ...pet0, "pet0.registered": "NOT YET" } }))!, lines: [] }]);
+    expect(notYet.tables[0].rows[0].cells.registered.text).toBe("Not registered");
+  });
+
+  it("hands open lines to the handwriting reader as whole lines, the contact number box by box", () => {
+    const read = readFlatSheet(drawSheet({ code: v2, answers: pet0, writing: { "owner.owner_name": [0, 1, 2], "owner.contact": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] } }))!;
+    const extraction = censusExtraction([{ page: 1, read, lines: [] }]);
+    const rows = (id: string) => censusLetterRows(extraction, [{ census: read }], { kind: "form", group: 0, id });
+    expect(rows("owner_name")).toEqual([expect.objectContaining({ box: expect.any(Object), slots: [], allowed: expect.stringContaining(" "), gaps: expect.any(Array) })]);
+    expect(rows("contact")?.[0].slots).toHaveLength(11);
   });
 });

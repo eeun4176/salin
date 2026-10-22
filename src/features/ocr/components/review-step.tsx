@@ -37,7 +37,7 @@ import { updateOcrDocument } from "@/core/storage/repositories/ocr.repository";
 import { PageViewer, type Overlay, type OverlayTone, type PickableWord } from "@/features/ocr/components/page-viewer";
 import { FieldRow, RecordTable, StateChip } from "@/features/ocr/components/review-parts";
 import { findFields } from "@/features/ai/ai-actions";
-import { AiTools, SuggestionCard, SuggestionsPanel } from "@/features/ai/components/review-assist";
+import { AiTools, CensusReaderPrompt, CityVetReader, SuggestionCard, SuggestionsPanel } from "@/features/ai/components/review-assist";
 import { useAiRun } from "@/features/ai/use-ai-run";
 import { TemplateHint } from "@/features/ocr/components/template-hint";
 import { acceptSuggestion, pendingSuggestions, refLabel, rejectSuggestion } from "@/core/ai/suggestions";
@@ -406,6 +406,8 @@ export function ReviewStep({ doc, pages, onBack, onFixPages }: ReviewStepProps) 
             )}
           </ColumnsBar>
           <AiTools extraction={extraction} pages={pages} generic={extraction.templateId === "generic"} onResult={change} />
+          {census && <CensusReaderPrompt extraction={extraction} pages={pages} onResult={change} />}
+          {census && <CityVetReader extraction={extraction} pages={pages} onResult={change} />}
           <SuggestionsPanel extraction={extraction} pageImage={pageImage} onChange={change} onSelect={(key) => setSelected(key)} />
           {extraction.forms.map((form, g) => {
             const fields = form.fields.filter((f) => visible(valueState(f.value, f)));

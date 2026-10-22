@@ -6,7 +6,7 @@
  * table, optionally turned. No canvas needed, so the OMR runs in unit tests.
  */
 
-import { CENSUS_LAYOUT, PAGE, type Rect } from "@/core/census/census-layout";
+import { layoutFor, PAGE, type Rect } from "@/core/census/census-layout";
 import { encodeSheetCode, type SheetCode } from "@/core/census/code-strip";
 import { createGray, rotateQuarter, warpPerspective, type GrayImage } from "@/core/ocr/imaging/pixels";
 
@@ -16,7 +16,7 @@ export interface SheetFill {
   answers?: Record<string, string | string[]>;
   /** Faint smudges (too light to be a tick) in these options. */
   faint?: Record<string, string>;
-  /** Letter boxes to ink, by "owner.owner_name" → cell indexes of the first row. */
+  /** Writing to ink, by "owner.owner_name" → cell indexes of the first row (on an open line: letter positions along it). */
   writing?: Record<string, number[]>;
   emptySlots?: number[];
 }
@@ -47,7 +47,7 @@ function tick(img: GrayImage, r: Rect, scale: number, value = 20) {
 
 /** The flat sheet at `scale` px per mm. */
 export function drawSheet(fill: SheetFill, scale = 8): GrayImage {
-  const layout = CENSUS_LAYOUT;
+  const layout = layoutFor(fill.code.version);
   const img = createGray(PAGE.width * scale, PAGE.height * scale, 250);
   layout.markers.forEach((m) => fillRect(img, m, scale));
   fillRect(img, layout.hollowMarker, scale, 250);
@@ -75,7 +75,8 @@ export function drawSheet(fill: SheetFill, scale = 8): GrayImage {
   const letters = (key: string, rows: Rect[][]) => {
     rows.flat().forEach((cell) => outline(img, cell, scale, 120));
     for (const i of fill.writing?.[key] ?? []) {
-      const c = rows[0][i];
+      // An open line is one long box: letters go one after another along it.
+      const c = rows[0].length === 1 ? { ...rows[0][0], x: rows[0][0].x + 2 + i * 4.5, width: 4.5 } : rows[0][i];
       fillRect(img, { x: c.x + c.width * 0.3, y: c.y + c.height * 0.25, width: c.width * 0.35, height: c.height * 0.5 }, scale, 25);
     }
   };

@@ -49,23 +49,21 @@ async function filledPhoto(browser: Browser, svg: string): Promise<SampleFile> {
       const y = Number(t.getAttribute("y")) - 3.5;
       add("path", { d: `M${x + 0.6} ${y + 2.4} L${x + 1.9} ${y + 3.9} L${x + 4} ${y + 0.5}`, stroke: "#123", "stroke-width": 0.55, fill: "none", "stroke-linecap": "round" });
     };
-    const letterBoxes = [...svg.querySelectorAll('rect[stroke="#8a8f8c"]')];
-    const write = (from: number, letters: string) =>
-      [...letters].forEach((ch, i) => {
-        if (ch === " ") return;
-        const r = letterBoxes[from + i];
-        add("text", { x: Number(r.getAttribute("x")) + 3.1, y: Number(r.getAttribute("y")) + 5.2, "font-size": 4.6, "font-family": "Arial", "font-weight": 700, "text-anchor": "middle", fill: "#1a2a5a" }, ch);
-      });
+    // v2: the owner's name goes on its open line (the first rounded one), written naturally.
+    const ownerLine = svg.querySelector('rect[stroke="#8a8f8c"][rx]')!;
+    const writeLine = (text: string) =>
+      add("text", { x: Number(ownerLine.getAttribute("x")) + 3, y: Number(ownerLine.getAttribute("y")) + 5, "font-size": 4.6, "font-family": "Arial", "font-weight": 700, "letter-spacing": 0.6, fill: "#1a2a5a" }, text);
     const bubbles = [...svg.querySelectorAll("circle")];
     const fill = (i: number) => add("circle", { cx: bubbles[i].getAttribute("cx")!, cy: bubbles[i].getAttribute("cy")!, r: 1.6, fill: "#123" });
 
-    write(0, "JUAN CRUZ");
-    // Pet 1: a male dog, 3 years old, first vaccination, free roaming.
+    writeLine("JUAN CRUZ");
+    // Pet 1: a male dog, 3 years old (one row of 0–20+ bubbles), first vaccination, free roaming, brown.
+    tick("BROWN", 0);
     tick("DOG", 0);
     tick("MALE", 0);
     tick("1ST", 0);
     tick("FREE ROAMING", 0);
-    fill(4 + 3);
+    fill(3);
     // Pet 2: both Dog and Cat ticked — must not be guessed.
     tick("DOG", 1);
     tick("CAT", 1);
@@ -92,8 +90,12 @@ async function scan(page: Page, fileName: string) {
   await expect(page).toHaveURL(/\/scans\/[\w-]+$/, { timeout: 30_000 });
   const read = page.getByRole("button", { name: /^Read (page|\d+ pages)$/ });
   // A new scan starts reading by itself once the recognition files are on the device.
-  if (await read.isVisible().catch(() => false)) await read.click();
-  await expect(page.getByRole("checkbox", { name: "Only show what needs a look" })).toBeVisible({ timeout: 180_000 });
+  const review = page.getByRole("checkbox", { name: "Only show what needs a look" });
+  // The button is enabled once the device check is done; it's gone while reading.
+  await expect(async () => {
+    if ((await read.isVisible()) && (await read.isEnabled())) await read.click();
+    await expect(review).toBeVisible({ timeout: 15_000 });
+  }).toPass({ timeout: 180_000 });
 }
 
 test("a printed census sheet is scanned, reviewed, counted once, and exported to the official workbook", async ({ page, browser }) => {

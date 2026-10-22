@@ -59,12 +59,56 @@ function darkBlobs(image: GrayImage, minSide: number, maxSide: number): Blob[] {
         }
       }
     }
+    // Solid pieces only; a marker may arrive in pieces (joined below).
     const w = blob.maxX - blob.minX + 1;
     const h = blob.maxY - blob.minY + 1;
-    const fill = blob.count / (w * h);
-    if (w >= minSide && h >= minSide && w <= maxSide && h <= maxSide && w / h > 0.6 && w / h < 1.67 && fill > 0.6) blobs.push(blob);
+    if (Math.max(w, h) >= minSide / 2 && w <= maxSide && h <= maxSide && blob.count / (w * h) > 0.6) blobs.push(blob);
   }
-  return blobs;
+  return joinSplit(blobs).filter((b) => {
+    const w = b.maxX - b.minX + 1;
+    const h = b.maxY - b.minY + 1;
+    return w >= minSide && h >= minSide && w <= maxSide && h <= maxSide && w / h > 0.6 && w / h < 1.67 && b.count / (w * h) > 0.6;
+  });
+}
+
+/**
+ * Joins solid pieces stacked (or side by side) with only a thin gap: printers
+ * and scanners often leave a light line through a corner square.
+ */
+function joinSplit(blobs: Blob[]): Blob[] {
+  const pieces = [...blobs];
+  for (let merged = true; merged; ) {
+    merged = false;
+    for (let i = 0; i < pieces.length && !merged; i++) {
+      for (let j = i + 1; j < pieces.length && !merged; j++) {
+        const a = pieces[i];
+        const b = pieces[j];
+        const overlapX = Math.min(a.maxX, b.maxX) - Math.max(a.minX, b.minX) + 1;
+        const overlapY = Math.min(a.maxY, b.maxY) - Math.max(a.minY, b.minY) + 1;
+        const gapX = Math.max(a.minX, b.minX) - Math.min(a.maxX, b.maxX) - 1;
+        const gapY = Math.max(a.minY, b.minY) - Math.min(a.maxY, b.maxY) - 1;
+        const narrow = Math.min(a.maxX - a.minX, b.maxX - b.minX) + 1;
+        const short = Math.min(a.maxY - a.minY, b.maxY - b.minY) + 1;
+        const wide = Math.max(a.maxX - a.minX, b.maxX - b.minX) + 1;
+        const tall = Math.max(a.maxY - a.minY, b.maxY - b.minY) + 1;
+        const stacked = overlapX >= 0.85 * wide && narrow >= 0.85 * wide && gapY >= 0 && gapY <= Math.max(2, 0.2 * wide);
+        const sideBySide = overlapY >= 0.85 * tall && short >= 0.85 * tall && gapX >= 0 && gapX <= Math.max(2, 0.2 * tall);
+        if (!stacked && !sideBySide) continue;
+        pieces[i] = {
+          minX: Math.min(a.minX, b.minX),
+          minY: Math.min(a.minY, b.minY),
+          maxX: Math.max(a.maxX, b.maxX),
+          maxY: Math.max(a.maxY, b.maxY),
+          count: a.count + b.count,
+          sumX: a.sumX + b.sumX,
+          sumY: a.sumY + b.sumY,
+        };
+        pieces.splice(j, 1);
+        merged = true;
+      }
+    }
+  }
+  return pieces;
 }
 
 /** Is the blob's middle (a third of its size) paper? */

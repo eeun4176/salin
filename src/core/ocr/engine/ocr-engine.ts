@@ -3,7 +3,8 @@
  * The contract every on-device recognition engine implements, so the rest
  * of Salin doesn't depend on one library: start it with a profile and
  * languages, read an image (whole page, or sparse text for forms) into lines
- * and words with boxes and confidence, and shut it down. Also converts the
+ * and words with boxes and confidence, read one line of text in each of
+ * given boxes (letter-box rows on printed forms), and shut it down. Also converts the
  * Tesseract result shape into Salin's OCR types.
  */
 
@@ -27,6 +28,13 @@ export interface ReadOptions {
   onProgress?: (fraction: number) => void;
 }
 
+/** The text read in one box: "" when nothing allowed was recognised. */
+export interface RegionRead {
+  text: string;
+  /** 0–100. */
+  confidence: number;
+}
+
 export interface RawRecognition {
   lines: OcrLine[];
   text: string;
@@ -40,6 +48,8 @@ export interface OcrEngine {
   /** False once terminated (e.g. after a cancel); a new engine must be started. */
   readonly alive: boolean;
   read(image: Blob, options: ReadOptions): Promise<RawRecognition>;
+  /** Reads one line of text inside each box (pixels) of the image, using only the `allowed` characters. */
+  readRegions(image: Blob, boxes: Box[], allowed: string, signal?: AbortSignal): Promise<RegionRead[]>;
   terminate(): Promise<void>;
 }
 

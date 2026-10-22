@@ -1,16 +1,22 @@
 /**
- * Census Sheet Layout (CVO-CENSUS v1)
+ * Census Sheet Layouts (CVO-CENSUS v1 and v2)
  * Where everything sits on the printed Dog & Cat working sheet, in
  * millimetres on long bond paper (216 × 330 mm). Printing draws from it and
  * scanning reads from it, so the two always agree: four corner markers to
  * find and straighten the page, the code strip (barangay, date, sheet
- * number), letter boxes for handwriting, and well-spaced tick boxes and
+ * number, form version), handwriting fields, and well-spaced tick boxes and
  * number bubbles that are read by how much ink is inside them. One owner
- * and three pets per sheet; a continuation sheet carries pets 4–6. Never
- * move anything within a version — print a new version instead.
+ * and three pets per sheet; a continuation sheet carries pets 4–6.
+ *
+ * v1 uses one letter box per character everywhere. v2 (printed now) keeps
+ * boxes only for the contact number; names, address and remarks are open
+ * writing lines, Color is tick boxes, age is one row of bubbles and
+ * Registered In is a row of years. Markers and the code strip sit in the
+ * same place in every version, so any sheet says which layout it uses.
+ * Never move anything within a version — add a new version instead.
  */
 
-import { CODE_BITS } from "@/core/census/code-strip";
+import { CODE_BITS, FORM_VERSION } from "@/core/census/code-strip";
 
 export interface Rect {
   x: number;
@@ -29,12 +35,16 @@ export interface Caption {
   anchor?: "start" | "middle" | "end";
 }
 
-/** A row (or rows) of letter boxes, one capital letter or digit per box. */
+/**
+ * Handwriting: rows of letter boxes (one capital letter or digit per box),
+ * or open writing lines (`open`: each row is a single box spanning the line).
+ */
 export interface WriteIn {
   key: string;
   label: string;
   rows: Rect[][];
   digits?: boolean;
+  open?: boolean;
 }
 
 /** Tick boxes where exactly one answer is expected. */
@@ -82,6 +92,8 @@ export interface CensusLayout {
 }
 
 export const PAGE = { width: 216, height: 330 };
+/** Registered In on v2: option values that stand for years counted back from the census year. */
+export const YEAR_OPTION = /^YEAR-(\d)$/;
 const MARKER = 9;
 const MARKER_INSET = 8;
 const LEFT = 15;
@@ -94,6 +106,8 @@ const BUBBLE_PITCH = 5.2;
 const CAPTION = 2.3;
 const OPTION = 2.5;
 const PET_HEIGHT = 70;
+const PET_HEIGHT_V2 = 72;
+const LINE_H = 6.5;
 const PET_GAP = 1.5;
 
 /** Approximate width of capital text in mm (Inter semibold), so option labels never collide. */
@@ -111,6 +125,12 @@ function cellRow(x: number, y: number, count: number, gapsAfter: number[] = []):
   return cells;
 }
 
+/** An open writing line (or lines), `width` mm wide. */
+function openLine(captions: Caption[], key: string, label: string, x: number, y: number, width: number, lines = 1, height = LINE_H): WriteIn {
+  captions.push({ x, y: y - 0.9, text: label, size: CAPTION, bold: true });
+  return { key, label, open: true, rows: Array.from({ length: lines }, (_, i) => [rect(x, y + i * (height + 1), width, height)]) };
+}
+
 function writeIn(captions: Caption[], key: string, label: string, x: number, y: number, count: number, lines = 1, digits = false): WriteIn {
   captions.push({ x, y: y - 0.9, text: label, size: CAPTION, bold: true });
   const rows = Array.from({ length: lines }, (_, i) => cellRow(x, y + i * (CELL_H + 1), count, digits && count === 11 ? [3, 6] : []));
@@ -124,7 +144,8 @@ function choices(captions: Caption[], key: string, label: string, x: number, y: 
   const options = values.map((value) => {
     const box = rect(at, y, BOX, BOX);
     captions.push({ x: at + BOX + 1.2, y: y + BOX - 1, text: value, size: OPTION });
-    at += BOX + 1.2 + textWidth(value, OPTION) + 4;
+    // Year options print as four digits, not their placeholder.
+    at += BOX + 1.2 + textWidth(YEAR_OPTION.test(value) ? "0000" : value, OPTION) + 4;
     return { value, box };
   });
   return [{ key, label, options }, at + 3];
@@ -138,6 +159,37 @@ function bubbles(captions: Caption[], x: number, y: number, count: number, first
     return rect(bx, y, BUBBLE, BUBBLE);
   });
 }
+
+/** Tick-box lines of a pet block; throws if one runs past the margin (caught by the layout tests). */
+function choiceLines(captions: Caption[], lines: [number, [string, string, string[]][]][]): ChoiceGroup[] {
+  const groups: ChoiceGroup[] = [];
+  for (const [y, specs] of lines) {
+    let x = LEFT;
+    for (const [key, label, values] of specs) {
+      const [group, next] = choices(captions, key, label, x, y, values);
+      groups.push(group);
+      x = next;
+    }
+    if (x - 3 > RIGHT) throw new Error(`Census layout: line at ${y} mm is too wide.`);
+  }
+  return groups;
+}
+
+const PET_CHOICES: [string, string, string[]][][] = [
+  [
+    ["type", "TYPE OF PET", ["DOG", "CAT"]],
+    ["sex", "SEX", ["MALE", "FEMALE"]],
+    ["sterilized", "STERILIZED", ["YES", "NO", "UNKNOWN"]],
+  ],
+  [
+    ["breed", "BREED", ["MONGREL MIX", "MIX", "PURE", "UNKNOWN"]],
+    ["classification", "CLASSIFICATION", ["CONFINED", "SEMI-CONFINED", "FREE ROAMING"]],
+  ],
+  [
+    ["vaccination", "VACCINATION STATUS", ["1ST", "2ND", "3RD", "BOOSTER", "NONE", "UNKNOWN"]],
+    ["laps", "LAPS (SKIPPED A VACCINE)", ["YES", "NO", "UNKNOWN"]],
+  ],
+];
 
 function petBlock(slot: number, top: number, captions: Caption[], frames: Rect[]): PetBlock {
   frames.push(rect(LEFT - 2, top, RIGHT - LEFT + 4, PET_HEIGHT));
@@ -159,28 +211,10 @@ function petBlock(slot: number, top: number, captions: Caption[], frames: Rect[]
     { key: "age_months", label: "Age (months)", base: 0, places: [{ weight: 1, bubbles: months }] },
   ];
 
-  const groups: ChoiceGroup[] = [];
-  const line = (y: number, specs: [string, string, string[]][]) => {
-    let x = LEFT;
-    for (const [key, label, values] of specs) {
-      const [group, next] = choices(captions, key, label, x, y, values);
-      groups.push(group);
-      x = next;
-    }
-    if (x - 3 > RIGHT) throw new Error(`Census layout: line at ${y} mm is too wide.`);
-  };
-  line(top + 28, [
-    ["type", "TYPE OF PET", ["DOG", "CAT"]],
-    ["sex", "SEX", ["MALE", "FEMALE"]],
-    ["sterilized", "STERILIZED", ["YES", "NO", "UNKNOWN"]],
-  ]);
-  line(top + 36.5, [
-    ["breed", "BREED", ["MONGREL MIX", "MIX", "PURE", "UNKNOWN"]],
-    ["classification", "CLASSIFICATION", ["CONFINED", "SEMI-CONFINED", "FREE ROAMING"]],
-  ]);
-  line(top + 45, [
-    ["vaccination", "VACCINATION STATUS", ["1ST", "2ND", "3RD", "BOOSTER", "NONE", "UNKNOWN"]],
-    ["laps", "LAPS (SKIPPED A VACCINE)", ["YES", "NO", "UNKNOWN"]],
+  const groups = choiceLines(captions, [
+    [top + 28, PET_CHOICES[0]],
+    [top + 36.5, PET_CHOICES[1]],
+    [top + 45, PET_CHOICES[2]],
   ]);
 
   // Registered In: 20__ as two bubble rows side by side.
@@ -198,7 +232,47 @@ function petBlock(slot: number, top: number, captions: Caption[], frames: Rect[]
   return { slot, frame: rect(LEFT - 2, top, RIGHT - LEFT + 4, PET_HEIGHT), titleAt: { x: LEFT, y: top + 3.8 }, notApplicable, writeIns, choices: groups, numbers };
 }
 
-export function buildCensusLayout(): CensusLayout {
+/**
+ * v2 pet block: open lines for the name, other vaccines and remarks; age as
+ * one row (0–20+ years, 0–11 months); Color and Registered In as tick boxes.
+ */
+function petBlockV2(slot: number, top: number, captions: Caption[], frames: Rect[]): PetBlock {
+  frames.push(rect(LEFT - 2, top, RIGHT - LEFT + 4, PET_HEIGHT_V2));
+  const notApplicable = rect(RIGHT - 52, top + 0.9, BOX, BOX);
+  captions.push({ x: notApplicable.x + BOX + 1.2, y: top + 4.4, text: "N/A — NO PET IN THIS SLOT", size: OPTION });
+
+  const writeIns = [openLine(captions, "pet_name", "NAME OF PET", LEFT, top + 8.5, RIGHT - LEFT)];
+
+  const ageY = top + 19.5;
+  captions.push({ x: LEFT, y: ageY - 2.9, text: "AGE — YEARS", size: CAPTION, bold: true });
+  const years = bubbles(captions, LEFT, ageY, 21);
+  // The last bubble means 20 or older.
+  captions.splice(captions.length - 1, 1, { x: years[20].x + BUBBLE / 2, y: ageY - 0.5, text: "20+", size: 1.9, anchor: "middle" });
+  const monthsX = LEFT + 21 * BUBBLE_PITCH + 8;
+  captions.push({ x: monthsX, y: ageY - 2.9, text: "AGE — MONTHS", size: CAPTION, bold: true });
+  const months = bubbles(captions, monthsX, ageY, 12);
+  const numbers: NumberGroup[] = [
+    { key: "age_years", label: "Age (years)", base: 0, places: [{ weight: 1, bubbles: years }] },
+    { key: "age_months", label: "Age (months)", base: 0, places: [{ weight: 1, bubbles: months }] },
+  ];
+
+  const groups = choiceLines(captions, [
+    [top + 26.5, PET_CHOICES[0]],
+    [top + 34.2, PET_CHOICES[1]],
+    [top + 41.9, PET_CHOICES[2]],
+    [top + 49.6, [["color", "COLOR", ["BLACK", "WHITE", "BROWN", "GRAY", "ORANGE", "MIXED/SPOTTED", "OTHER"]]]],
+    // Years are printed from the census year (YEAR-7 … YEAR-0): the same boxes every year.
+    [top + 57.3, [["registered", "REGISTERED IN (YEAR)", [...[7, 6, 5, 4, 3, 2, 1, 0].map((k) => `YEAR-${k}`), "EARLIER", "NOT YET"]]]],
+  ]);
+
+  const half = (RIGHT - LEFT - 6) / 2;
+  writeIns.push(openLine(captions, "other_vaccines", "OTHER VACCINES", LEFT, top + 66, half, 1, 5));
+  writeIns.push(openLine(captions, "remarks", "REMARKS (OR OTHER COLOR)", LEFT + half + 6, top + 66, half, 1, 5));
+
+  return { slot, frame: rect(LEFT - 2, top, RIGHT - LEFT + 4, PET_HEIGHT_V2), titleAt: { x: LEFT, y: top + 3.8 }, notApplicable, writeIns, choices: groups, numbers };
+}
+
+export function buildCensusLayout(version: number = FORM_VERSION): CensusLayout {
   const captions: Caption[] = [];
   const frames: Rect[] = [];
   const near = MARKER_INSET;
@@ -210,13 +284,26 @@ export function buildCensusLayout(): CensusLayout {
 
   frames.push(rect(LEFT - 2, 36.5, RIGHT - LEFT + 4, 10));
   frames.push(rect(LEFT - 2, 48, RIGHT - LEFT + 4, 41));
-  captions.push({ x: RIGHT, y: 52.3 - 1.6, text: "USE CAPITAL LETTERS · ONE LETTER PER BOX · TICK ✓ OR FILL ● ONE BOX", size: 2.1, anchor: "end" });
+  const v1 = version === 1;
+  captions.push({
+    x: RIGHT,
+    y: 52.3 - 1.6,
+    text: v1 ? "USE CAPITAL LETTERS · ONE LETTER PER BOX · TICK ✓ OR FILL ● ONE BOX" : "WRITE IN CAPITAL LETTERS INSIDE THE LINES · TICK ✓ OR FILL ● ONE BOX",
+    size: 2.1,
+    anchor: "end",
+  });
   const ownerCaptions: Caption[] = [{ x: LEFT, y: 52.3 - 1.6, text: "B. OWNER INFORMATION", size: 3, bold: true }];
-  const owner = [
-    writeIn(ownerCaptions, "owner_name", "FULL NAME OF OWNER", LEFT, 55, 30),
-    writeIn(ownerCaptions, "address", "COMPLETE ADDRESS", LEFT, 64.5, 30, 2),
-    writeIn(ownerCaptions, "contact", "CONTACT NUMBER (0000-000-0000)", LEFT, 81, 11, 1, true),
-  ];
+  const owner = v1
+    ? [
+        writeIn(ownerCaptions, "owner_name", "FULL NAME OF OWNER", LEFT, 55, 30),
+        writeIn(ownerCaptions, "address", "COMPLETE ADDRESS", LEFT, 64.5, 30, 2),
+        writeIn(ownerCaptions, "contact", "CONTACT NUMBER (0000-000-0000)", LEFT, 81, 11, 1, true),
+      ]
+    : [
+        openLine(ownerCaptions, "owner_name", "FULL NAME OF OWNER", LEFT, 55, RIGHT - LEFT),
+        openLine(ownerCaptions, "address", "COMPLETE ADDRESS", LEFT, 64.5, RIGHT - LEFT, 2),
+        writeIn(ownerCaptions, "contact", "CONTACT NUMBER (0000-000-0000)", LEFT, 81, 11, 1, true),
+      ];
 
   // Continuation sheets print this in the owner block instead.
   const continuedFrom: NumberGroup = {
@@ -226,7 +313,7 @@ export function buildCensusLayout(): CensusLayout {
     places: [1000, 100, 10, 1].map((weight, i) => ({ weight, bubbles: bubbles([], LEFT + 40, 58 + i * 7.5, 10) })),
   };
 
-  const pets = [0, 1, 2].map((slot) => petBlock(slot, 91 + slot * (PET_HEIGHT + PET_GAP), captions, frames));
+  const pets = [0, 1, 2].map((slot) => (v1 ? petBlock(slot, 91 + slot * (PET_HEIGHT + PET_GAP), captions, frames) : petBlockV2(slot, 91 + slot * (PET_HEIGHT_V2 + PET_GAP), captions, frames)));
 
   return {
     page: PAGE,
@@ -243,7 +330,23 @@ export function buildCensusLayout(): CensusLayout {
   };
 }
 
-export const CENSUS_LAYOUT = buildCensusLayout();
+const LAYOUTS = new Map([1, 2].map((v) => [v, buildCensusLayout(v)]));
+
+/** The layout a sheet of this form version was printed with. */
+export function layoutFor(version: number): CensusLayout {
+  const layout = LAYOUTS.get(version);
+  if (!layout) throw new RangeError(`Census sheet version ${version} isn't known.`);
+  return layout;
+}
+
+/** The layout printed now. */
+export const CENSUS_LAYOUT = layoutFor(FORM_VERSION);
+
+/** What a printed option says: Registered In years are counted back from the census year. */
+export function optionText(value: string, censusYear: number) {
+  const year = value.match(YEAR_OPTION);
+  return year ? String(censusYear - Number(year[1])) : value;
+}
 
 /** Captions for the continuation sheet's "Continued from sheet no." bubbles (digits above each bubble). */
 export function continuationCaptions(layout: CensusLayout): Caption[] {

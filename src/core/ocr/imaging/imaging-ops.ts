@@ -55,7 +55,7 @@ export async function runImaging(request: ImagingRequest): Promise<ImagingResult
     const found = locateAndRead(rotateQuarter(toGray(rgba), request.rotation, 1));
     if (!found) return { census: null };
     const { sheet, read } = found;
-    const [flat, handwriting] = await Promise.all([encodeGray(sheet, "image/png"), encodeGray(handwritingOnly(sheet, read.code.continuation), "image/png")]);
+    const [flat, handwriting] = await Promise.all([encodeGray(sheet, "image/png"), encodeGray(handwritingOnly(sheet, read), "image/png")]);
     return { census: { sheet: flat, handwriting, width: sheet.width, height: sheet.height, read } };
   }
   if (request.op === "preview") {

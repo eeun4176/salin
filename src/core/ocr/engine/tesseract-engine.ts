@@ -7,7 +7,7 @@
  * terminates the worker immediately.
  */
 
-import { engineKey, fromTesseract, type EngineConfig, type EngineStatus, type OcrEngine, type ReadOptions, type RawRecognition } from "@/core/ocr/engine/ocr-engine";
+import { engineKey, fromTesseract, type RegionRead, type EngineConfig, type EngineStatus, type OcrEngine, type ReadOptions, type RawRecognition } from "@/core/ocr/engine/ocr-engine";
 import { ENGINE_LABEL, languageAsset, workerScriptUrl } from "@/core/ocr/models/model-assets";
 import { loadAsset, ModelError } from "@/core/ocr/models/model-manager";
 
@@ -92,7 +92,8 @@ export async function createTesseractEngine(config: EngineConfig, options: { sig
       if (!alive) throw new Error("This recognition engine was stopped.");
       readSignal?.throwIfAborted();
       if (nextMode !== mode) {
-        await worker.setParameters({ tessedit_pageseg_mode: nextMode === "sparse" ? Tesseract.PSM.SPARSE_TEXT : Tesseract.PSM.AUTO });
+        // Also clears a character list left by readRegions.
+        await worker.setParameters({ tessedit_pageseg_mode: nextMode === "sparse" ? Tesseract.PSM.SPARSE_TEXT : Tesseract.PSM.AUTO, tessedit_char_whitelist: "" });
         mode = nextMode;
       }
       onRead = onProgress;
@@ -113,6 +114,20 @@ export async function createTesseractEngine(config: EngineConfig, options: { sig
         if (onAbort) readSignal?.removeEventListener("abort", onAbort);
         onRead = undefined;
       }
+    },
+    async readRegions(image: Blob, boxes, allowed, readSignal): Promise<RegionRead[]> {
+      if (!alive) throw new Error("This recognition engine was stopped.");
+      await worker.setParameters({ tessedit_pageseg_mode: Tesseract.PSM.SINGLE_LINE, tessedit_char_whitelist: allowed });
+      mode = null;
+      const out: RegionRead[] = [];
+      for (const box of boxes) {
+        readSignal?.throwIfAborted();
+        const rectangle = { left: Math.max(0, Math.round(box.x)), top: Math.max(0, Math.round(box.y)), width: Math.round(box.width), height: Math.round(box.height) };
+        const { data } = await worker.recognize(image, { rectangle }, { text: true });
+        const text = [...data.text.trim()].filter((c) => c === " " || allowed.includes(c)).join("").trim();
+        out.push({ text, confidence: text ? Math.round(data.confidence) : 0 });
+      }
+      return out;
     },
     async terminate() {
       if (!alive) return;

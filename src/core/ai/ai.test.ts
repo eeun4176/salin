@@ -16,9 +16,9 @@ import { statSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AI_MODELS, isApprovedModelUrl, recommendAiMode, variantFor, variantSource } from "@/core/ai/ai-models";
-import { AiError, createAiRuntime } from "@/core/ai/ai-runtime";
+import { AiError, createAiRuntime, READ_STALL_MS } from "@/core/ai/ai-runtime";
 import { findOnPage, isCloseCorrection } from "@/core/ai/grounding";
-import { cleanReading, decodeLine, HANDWRITING_CHARACTERS, lineTensor } from "@/core/ai/handwriting";
+import { cleanReading, decodeLine, decodeSlots, HANDWRITING_CHARACTERS, lineTensor } from "@/core/ai/handwriting";
 import { commandMessages, extractJson, parseCommandReply, parseCorrectionReply, parseFieldReply, parseMappingReply } from "@/core/ai/llm-tasks";
 import { acceptSuggestion, correctionSuggestions, fieldSuggestion, pendingSuggestions, rejectSuggestion, ruleSuggestions, templateRules, withHandwritingReadings } from "@/core/ai/suggestions";
 import type { DeviceCapabilities } from "@/core/ocr/models/capabilities";
@@ -249,6 +249,42 @@ describe("handwriting decoding", () => {
     expect(HANDWRITING_CHARACTERS).toContain("ñ");
   });
 
+  it("reads exactly one allowed character per letter box", () => {
+    const classes = HANDWRITING_CHARACTERS.length;
+    const index = (ch: string) => HANDWRITING_CHARACTERS.indexOf(ch);
+    // 8 columns, 2 per box: "i" (lowercase), a blank box read as "|", "A", and an "O" in a digit box.
+    const probs = new Float32Array(8 * classes);
+    const set = (s: number, ch: string, p: number) => (probs[s * classes + (ch ? index(ch) : 0)] = p);
+    set(0, "i", 0.8);
+    set(1, "", 0.9);
+    set(2, "|", 0.7);
+    set(4, "A", 0.6);
+    set(5, "R", 0.3);
+    set(6, "O", 0.9);
+    const slots = [
+      { from: 0, to: 0.25, allowed: "ABCDEFGHIJKLMNOPQRSTUVWXYZ" },
+      { from: 0.5, to: 0.75, allowed: "ABCDEFGHIJKLMNOPQRSTUVWXYZ", spaceBefore: true },
+      { from: 0.75, to: 1, allowed: "0123456789" },
+    ];
+    expect(decodeSlots(probs, 8, classes, slots)).toEqual({ text: "I A0", confidence: expect.closeTo((0.8 + 0.6 + 0.9) / 3) });
+  });
+
+  it("reads an open line with only its allowed characters, as capitals", () => {
+    const classes = HANDWRITING_CHARACTERS.length;
+    const index = (ch: string) => HANDWRITING_CHARACTERS.indexOf(ch);
+    // "j", "@" (a smudge, not allowed — the next best allowed is "U"), blank, space, "O" read as lowercase "o".
+    const probs = new Float32Array(5 * classes);
+    const set = (s: number, ch: string, p: number) => (probs[s * classes + (ch ? index(ch) : 0)] = p);
+    set(0, "j", 0.9);
+    set(1, "@", 0.8);
+    set(1, "U", 0.6);
+    set(2, "", 0.9);
+    set(3, " ", 0.7);
+    set(4, "o", 0.85);
+    expect(decodeLine(probs, 5, classes, HANDWRITING_CHARACTERS, "ABCDEFGHIJKLMNOPQRSTUVWXYZ ").text).toBe("JU O");
+    expect(decodeLine(probs, 5, classes).text).toBe("j@ o");
+  });
+
   it("treats a crop without ink as empty", () => {
     const width = 20;
     const white = new Uint8ClampedArray(48 * width * 4).fill(255);
@@ -432,5 +468,28 @@ describe("AI runtime", () => {
     hang = false;
     expect(await runtime.generate([], variantFor(AI_MODELS.assistant, null))).toBe("ok");
     expect(workers).toHaveLength(2);
+  });
+
+  it("stops a handwriting read whose worker goes silent, so a scan can't hang", async () => {
+    vi.useFakeTimers();
+    try {
+      const workers: FakeWorker[] = [];
+      let hang = true;
+      const runtime = createAiRuntime(() => {
+        const w = new FakeWorker((r) => (hang ? "hang" : { id: r.id, type: "result", result: [] }));
+        workers.push(w);
+        return w as never;
+      }, async () => undefined);
+      const stalled = runtime.readLines([]).catch((e) => e);
+      await vi.advanceTimersByTimeAsync(READ_STALL_MS + 1);
+      expect(await stalled).toBeInstanceOf(AiError);
+      expect(workers[0].terminated).toBe(true);
+      hang = false;
+      const next = runtime.readLines([]);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(await next).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

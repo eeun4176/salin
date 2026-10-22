@@ -5,9 +5,9 @@
 
 import { describe, expect, it } from "vitest";
 
-import { CODE_BITS, decodeSheetCode, encodeSheetCode, FORM_VERSION, type SheetCode } from "./code-strip";
+import { CODE_BITS, decodeSheetCode, encodeSheetCode, type SheetCode } from "./code-strip";
 
-const code: SheetCode = { version: FORM_VERSION, continuation: false, barangay: 6, censusDate: "2026-10-22", sheetNumber: 7 };
+const code: SheetCode = { version: 1, continuation: false, barangay: 6, censusDate: "2026-10-22", sheetNumber: 7 };
 
 describe("sheet code", () => {
   it("round-trips every field", () => {

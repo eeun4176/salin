@@ -1,0 +1,845 @@
+{
+  "failed": [],
+  "kind": "census-synthetic",
+  "note": "Synthetic sheets in handwriting-style fonts — neater than real hands; an upper bound until real sheets are measured.",
+  "sheets": 12,
+  "cer": {
+    "ocr": 0.048879837067209775,
+    "handwritingReader": 0.06109979633401222
+  },
+  "exactFields": {
+    "ocr": 0.75,
+    "handwritingReader": 0.75
+  },
+  "omrAccuracy": 1,
+  "details": [
+    {
+      "sheet": 1,
+      "font": "Segoe Print",
+      "style": "neat",
+      "fields": [
+        {
+          "key": "owner_name",
+          "want": "IAN BAUTISTA",
+          "ocr": "IAN BAUTISTA",
+          "reader": "IAN BAUTISTA",
+          "cer": {
+            "ocr": 0,
+            "reader": 0
+          }
+        },
+        {
+          "key": "address",
+          "want": "PUROK 3",
+          "ocr": "PUROK 3",
+          "reader": "PUROK 3",
+          "cer": {
+            "ocr": 0,
+            "reader": 0
+          }
+        },
+        {
+          "key": "contact",
+          "want": "09587446405",
+          "ocr": "09587446405",
+          "reader": "09587446405",
+          "cer": {
+            "ocr": 0,
+            "reader": 0
+          }
+        },
+        {
+          "key": "pet_name",
+          "want": "MINGMING",
+          "ocr": "MINGMING",
+          "reader": "MINGMING",
+          "cer": {
+            "ocr": 0,
+            "reader": 0
+          }
+        }
+      ],
+      "omr": [
+        {
+          "key": "type",
+          "want": "CAT",
+          "got": "CAT"
+        },
+        {
+          "key": "sex",
+          "want": "FEMALE",
+          "got": "FEMALE"
+        },
+        {
+          "key": "vaccination",
+          "want": "2ND",
+          "got": "2ND"
+        },
+        {
+          "key": "color",
+          "want": "GRAY",
+          "got": "GRAY"
+        }
+      ]
+    },
+    {
+      "sheet": 2,
+      "font": "Segoe Script",
+      "style": "messy",
+      "fields": [
+        {
+          "key": "owner_name",
+          "want": "RAMON CABALQUINTO",
+          "ocr": "RAMO N CABALQUINTO",
+          "reader": "RAMO N CABALQUINTO",
+          "cer": {
+            "ocr": 0.058823529411764705,
+            "reader": 0.058823529411764705
+          }
+        },
+        {
+          "key": "address",
+          "want": "SITIO PAG ASA",
+          "ocr": "SITO PAG ASA",
+          "reader": "SITO PAG ASA",
+          "cer": {
+            "ocr": 0.07692307692307693,
+            "reader": 0.07692307692307693
+          }
+        },
+        {
+          "key": "contact",
+          "want": "09563331365",
+          "ocr": "09563331365",
+          "reader": "09563331365",
+          "cer": {
+            "ocr": 0,
+            "reader": 0
+          }
+        },
+        {
+          "key": "pet_name",
+          "want": "MINGMING",
+          "ocr": "MINGMING",
+          "reader": "MINGMING",
+          "cer": {
+            "ocr": 0,
+            "reader": 0
+          }
+        }
+      ],
+      "omr": [
+        {
+          "key": "type",
+          "want": "DOG",
+          "got": "DOG"
+        },
+        {
+          "key": "sex",
+          "want": "FEMALE",
+          "got": "FEMALE"
+        },
+        {
+          "key": "vaccination",
+          "want": "1ST",
+          "got": "1ST"
+        },
+        {
+          "key": "color",
+          "want": "WHITE",
+          "got": "WHITE"
+        }
+      ]
+    },
+    {
+      "sheet": 3,
+      "font": "Ink Free",
+      "style": "thin",
+      "fields": [
+        {
+          "key": "owner_name",
+          "want": "ANA BAUTISTA",
+          "ocr": "ANA BAUTISTA",
+          "reader": "ANA BAUTISTA",
+          "cer": {
+            "ocr": 0,
+            "reader": 0
+          }
+        },
+        {
+          "key": "address",
+          "want": "123 RIZAL ST",
+          "ocr": "123 RIZAL ST",
+          "reader": "123 RIZAL ST",
+          "cer": {
+            "ocr": 0,
+            "reader": 0
+          }
+        },
+        {
+          "key": "contact",
+          "want": "09410573635",
+          "ocr": "40573635",
+          "reader": "40573635",
+          "cer": {
+            "ocr": 0.2727272727272727,
+            "reader": 0.2727272727272727
+          }
+        },
+        {
+          "key": "pet_name",
+          "want": "MINGMING",
+          "ocr": "MI N GMI NG",
+          "reader": "MI N GMI NG",
+          "cer": {
+            "ocr": 0.375,
+            "reader": 0.375
+          }
+        }
+      ],
+      "omr": [
+        {
+          "key": "type",
+          "want": "CAT",
+          "got": "CAT"
+        },
+        {
+          "key": "sex",
+          "want": "MALE",
+          "got": "MALE"
+        },
+        {
+          "key": "vaccination",
+          "want": "2ND",
+          "got": "2ND"
+        },
+        {
+          "key": "color",
+          "want": "ORANGE",
+          "got": "ORANGE"
+        }
+      ]
+    },
+    {
+      "sheet": 4,
+      "font": "Comic Sans MS",
+      "style": "neat",
+      "fields": [
+        {
+          "key": "owner_name",
+          "want": "LIZA VILLANUEVA",
+          "ocr": "LIZA VILLANUEVA",
+          "reader": "LIZA VILLANUEVA",
+          "cer": {
+            "ocr": 0,
+            "reader": 0
+          }
+        },
+        {
+          "key": "address",
+          "want": "VC2 AREA G",
+          "ocr": "VC2 AREA G",
+          "reader": "VC2 AREA G",
+          "cer": {
+            "ocr": 0,
+            "reader": 0
+          }
+        },
+        {
+          "key": "contact",
+          "want": "09228251784",
+          "ocr": "09228251784",
+          "reader": "09228251784",
+          "cer": {
+            "ocr": 0,
+            "reader": 0
+          }
+        },
+        {
+          "key": "pet_name",
+          "want": "BROWNIE",
+          "ocr": "BROWNIE",
+          "reader": "BROWNIE",
+          "cer": {
+            "ocr": 0,
+            "reader": 0
+          }
+        }
+      ],
+      "omr": [
+        {
+          "key": "type",
+          "want": "CAT",
+          "got": "CAT"
+        },
+        {
+          "key": "sex",
+          "want": "FEMALE",
+          "got": "FEMALE"
+        },
+        {
+          "key": "vaccination",
+          "want": "1ST",
+          "got": "1ST"
+        },
+        {
+          "key": "color",
+          "want": "GRAY",
+          "got": "GRAY"
+        }
+      ]
+    },
+    {
+      "sheet": 5,
+      "font": "Bradley Hand ITC",
+      "style": "messy",
+      "fields": [
+        {
+          "key": "owner_name",
+          "want": "JOSE AQUINO",
+          "ocr": "IOSE AQU I NO",
+          "reader": "IOSE AQU I NO",
+          "cer": {
+            "ocr": 0.2727272727272727,
+            "reader": 0.2727272727272727
+          }
+        },
+        {
+          "key": "address",
+          "want": "123 RIZAL ST",
+          "ocr": "12 3 RIZAL ST",
+          "reader": "12 3 RIZAL ST",
+          "cer": {
+            "ocr": 0.08333333333333333,
+            "reader": 0.08333333333333333
+          }
+        },
+        {
+          "key": "contact",
+          "want": "09010316899",
+          "ocr": "09010316899",
+          "reader": "09010316899",
+          "cer": {
+            "ocr": 0,
+            "reader": 0
+          }
+        },
+        {
+          "key": "pet_name",
+          "want": "BROWNIE",
+          "ocr": "BR DN I E",
+          "reader": "BR DN I E",
+          "cer": {
+            "ocr": 0.5714285714285714,
+            "reader": 0.5714285714285714
+          }
+        }
+      ],
+      "omr": [
+        {
+          "key": "type",
+          "want": "CAT",
+          "got": "CAT"
+        },
+        {
+          "key": "sex",
+          "want": "FEMALE",
+          "got": "FEMALE"
+        },
+        {
+          "key": "vaccination",
+          "want": "BOOSTER",
+          "got": "BOOSTER"
+        },
+        {
+          "key": "color",
+          "want": "ORANGE",
+          "got": "ORANGE"
+        }
+      ]
+    },
+    {
+      "sheet": 6,
+      "font": "Kristen ITC",
+      "style": "thin",
+      "fields": [
+        {
+          "key": "owner_name",
+          "want": "JOSE BAUTISTA",
+          "ocr": "JOSE BAUTI STA",
+          "reader": "JOSE BAUTI STA",
+          "cer": {
+            "ocr": 0.07692307692307693,
+            "reader": 0.07692307692307693
+          }
+        },
+        {
+          "key": "address",
+          "want": "PH 1 BLK 7",
+          "ocr": "PH 1 BLK 7",
+          "reader": "PH 1 BLK 7",
+          "cer": {
+            "ocr": 0,
+            "reader": 0
+          }
+        },
+        {
+          "key": "contact",
+          "want": "09190046978",
+          "ocr": "09190046978",
+          "reader": "09190046978",
+          "cer": {
+            "ocr": 0,
+            "reader": 0
+          }
+        },
+        {
+          "key": "pet_name",
+          "want": "TIGER",
+          "ocr": "TIGER",
+          "reader": "TIGER",
+          "cer": {
+            "ocr": 0,
+            "reader": 0
+          }
+        }
+      ],
+      "omr": [
+        {
+          "key": "type",
+          "want": "DOG",
+          "got": "DOG"
+        },
+        {
+          "key": "sex",
+          "want": "MALE",
+          "got": "MALE"
+        },
+        {
+          "key": "vaccination",
+          "want": "2ND",
+          "got": "2ND"
+        },
+        {
+          "key": "color",
+          "want": "BROWN",
+          "got": "BROWN"
+        }
+      ]
+    },
+    {
+      "sheet": 7,
+      "font": "Lucida Handwriting",
+      "style": "neat",
+      "fields": [
+        {
+          "key": "owner_name",
+          "want": "RAMON DELA CRUZ",
+          "ocr": "RAMON DELA CRUZ",
+          "reader": "RAMON DELA CRUZ",
+          "cer": {
+            "ocr": 0,
+            "reader": 0
+          }
+        },
+        {
+          "key": "address",
+          "want": "PH 1 BLK 7",
+          "ocr": "PH 1 BLK 7",
+          "reader": "PH 1 BLK 7",
+          "cer": {
+            "ocr": 0,
+            "reader": 0
+          }
+        },
+        {
+          "key": "contact",
+          "want": "09280040822",
+          "ocr": "09280040822",
+          "reader": "09280040822",
+          "cer": {
+            "ocr": 0,
+            "reader": 0
+          }
+        },
+        {
+          "key": "pet_name",
+          "want": "TIGER",
+          "ocr": "TIGER",
+          "reader": "TIGER",
+          "cer": {
+            "ocr": 0,
+            "reader": 0
+          }
+        }
+      ],
+      "omr": [
+        {
+          "key": "type",
+          "want": "DOG",
+          "got": "DOG"
+        },
+        {
+          "key": "sex",
+          "want": "FEMALE",
+          "got": "FEMALE"
+        },
+        {
+          "key": "vaccination",
+          "want": "BOOSTER",
+          "got": "BOOSTER"
+        },
+        {
+          "key": "color",
+          "want": "WHITE",
+          "got": "WHITE"
+        }
+      ]
+    },
+    {
+      "sheet": 8,
+      "font": "MV Boli",
+      "style": "messy",
+      "fields": [
+        {
+          "key": "owner_name",
+          "want": "CARLO SANTOS",
+          "ocr": "CAR LO SANTOS",
+          "reader": "CAR LO SANTOS",
+          "cer": {
+            "ocr": 0.08333333333333333,
+            "reader": 0.08333333333333333
+          }
+        },
+        {
+          "key": "address",
+          "want": "SITIO PAG ASA",
+          "ocr": "SITIO PAG ASA",
+          "reader": "SITIO PAG ASA",
+          "cer": {
+            "ocr": 0,
+            "reader": 0
+          }
+        },
+        {
+          "key": "contact",
+          "want": "09588182747",
+          "ocr": "09588182747",
+          "reader": "09588182747",
+          "cer": {
+            "ocr": 0,
+            "reader": 0
+          }
+        },
+        {
+          "key": "pet_name",
+          "want": "MOCHA",
+          "ocr": "MO CHA",
+          "reader": "MO CHA",
+          "cer": {
+            "ocr": 0.2,
+            "reader": 0.2
+          }
+        }
+      ],
+      "omr": [
+        {
+          "key": "type",
+          "want": "DOG",
+          "got": "DOG"
+        },
+        {
+          "key": "sex",
+          "want": "MALE",
+          "got": "MALE"
+        },
+        {
+          "key": "vaccination",
+          "want": "2ND",
+          "got": "2ND"
+        },
+        {
+          "key": "color",
+          "want": "WHITE",
+          "got": "WHITE"
+        }
+      ]
+    },
+    {
+      "sheet": 9,
+      "font": "Segoe Print",
+      "style": "thin",
+      "fields": [
+        {
+          "key": "owner_name",
+          "want": "CARLO VILLANUEVA",
+          "ocr": "CARLO VILLANUEVA",
+          "reader": "CARLO VILLANUEVA",
+          "cer": {
+            "ocr": 0,
+            "reader": 0
+          }
+        },
+        {
+          "key": "address",
+          "want": "SITIO PAG ASA",
+          "ocr": "SITIO PAG ASA",
+          "reader": "SITIO PAG ASA",
+          "cer": {
+            "ocr": 0,
+            "reader": 0
+          }
+        },
+        {
+          "key": "contact",
+          "want": "09581898585",
+          "ocr": "09581898585",
+          "reader": "09581898585",
+          "cer": {
+            "ocr": 0,
+            "reader": 0
+          }
+        },
+        {
+          "key": "pet_name",
+          "want": "BANTAY",
+          "ocr": "BANTAY",
+          "reader": "BANTAY",
+          "cer": {
+            "ocr": 0,
+            "reader": 0
+          }
+        }
+      ],
+      "omr": [
+        {
+          "key": "type",
+          "want": "DOG",
+          "got": "DOG"
+        },
+        {
+          "key": "sex",
+          "want": "FEMALE",
+          "got": "FEMALE"
+        },
+        {
+          "key": "vaccination",
+          "want": "2ND",
+          "got": "2ND"
+        },
+        {
+          "key": "color",
+          "want": "ORANGE",
+          "got": "ORANGE"
+        }
+      ]
+    },
+    {
+      "sheet": 10,
+      "font": "Segoe Script",
+      "style": "neat",
+      "fields": [
+        {
+          "key": "owner_name",
+          "want": "LIZA SANTOS",
+          "ocr": "LIZA SANTOS",
+          "reader": "LIZA SANTOS",
+          "cer": {
+            "ocr": 0,
+            "reader": 0
+          }
+        },
+        {
+          "key": "address",
+          "want": "PUROK 3",
+          "ocr": "PUROK 3",
+          "reader": "PUROK 3",
+          "cer": {
+            "ocr": 0,
+            "reader": 0
+          }
+        },
+        {
+          "key": "contact",
+          "want": "09977899010",
+          "ocr": "09977899010",
+          "reader": "09977899010",
+          "cer": {
+            "ocr": 0,
+            "reader": 0
+          }
+        },
+        {
+          "key": "pet_name",
+          "want": "BROWNIE",
+          "ocr": "BRONNIE",
+          "reader": "",
+          "cer": {
+            "ocr": 0.14285714285714285,
+            "reader": 1
+          }
+        }
+      ],
+      "omr": [
+        {
+          "key": "type",
+          "want": "DOG",
+          "got": "DOG"
+        },
+        {
+          "key": "sex",
+          "want": "MALE",
+          "got": "MALE"
+        },
+        {
+          "key": "vaccination",
+          "want": "1ST",
+          "got": "1ST"
+        },
+        {
+          "key": "color",
+          "want": "BROWN",
+          "got": "BROWN"
+        }
+      ]
+    },
+    {
+      "sheet": 11,
+      "font": "Ink Free",
+      "style": "messy",
+      "fields": [
+        {
+          "key": "owner_name",
+          "want": "RAMON REYES",
+          "ocr": "K AMON RE Y ES",
+          "reader": "K AMON RE Y ES",
+          "cer": {
+            "ocr": 0.36363636363636365,
+            "reader": 0.36363636363636365
+          }
+        },
+        {
+          "key": "address",
+          "want": "PH 1 BLK 7",
+          "ocr": "PH 1 BLK 7",
+          "reader": "PH 1 BLK 7",
+          "cer": {
+            "ocr": 0,
+            "reader": 0
+          }
+        },
+        {
+          "key": "contact",
+          "want": "09873907032",
+          "ocr": "09873907032",
+          "reader": "09873907032",
+          "cer": {
+            "ocr": 0,
+            "reader": 0
+          }
+        },
+        {
+          "key": "pet_name",
+          "want": "BROWNIE",
+          "ocr": "BROWNIE",
+          "reader": "BROWNIE",
+          "cer": {
+            "ocr": 0,
+            "reader": 0
+          }
+        }
+      ],
+      "omr": [
+        {
+          "key": "type",
+          "want": "CAT",
+          "got": "CAT"
+        },
+        {
+          "key": "sex",
+          "want": "FEMALE",
+          "got": "FEMALE"
+        },
+        {
+          "key": "vaccination",
+          "want": "1ST",
+          "got": "1ST"
+        },
+        {
+          "key": "color",
+          "want": "BLACK",
+          "got": "BLACK"
+        }
+      ]
+    },
+    {
+      "sheet": 12,
+      "font": "Comic Sans MS",
+      "style": "thin",
+      "fields": [
+        {
+          "key": "owner_name",
+          "want": "JOSE REYES",
+          "ocr": "JOSE REYES",
+          "reader": "JOSE REYES",
+          "cer": {
+            "ocr": 0,
+            "reader": 0
+          }
+        },
+        {
+          "key": "address",
+          "want": "PH 1 BLK 7",
+          "ocr": "PH 1 BLK 7",
+          "reader": "PH 1 BLK 7",
+          "cer": {
+            "ocr": 0,
+            "reader": 0
+          }
+        },
+        {
+          "key": "contact",
+          "want": "09554863567",
+          "ocr": "09554863567",
+          "reader": "09554863567",
+          "cer": {
+            "ocr": 0,
+            "reader": 0
+          }
+        },
+        {
+          "key": "pet_name",
+          "want": "PUTI",
+          "ocr": "PUTI",
+          "reader": "PUTI",
+          "cer": {
+            "ocr": 0,
+            "reader": 0
+          }
+        }
+      ],
+      "omr": [
+        {
+          "key": "type",
+          "want": "DOG",
+          "got": "DOG"
+        },
+        {
+          "key": "sex",
+          "want": "FEMALE",
+          "got": "FEMALE"
+        },
+        {
+          "key": "vaccination",
+          "want": "BOOSTER",
+          "got": "BOOSTER"
+        },
+        {
+          "key": "color",
+          "want": "GRAY",
+          "got": "GRAY"
+        }
+      ]
+    }
+  ]
+}

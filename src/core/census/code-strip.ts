@@ -7,7 +7,9 @@
  * instead of guessed. Printing encodes it; scanning decodes it.
  */
 
-export const FORM_VERSION = 1;
+/** The version printed now; every version in SUPPORTED_VERSIONS still scans. */
+export const FORM_VERSION = 2;
+export const SUPPORTED_VERSIONS = [1, 2];
 
 export interface SheetCode {
   version: number;
@@ -74,6 +76,6 @@ export function decodeSheetCode(bits: number[]): SheetCode | null {
     values[key] = readNumber(bits, at, width);
     at += width;
   }
-  if (values.version !== FORM_VERSION) return null;
+  if (!SUPPORTED_VERSIONS.includes(values.version)) return null;
   return { version: values.version, continuation: values.continuation === 1, barangay: values.barangay, censusDate: fromDay(values.day), sheetNumber: values.sheetNumber };
 }

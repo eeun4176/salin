@@ -9,8 +9,8 @@
  * the Accurate profile, and classifies the result (ok, blank, unreadable).
  */
 
-import { engineKey, type EngineConfig, type EngineStatus, type OcrEngine, type RawRecognition } from "@/core/ocr/engine/ocr-engine";
-import type { OcrPageResult, PageMarks } from "@/types/ocr";
+import { engineKey, type RegionRead, type EngineConfig, type EngineStatus, type OcrEngine, type RawRecognition } from "@/core/ocr/engine/ocr-engine";
+import type { Box, OcrPageResult, PageMarks } from "@/types/ocr";
 
 const IDLE_SHUTDOWN_MS = 60_000;
 /** Pages with less ink than this are blank (no OCR is run). */
@@ -117,6 +117,17 @@ export function createOcrRuntime(factory: EngineFactory = defaultFactory) {
     /** Starts the engine ahead of time (e.g. while the user picks a template). */
     warmUp: (config: EngineConfig, onStatus?: EngineStatus) => engineFor(config, undefined, onStatus).then(() => scheduleShutdown()),
     readPage,
+    /** One line of text per box (letter-box rows on printed forms), from the `allowed` characters only. */
+    readRegions: (image: Blob, boxes: Box[], allowed: string, config: EngineConfig, options: PageReadOptions = {}): Promise<RegionRead[]> =>
+      exclusive(async () => {
+        running++;
+        try {
+          return await (await engineFor(config, options.signal, options.onStatus)).readRegions(image, boxes, allowed, options.signal);
+        } finally {
+          running--;
+          scheduleShutdown();
+        }
+      }),
     /** Raw read without page logic (benchmarks). */
     read: (image: Blob, config: EngineConfig, mode: "auto" | "sparse" = "auto", options: PageReadOptions = {}) => exclusive(() => read(image, config, mode, options)),
     shutdown,

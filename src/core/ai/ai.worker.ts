@@ -16,13 +16,19 @@ import * as ort from "onnxruntime-web/webgpu";
 // The engine's small JS loader ships with the app (precached for offline use); the 27 MB engine itself comes from the model cache.
 import engineLoaderUrl from "onnxruntime-web/ort-wasm-simd-threaded.asyncify.mjs?url";
 
-import { decodeLine, LINE_HEIGHT, lineTensor, type LineReading } from "@/core/ai/handwriting";
+import { decodeLine, decodeSlots, LINE_HEIGHT, lineTensor, type LineReading, type LineSlot } from "@/core/ai/handwriting";
 import type { ChatMessage } from "@/core/ai/llm-tasks";
 
 export interface LineCrop {
   /** RGBA pixels already scaled to LINE_HEIGHT × width. */
   pixels: Uint8ClampedArray;
   width: number;
+  /** Letter boxes in the crop: read exactly one allowed character in each. */
+  slots?: LineSlot[];
+  /** An open line: only these characters can be read. */
+  allowed?: string;
+  /** An open line: where the ink shows gaps between words (0–1 across the crop). */
+  gaps?: number[];
 }
 
 export type AiWorkerRequest =
@@ -115,7 +121,8 @@ async function readLines(request: Extract<AiWorkerRequest, { type: "read-lines" 
     else {
       const result = await session.run({ [session.inputNames[0]]: new ort.Tensor("float32", input, [1, 3, LINE_HEIGHT, crop.width]) });
       const probs = result[session.outputNames[0]];
-      out.push({ ...decodeLine(probs.data as Float32Array, probs.dims[1], probs.dims[2]), empty: false });
+      const data = probs.data as Float32Array;
+      out.push({ ...(crop.slots?.length ? decodeSlots(data, probs.dims[1], probs.dims[2], crop.slots) : decodeLine(data, probs.dims[1], probs.dims[2], undefined, crop.allowed, crop.gaps)), empty: false });
       probs.dispose();
     }
     progress((i + 1) / request.crops.length);

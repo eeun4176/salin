@@ -6,22 +6,24 @@
  * region, and Use / Edit / Dismiss; suggestions not found on the page are
  * marked and need an extra confirmation. The AI tools bar runs the optional
  * models (Read handwriting, Check with assistant, Find fields) with
- * progress and Cancel, or explains how to turn them on. Nothing is applied
- * without the reviewer's choice.
+ * progress and Cancel, or explains how to turn them on; census sheets also
+ * get "Read on City Vet server" (online, once the admin system provides it).
+ * Nothing is applied without the reviewer's choice.
  */
 
 import { useState } from "react";
 import { Link } from "react-router";
-import { Bot, Check, PenLine, Search, Sparkles, X } from "lucide-react";
+import { Bot, Check, CloudUpload, Download, PenLine, Search, Sparkles, X } from "lucide-react";
 
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { NameDialog } from "@/components/common/name-dialog";
 import { acceptSuggestion, pendingSuggestions, refLabel, rejectSuggestion } from "@/core/ai/suggestions";
 import { reviewItems, refKey } from "@/core/ocr/review/review-state";
-import { findFields, handwritingTargets, readHandwriting, suggestCorrections, suggestMappings } from "@/features/ai/ai-actions";
+import { CITY_VET_READER_URL } from "@/core/census/city-vet-reader";
+import { findFields, handwritingTargets, readHandwriting, readOnCityVet, suggestCorrections, suggestMappings } from "@/features/ai/ai-actions";
 import { RegionCrop } from "@/features/ocr/components/review-parts";
 import { useAiRun } from "@/features/ai/use-ai-run";
-import { useAiFeature, useAiMode } from "@/stores/ai-store";
+import { useAiFeature, useAiMode, useAiStore } from "@/stores/ai-store";
 import { cn } from "@/lib/utils";
 import type { Box, Extraction, OcrPage, Suggestion, SuggestionSource } from "@/types/ocr";
 
@@ -218,6 +220,68 @@ interface AiToolsProps {
   pages: OcrPage[];
   generic: boolean;
   onResult: (apply: (current: Extraction) => Extraction) => void;
+}
+
+/**
+ * Census sheets without the handwriting reader: asks once to download it
+ * (then every census scan reads handwriting with it, offline), and reads
+ * this scan with it right after. Hidden once it's installed and used.
+ */
+export function CensusReaderPrompt({ extraction, pages, onResult }: Omit<AiToolsProps, "generic">) {
+  const state = useAiStore((s) => s.models.handwriting);
+  const download = useAiStore((s) => s.download);
+  const { busy, run, status } = useAiRun(onResult);
+  const readByReader = pages.some((p) => p.census && p.result?.engine.startsWith("PP-OCRv5"));
+  if (readByReader || state.status === "unsupported" || state.status === "checking") return null;
+  const ready = state.status === "ready";
+  const targets = handwritingTargets(extraction).length;
+  return (
+    <div role="note" className="space-y-2 rounded-xl bg-salin-primary-soft px-3.5 py-3 text-sm text-salin-text">
+      <p>
+        {ready
+          ? "The handwriting reader is on this device. Read this sheet's handwriting with it — every new census scan uses it automatically."
+          : "Census sheets read best with the handwriting reader (about 35 MB, downloaded once; then it works offline). Without it, handwriting is read by printed-text recognition, which often gets it wrong."}
+      </p>
+      {ready ? (
+        <button type="button" disabled={busy || targets === 0} onClick={() => void run("Reading handwriting", (o) => readHandwriting(extraction, pages, o))} className={toolButton}>
+          <PenLine className="size-4" /> Read handwriting now
+        </button>
+      ) : state.status === "downloading" ? (
+        <p role="status" className="text-xs text-salin-muted">
+          Downloading {state.label} — {Math.round((state.loaded / Math.max(1, state.total)) * 100)}%
+        </p>
+      ) : (
+        <button type="button" onClick={() => void download("handwriting")} className={toolButton}>
+          <Download className="size-4" /> Download the handwriting reader
+        </button>
+      )}
+      {state.status === "error" && <p className="text-xs text-destructive">{state.message}</p>}
+      {status}
+    </div>
+  );
+}
+
+/**
+ * Census sheets: sends only the written letter-box rows to the City Vet
+ * server's reader, when online and connected. Shown (disabled, with why)
+ * before the admin system exists, so paravets know it's coming.
+ */
+export function CityVetReader({ extraction, pages, onResult }: Omit<AiToolsProps, "generic">) {
+  const { busy, run, status } = useAiRun(onResult);
+  const targets = handwritingTargets(extraction).length;
+  const reason = !CITY_VET_READER_URL ? "Not connected yet — this comes with the City Vet admin system." : targets === 0 ? "No handwritten boxes left to read." : null;
+  return (
+    <div className="space-y-1">
+      <button type="button" disabled={busy || reason !== null} title={reason ?? undefined} onClick={() => void run("Reading on the City Vet server", (o) => readOnCityVet(extraction, pages, o))} className={toolButton}>
+        <CloudUpload className="size-4" /> Read on City Vet server
+      </button>
+      {status ?? (
+        <p className="text-xs text-salin-muted">
+          {reason ?? "Sends only the handwritten boxes (not the photo) to the city's own server, when you're online. You still check every suggestion."}
+        </p>
+      )}
+    </div>
+  );
 }
 
 /** Runs the optional on-device models over the scan; results arrive as suggestions. */

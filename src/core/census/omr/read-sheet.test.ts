@@ -8,14 +8,15 @@
 
 import { describe, expect, it } from "vitest";
 
-import { CENSUS_LAYOUT, PAGE } from "@/core/census/census-layout";
-import { FORM_VERSION, type SheetCode } from "@/core/census/code-strip";
+import { layoutFor, PAGE } from "@/core/census/census-layout";
+import type { SheetCode } from "@/core/census/code-strip";
 import { createGray } from "@/core/ocr/imaging/pixels";
 import { drawSheet, photograph } from "@/test/census-fixtures";
 
 import { handwritingOnly, locateAndRead, readFlatSheet } from "./read-sheet";
 
-const code: SheetCode = { version: FORM_VERSION, continuation: false, barangay: 6, censusDate: "2026-10-22", sheetNumber: 7 };
+const CENSUS_LAYOUT = layoutFor(1);
+const code: SheetCode = { version: 1, continuation: false, barangay: 6, censusDate: "2026-10-22", sheetNumber: 7 };
 
 const filled = drawSheet({
   code,
@@ -87,6 +88,14 @@ describe("locateAndRead", () => {
     expect(found?.sheet.width).toBe(PAGE.width * 8);
   });
 
+  it("still finds corner squares split by a thin printer or scanner line", () => {
+    const split = drawSheet({ code, answers: { "pet0.type": "DOG" } });
+    const bottom = CENSUS_LAYOUT.markers[2];
+    const y = Math.round((bottom.y + bottom.height * 0.45) * 8);
+    for (let row = y; row < y + 5; row++) split.data.fill(250, row * split.width, (row + 1) * split.width);
+    expect(locateAndRead(photograph(split))?.read.code).toEqual(code);
+  });
+
   it("returns null for a photo without the markers", () => {
     expect(locateAndRead(createGray(1200, 1600, 230))).toBeNull();
   });
@@ -94,10 +103,34 @@ describe("locateAndRead", () => {
 
 describe("handwritingOnly", () => {
   it("keeps the letter boxes' insides and drops everything else", () => {
-    const clean = handwritingOnly(filled, false);
+    const clean = handwritingOnly(filled, readFlatSheet(filled)!);
     const at = (x: number, y: number) => clean.data[Math.round(y * 8) * clean.width + Math.round(x * 8)];
     const first = CENSUS_LAYOUT.owner[0].rows[0][0];
     expect(at(first.x + first.width / 2, first.y + first.height / 2)).toBeLessThan(100);
     expect(at(CENSUS_LAYOUT.markers[0].x + 4, CENSUS_LAYOUT.markers[0].y + 4)).toBe(255);
+  });
+});
+
+describe("v2 sheets", () => {
+  const v2: SheetCode = { ...code, version: 2 };
+  const sheet = drawSheet({
+    code: v2,
+    answers: { "pet0.type": "CAT", "pet0.age_years": "15", "pet0.age_months": "3", "pet0.color": "BROWN", "pet0.registered": "YEAR-2" },
+    writing: { "owner.owner_name": [0, 1, 2, 3, 5, 6, 7, 8], "owner.contact": [0, 1, 2], "pet0.pet_name": [0, 1, 2] },
+  });
+
+  it("reads with the v2 layout: one-row age, color and year tick boxes, open writing lines", () => {
+    const found = locateAndRead(photograph(sheet, 90))!;
+    expect(found.read.code).toEqual(v2);
+    const value = (key: string) => found.read.answers[key].value;
+    expect([value("pet0.type"), value("pet0.age_years"), value("pet0.age_months"), value("pet0.color"), value("pet0.registered")]).toEqual(["CAT", "15", "3", "BROWN", "YEAR-2"]);
+    // An open line is one box: written or not. The contact number keeps its 11 boxes.
+    expect(found.read.inked["owner.owner_name"]).toEqual([[true]]);
+    expect(found.read.inked["owner.address"]).toEqual([[false], [false]]);
+    expect(found.read.inked["owner.contact"][0].slice(0, 4)).toEqual([true, true, true, false]);
+    expect(found.read.inked["pet0.remarks"]).toEqual([[false]]);
+    // Evenly spaced letters are one word; the skipped position in the owner's name is the one gap between words.
+    expect(found.read.writing?.["owner.owner_name"][0]?.gaps).toHaveLength(1);
+    expect(found.read.writing?.["pet0.pet_name"][0]?.gaps).toEqual([]);
   });
 });

@@ -52,6 +52,9 @@ function fakeFactory(read: (mode: string) => Promise<RawRecognition> = async () 
           active--;
         }
       },
+      async readRegions(_image, boxes) {
+        return boxes.map(() => ({ text: "", confidence: 0 }));
+      },
       async terminate() {
         alive = false;
       },

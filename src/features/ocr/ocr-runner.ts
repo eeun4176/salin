@@ -9,9 +9,10 @@
  * others. A scan can't be read twice at the same time. A printed census
  * sheet is recognised first by its corner markers: it's flattened to the
  * sheet layout, its boxes are read by OMR, and OCR reads only the
- * handwriting in its letter boxes.
+ * handwriting in its letter boxes, one box (one character) at a time.
  */
 
+import { letterBoxGroups, linesFromLetterBoxes, sheetLetterRows } from "@/core/census/census-extraction";
 import { prepareImage, readCensusSheet } from "@/core/ocr/imaging/imaging-client";
 import type { CensusImage, PreparedImage } from "@/core/ocr/imaging/imaging-ops";
 import { UnreadableImageError } from "@/core/ocr/imaging/image-io";
@@ -22,7 +23,9 @@ import { analyzeLayout } from "@/core/ocr/layout/layout-analysis";
 import { ModelError } from "@/core/ocr/models/model-manager";
 import { errorMessage } from "@/core/storage/errors";
 import { getOcrPages, updateOcrPage } from "@/core/storage/repositories/ocr.repository";
+import { cropLines } from "@/features/ai/line-crops";
 import { pageSource, sourceKey } from "@/features/ocr/page-sources";
+import { handwritingReaderInstalled } from "@/stores/ai-store";
 import type { OcrPage, OcrPageResult, OcrProfileId, PageEdits, PageMarks, QuarterTurn } from "@/types/ocr";
 
 export type ReadStage = "preparing" | "starting" | "reading" | "analysing";
@@ -84,14 +87,66 @@ async function prepared(page: OcrPage, source: Blob, key: string, edits: PageEdi
 
 const score = (r: Pick<OcrPageResult, "confidence" | "lines">) => r.confidence * r.lines.reduce((n, l) => n + l.words.length, 0);
 
-/** A census sheet: OCR reads the handwriting-only copy; the flattened sheet is what review shows. */
+/**
+ * A census sheet: OCR reads each written-in letter box of the handwriting-only
+ * copy as one character (only letters, or only digits, as the box allows);
+ * the flattened sheet is what review shows.
+ */
+/**
+ * The handwriting reader on every written row of the sheet (one character per
+ * letter box; open lines whole), as OCR lines — or `null` when it isn't
+ * installed or can't run, so printed-text OCR reads instead.
+ */
+async function readWithHandwritingReader(census: CensusImage, signal: AbortSignal, report: (stage: ReadStage, fraction: number, detail?: string) => void) {
+  if (!(await handwritingReaderInstalled())) return null;
+  const rows = sheetLetterRows(census.read);
+  if (!rows.length) return [];
+  try {
+    // Tesseract and the reader never sit in memory together (phones).
+    await ocrRuntime.shutdown();
+    const crops = await cropLines(census.handwriting, rows.map((r) => r.box), rows.map((r) => r.slots), rows.map((r) => (r.slots.length ? undefined : r.allowed)), rows.map((r) => r.gaps));
+    const read = () => aiRuntime.readLines(crops, { signal, onProgress: (p) => report("reading", 0.2 + (p.fraction ?? 0) * 0.7) });
+    // A stalled worker is stopped by the runtime's watchdog; one fresh try before giving up.
+    const readings = await read().catch((error: unknown) => {
+      if (signal.aborted) throw error;
+      return read();
+    });
+    return rows.map((row, i) => {
+      const word = { text: readings[i].text, confidence: Math.round(readings[i].confidence * 100), box: row.box, unclear: "" };
+      return { text: word.text, confidence: word.confidence, box: row.box, block: 0, words: [word] };
+    });
+  } catch (error) {
+    if (signal.aborted) throw error;
+    console.error(error);
+    return null;
+  }
+}
+
 async function readCensusPage(page: OcrPage, census: CensusImage, key: string, options: ReadOptions, signal: AbortSignal, report: (stage: ReadStage, fraction: number, detail?: string) => void) {
   const marks: PageMarks = { horizontal: [], vertical: [], checkboxes: [], inkRatio: 1, skew: 0, sideways: false };
-  const result = await ocrRuntime.readPage(census.handwriting, marks, options.config, {
-    signal,
-    onStatus: (status, p) => report("starting", 0.2, `${status} ${Math.round(p * 100)}%`),
-    onProgress: (f) => report("reading", 0.2 + f * 0.7),
-  });
+  const started = performance.now();
+  let lines = await readWithHandwritingReader(census, signal, report);
+  const byReader = lines !== null;
+  if (!lines) {
+    const groups = letterBoxGroups(census.read);
+    const reads = [];
+    for (const [i, group] of groups.entries()) {
+      report("reading", 0.2 + (i / groups.length) * 0.7);
+      reads.push(await ocrRuntime.readRegions(census.handwriting, group.boxes, group.allowed, options.config, { signal, onStatus: (status, p) => report("starting", 0.2, `${status} ${Math.round(p * 100)}%`) }));
+    }
+    lines = linesFromLetterBoxes(groups, reads);
+  }
+  const read = lines.filter((l) => l.text);
+  const result: Omit<OcrPageResult, "width" | "height" | "autoRotated"> = {
+    engine: byReader ? "PP-OCRv5 handwriting reader · census sheet" : "tesseract.js 7 · letter boxes",
+    profile: options.config.profile,
+    languages: options.config.languages,
+    lines,
+    text: read.map((l) => l.text).join(""),
+    confidence: read.length ? Math.round(read.reduce((n, l) => n + l.confidence, 0) / read.length) : 0,
+    status: "ok",
+    durationMs: Math.round(performance.now() - started),
+  };
   report("analysing", 0.95);
   const { width, height } = census;
   await updateOcrPage(page.id, {
@@ -104,6 +159,7 @@ async function readCensusPage(page: OcrPage, census: CensusImage, key: string, o
     resultKey: resultKeyOf(key, options.config),
     layout: analyzeLayout({ width, height, lines: result.lines, marks }),
     census: census.read,
+    handwriting: census.handwriting,
     state: "done",
     error: null,
   });
@@ -158,6 +214,7 @@ async function readOne(page: OcrPage, options: ReadOptions, signal: AbortSignal,
   await updateOcrPage(page.id, {
     edits,
     census: null,
+    handwriting: null,
     processed: image.blob,
     processedKey: key,
     width: image.width,

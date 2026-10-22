@@ -1,14 +1,15 @@
 /**
  * Census Sheet (printable)
- * One CVO-CENSUS v1 working sheet drawn from the shared layout at true size
- * (216 × 330 mm, long bond): corner markers, the code strip with its
- * readable twin, the office's header and logos, the printed census
- * information, letter boxes, tick boxes and number bubbles. Black and white
- * only, so it photocopies.
+ * One CVO-CENSUS working sheet drawn from the shared layout of its version
+ * at true size (216 × 330 mm, long bond): corner markers, the code strip with
+ * its readable twin, the office's header and logos, the printed census
+ * information, handwriting fields (open lines; letter boxes for the contact
+ * number), tick boxes and number bubbles. Registered In shows the years
+ * before the census date. Black and white only, so it photocopies.
  */
 
 import { BARANGAYS } from "@/core/census/barangays";
-import { CENSUS_LAYOUT, continuationCaptions, PAGE, type Caption } from "@/core/census/census-layout";
+import { continuationCaptions, layoutFor, optionText, PAGE, type Caption } from "@/core/census/census-layout";
 import { encodeSheetCode, type SheetCode } from "@/core/census/code-strip";
 
 import citySeal from "@/assets/census/city-seal.png";
@@ -18,10 +19,10 @@ const INK = "#111";
 const BOX_LINE = "#555";
 const LETTER_LINE = "#8a8f8c";
 
-function Text({ caption }: { caption: Caption }) {
+function Text({ caption, year }: { caption: Caption; year: number }) {
   return (
     <text x={caption.x} y={caption.y} fontSize={caption.size} fontWeight={caption.bold ? 700 : 500} textAnchor={caption.anchor ?? "start"} fill={INK}>
-      {caption.text}
+      {optionText(caption.text, year)}
     </text>
   );
 }
@@ -34,12 +35,14 @@ function sheetLabel(code: SheetCode) {
 }
 
 export function CensusSheet({ code, className }: { code: SheetCode; className?: string }) {
-  const layout = CENSUS_LAYOUT;
+  const layout = layoutFor(code.version);
   const bits = encodeSheetCode(code);
   const barangay = BARANGAYS[code.barangay];
   const [y, m, d] = code.censusDate.split("-");
   const ownerWords = code.continuation ? continuationCaptions(layout) : layout.ownerCaptions;
-  const letterBoxes = [...(code.continuation ? [] : layout.owner), ...layout.pets.flatMap((p) => p.writeIns)].flatMap((f) => f.rows.flat());
+  const fields = [...(code.continuation ? [] : layout.owner), ...layout.pets.flatMap((p) => p.writeIns)];
+  const letterBoxes = fields.filter((f) => !f.open).flatMap((f) => f.rows.flat());
+  const openLines = fields.filter((f) => f.open).flatMap((f) => f.rows.flat());
 
   return (
     <svg
@@ -91,7 +94,7 @@ export function CensusSheet({ code, className }: { code: SheetCode; className?: 
       </text>
 
       {[...layout.captions, ...ownerWords].map((c, i) => (
-        <Text key={i} caption={c} />
+        <Text key={i} caption={c} year={Number(y)} />
       ))}
       {layout.pets.map((pet) => (
         <text key={pet.slot} x={pet.titleAt.x} y={pet.titleAt.y} fontSize={3} fontWeight={700} fill={INK}>
@@ -101,6 +104,9 @@ export function CensusSheet({ code, className }: { code: SheetCode; className?: 
 
       {letterBoxes.map((r, i) => (
         <rect key={i} {...r} fill="none" stroke={LETTER_LINE} strokeWidth={0.25} />
+      ))}
+      {openLines.map((r, i) => (
+        <rect key={`line-${i}`} {...r} rx={1} fill="none" stroke={LETTER_LINE} strokeWidth={0.25} />
       ))}
       {layout.pets.flatMap((pet) => [pet.notApplicable, ...pet.choices.flatMap((g) => g.options.map((o) => o.box))]).map((r, i) => (
         <rect key={i} {...r} rx={0.4} fill="none" stroke={BOX_LINE} strokeWidth={0.3} />

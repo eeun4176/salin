@@ -189,3 +189,10 @@ export function useAiFeature(id: AiModelId): AiFeature {
   if (state.status !== "ready") return { ready: false, reason: `Download the ${AI_MODELS[id].name.toLowerCase()} in Settings → On-device AI.`, variant };
   return { ready: true, reason: null, variant };
 }
+
+/** Is the handwriting reader on this device (whatever the AI mode)? Census sheets use it whenever it is. */
+export async function handwritingReaderInstalled() {
+  const store = useAiStore.getState();
+  if (store.models.handwriting.status === "checking") await store.refresh();
+  return useAiStore.getState().models.handwriting.status === "ready";
+}

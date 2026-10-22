@@ -373,6 +373,8 @@ export interface OcrPage {
   error: string | null;
   /** What was marked on a printed census sheet (the processed image is then the flattened sheet). */
   census?: CensusSheetRead | null;
+  /** Census sheets: the flattened sheet with only the letter boxes' handwriting (no box lines), for the handwriting reader. */
+  handwriting?: Blob | null;
 }
 
 /** A saved, reusable template (built-in templates live in code). */
