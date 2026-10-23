@@ -40,7 +40,7 @@ export function PageFrame({ title, description, aside, back = { to: "/", label: 
             <div>
               <Link
                 to={back.to}
-                className="mb-3 inline-flex items-center gap-1.5 rounded-md text-[13px] font-medium text-salin-muted hover:text-salin-text"
+                className="mb-1 -ml-2 inline-flex h-10 items-center gap-1.5 rounded-lg px-2 text-[13px] font-medium text-salin-muted hover:text-salin-text"
               >
                 <ArrowLeft className="size-4" />
                 {back.label}

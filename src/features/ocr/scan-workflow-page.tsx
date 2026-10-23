@@ -1,6 +1,7 @@
 /**
  * Read Text Page (/scans/:documentId)
- * The OCR workflow for one scan, in two steps:
+ * The OCR workflow for one scan, in two stages (no step counter — one line
+ * under the name says what to do now):
  *   1. Read — every page is read on the device by itself (page edges found,
  *      a fitting template picked); options are tucked away.
  *   2. Check & save — say which columns you need, check each value against
@@ -18,7 +19,6 @@ import { ArrowRight, Crop, LoaderCircle, Pencil, ScanText, Trash2 } from "lucide
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { NameDialog } from "@/components/common/name-dialog";
 import { primaryButton, secondaryButton, StepFooter } from "@/components/common/step-footer";
-import { Stepper, type StepInfo } from "@/components/common/stepper";
 import { PageFrame } from "@/components/layout/page-frame";
 import { validateName } from "@/core/storage/names";
 import { deleteOcrDocument, updateOcrDocument } from "@/core/storage/repositories/ocr.repository";
@@ -32,10 +32,10 @@ import { useOcrStore } from "@/stores/ocr-store";
 import { toast } from "@/stores/toast-store";
 import type { OcrStage } from "@/types/ocr";
 
-const STEPS: StepInfo[] = [
-  { label: "Read", description: "Reading the pages on this device." },
-  { label: "Check & save", description: "Pick what you need and save." },
-];
+const HINT: Record<number, string> = {
+  1: "Salin reads the pages on this device, then you check what it found.",
+  2: "Check each value against the page, then save it as a dataset.",
+};
 
 const STEP_OF: Record<OcrStage, number> = { prepare: 1, read: 1, review: 2, done: 2 };
 
@@ -104,9 +104,9 @@ export function ScanWorkflowPage() {
           <Trash2 className="size-4" />
         </button>
       </div>
-      <Stepper steps={STEPS} current={current} className="mt-5" />
+      <p className="mt-1 text-center text-sm text-salin-muted">{fixingPages ? "Crop, rotate or reorder pages, then read them again." : HINT[current]}</p>
 
-      <div className="mt-8 border-t border-salin-border pt-6">
+      <div className="mt-5 border-t border-salin-border pt-6">
         {fixingPages ? (
           <>
             <PrepareStep doc={doc} pages={pages} selected={selectedPage} onSelect={setSelectedPage} />

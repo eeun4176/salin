@@ -70,7 +70,7 @@ function NavLink({ to, label, icon: Icon, count, active }: { to: string; label: 
 }
 
 /** "12.4 MB Local": how much Salin keeps on this device, refreshed when the workspace changes. */
-function StorageBadge() {
+export function StorageBadge({ className }: { className?: string }) {
   const items = useWorkspaceStore((s) => s.items);
   const [usage, setUsage] = useState<number | null>(null);
   useEffect(() => {
@@ -87,7 +87,7 @@ function StorageBadge() {
     <Link
       to="/settings"
       title="Stored on this device"
-      className="flex h-9 items-center gap-2 overflow-hidden rounded-xl px-3 text-xs text-salin-muted ring-1 ring-salin-border hover:text-salin-text"
+      className={cn("flex h-9 items-center gap-2 overflow-hidden rounded-xl px-3 text-xs text-salin-muted ring-1 ring-salin-border hover:text-salin-text", className)}
     >
       <HardDrive aria-hidden="true" className="size-4 shrink-0" />
       <span className={cn(wipe, "tabular-nums")}>{formatBytes(usage)} Local</span>
@@ -95,7 +95,8 @@ function StorageBadge() {
   );
 }
 
-function AccountMenu() {
+/** The signed-in paravet: avatar + name in the sidebar; just the avatar (`compact`) in the phone header. */
+export function AccountMenu({ compact = false }: { compact?: boolean }) {
   const navigate = useNavigate();
   const session = useAuthStore((s) => s.session);
   const signOut = useAuthStore((s) => s.signOut);
@@ -120,18 +121,27 @@ function AccountMenu() {
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger
         aria-label={`Account: ${session.name}`}
-        className="flex w-full items-center gap-2.5 overflow-hidden rounded-xl p-1 text-left outline-none hover:bg-salin-tile focus-visible:ring-2 focus-visible:ring-salin-primary"
+        className={cn("flex items-center gap-2.5 overflow-hidden rounded-xl p-1 text-left outline-none hover:bg-salin-tile focus-visible:ring-2 focus-visible:ring-salin-primary", compact ? "rounded-full" : "w-full")}
       >
         <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-full bg-salin-primary-soft text-xs font-semibold text-salin-primary-ink">
           {initials}
         </span>
-        <span className={cn(wipe, "flex-1")}>
-          <span className="block truncate text-sm font-medium text-salin-text">{session.name}</span>
-          <span className="block truncate text-[11px] text-salin-subtle">{session.key}</span>
-        </span>
+        {!compact && (
+          <span className={cn(wipe, "flex-1")}>
+            <span className="block truncate text-sm font-medium text-salin-text">{session.name}</span>
+            <span className="block truncate text-[11px] text-salin-subtle">{session.key}</span>
+          </span>
+        )}
       </DropdownMenuTrigger>
-      <DropdownMenuContent side="top" align="start" className="w-60 rounded-xl p-1.5">
+      <DropdownMenuContent side={compact ? "bottom" : "top"} align={compact ? "end" : "start"} className="w-60 rounded-xl p-1.5">
         <DropdownMenuLabel className="truncate">{session.name}</DropdownMenuLabel>
+        {/* Phones have no sidebar, so these areas are reached from here. */}
+        {compact &&
+          OTHER_LINKS.map(({ to, label, icon: Icon }) => (
+            <DropdownMenuItem key={to} className="gap-2.5 py-2" onSelect={() => navigate(to)}>
+              <Icon /> {label}
+            </DropdownMenuItem>
+          ))}
         {!installed && (
           <DropdownMenuItem className="gap-2.5 py-2" onSelect={() => void install()}>
             <Download /> Install Salin

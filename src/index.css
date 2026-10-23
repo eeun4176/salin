@@ -45,7 +45,6 @@
   --ease-spring: linear(0, 0.083 5.6%, 0.26 11.1%, 0.457 16.7%, 0.633 22.2%, 0.774 27.8%, 0.876 33.3%, 0.944 38.9%, 0.986 44.4%, 1.008 50%, 1.018 55.6%, 1.02 61.1%, 1.018 66.7%, 1.014 72.2%, 1 100%);
   --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
 
-  --animate-bob: bob 6s ease-in-out infinite;
   --animate-caret: caret 1.05s steps(1, end) infinite;
   --animate-flash: flash 450ms ease-out forwards;
   --animate-scan: scan 2.8s ease-in-out infinite alternate;
@@ -133,16 +132,6 @@
     40% {
       opacity: 1;
       transform: translateY(-3px);
-    }
-  }
-
-  @keyframes bob {
-    0%,
-    100% {
-      transform: translate3d(0, 0, 0) rotate(var(--tilt, 0deg));
-    }
-    50% {
-      transform: translate3d(0, -10px, 0) rotate(calc(var(--tilt, 0deg) * -1));
     }
   }
 
@@ -235,8 +224,8 @@
   --sidebar-border: #e6ebe8;
   --sidebar-ring: #01a85a;
 
-  /* Height of the mobile bottom tab bar (without safe-area inset) */
-  --mobile-nav-h: 68px;
+  /* Space the floating mobile bar takes: 56px pill + 10px gap above the screen edge (without safe-area inset) */
+  --mobile-nav-h: 66px;
 }
 
 /* ---------------------------------------------------------------

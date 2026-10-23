@@ -36,11 +36,11 @@ function scanFileName(index: number) {
   return `Scan ${stamp} p${index}.jpg`;
 }
 
-/** Green corner brackets marking where the page should sit. */
+/** Soft green-tinted page area with green corner brackets marking where the page should sit. */
 function DocumentFrame({ animate }: { animate: boolean }) {
   const corner = "absolute size-9 border-salin-primary";
   return (
-    <div aria-hidden="true" className="pointer-events-none absolute inset-x-[10%] inset-y-[8%] overflow-hidden rounded-xl">
+    <div aria-hidden="true" className="pointer-events-none absolute inset-x-[10%] inset-y-[8%] overflow-hidden rounded-xl bg-salin-primary/10 ring-1 ring-salin-primary/25">
       <span className={cn(corner, "top-0 left-0 rounded-tl-xl border-t-[3px] border-l-[3px]")} />
       <span className={cn(corner, "top-0 right-0 rounded-tr-xl border-t-[3px] border-r-[3px]")} />
       <span className={cn(corner, "bottom-0 left-0 rounded-bl-xl border-b-[3px] border-l-[3px]")} />
@@ -186,20 +186,20 @@ export function ScanPage() {
       <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_17.5rem]">
         {/* Camera */}
         <div>
-          <div className="relative mx-auto aspect-[3/4] max-h-[68vh] overflow-hidden rounded-3xl bg-[#0E1511] sm:aspect-[4/3] md:max-h-none">
+          <div className="relative mx-auto aspect-[3/4] max-h-[52dvh] overflow-hidden rounded-3xl bg-salin-primary/10 ring-1 ring-salin-primary/20 sm:aspect-[4/3] md:max-h-none">
             <video ref={videoRef} playsInline muted className={cn("absolute inset-0 size-full object-cover transition-opacity duration-300", live ? "opacity-100" : "opacity-0")} />
 
             {live && (
               <>
                 <DocumentFrame animate={!reduced} />
-                <p className="absolute top-3 left-1/2 -translate-x-1/2 rounded-full bg-black/45 px-3 py-1.5 text-xs font-medium whitespace-nowrap text-white backdrop-blur">
+                <p className="absolute top-3 left-1/2 -translate-x-1/2 rounded-full bg-salin-surface/85 px-3 py-1.5 text-xs font-medium whitespace-nowrap text-salin-text shadow-sm backdrop-blur">
                   Fit the whole page inside the frame
                 </p>
               </>
             )}
 
             {status.state === "starting" && (
-              <div className="absolute inset-0 grid place-items-center text-sm text-white/80">
+              <div className="absolute inset-0 grid place-items-center text-sm text-salin-muted">
                 <span className="flex items-center gap-2">
                   <LoaderCircle className="size-5 animate-spin motion-reduce:animate-none" /> Starting camera…
                 </span>
@@ -207,22 +207,22 @@ export function ScanPage() {
             )}
 
             {errorCopy && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center text-white">
-                <span className="grid size-14 place-items-center rounded-2xl bg-white/10">
+              <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center text-salin-text">
+                <span className="grid size-14 place-items-center rounded-2xl bg-salin-surface text-salin-primary ring-1 ring-salin-border">
                   <CameraOff className="size-6" />
                 </span>
                 <p className="mt-4 font-semibold">{errorCopy.title}</p>
-                <p className="mt-1 max-w-xs text-sm text-white/70">{errorCopy.body}</p>
+                <p className="mt-1 max-w-xs text-sm text-salin-muted">{errorCopy.body}</p>
                 <div className="mt-5 flex flex-wrap justify-center gap-2">
                   {canRetry && (
-                    <button type="button" onClick={retry} className="press inline-flex h-10 items-center gap-2 rounded-xl bg-white/10 px-4 text-sm font-semibold ring-1 ring-white/20 hover:bg-white/15">
+                    <button type="button" onClick={retry} className="press inline-flex h-10 items-center gap-2 rounded-xl bg-salin-surface px-4 text-sm font-semibold text-salin-text ring-1 ring-salin-border hover:bg-salin-tile">
                       <RotateCcw className="size-4" /> Try again
                     </button>
                   )}
-                  <button type="button" onClick={() => nativeRef.current?.click()} className="press inline-flex h-10 items-center gap-2 rounded-xl bg-salin-primary px-4 text-sm font-semibold hover:bg-salin-primary-strong">
+                  <button type="button" onClick={() => nativeRef.current?.click()} className="press inline-flex h-10 items-center gap-2 rounded-xl bg-salin-primary px-4 text-sm font-semibold text-white hover:bg-salin-primary-strong">
                     <Camera className="size-4" /> Use the camera app
                   </button>
-                  <button type="button" onClick={() => uploadRef.current?.click()} className="press inline-flex h-10 items-center gap-2 rounded-xl bg-white/10 px-4 text-sm font-semibold ring-1 ring-white/20 hover:bg-white/15">
+                  <button type="button" onClick={() => uploadRef.current?.click()} className="press inline-flex h-10 items-center gap-2 rounded-xl bg-salin-surface px-4 text-sm font-semibold text-salin-text ring-1 ring-salin-border hover:bg-salin-tile">
                     <Images className="size-4" /> Upload a photo or PDF
                   </button>
                 </div>
@@ -232,10 +232,10 @@ export function ScanPage() {
             {flashes > 0 && <div key={flashes} aria-hidden="true" className="pointer-events-none absolute inset-0 animate-flash bg-white opacity-0" />}
 
             {shot && (
-              <div role="dialog" aria-label="Check the photo" className="absolute inset-0 flex flex-col bg-[#0E1511]">
+              <div role="dialog" aria-label="Check the photo" className="absolute inset-0 flex flex-col bg-salin-canvas">
                 {shot.previewUrl && <img src={shot.previewUrl} alt="Photo just taken" className="min-h-0 flex-1 object-contain" />}
                 <div className="flex items-center justify-center gap-3 p-3">
-                  <button type="button" onClick={retake} className="press inline-flex h-11 items-center gap-2 rounded-xl bg-white/10 px-4 text-sm font-semibold text-white ring-1 ring-white/20 hover:bg-white/15">
+                  <button type="button" onClick={retake} className="press inline-flex h-11 items-center gap-2 rounded-xl bg-salin-surface px-4 text-sm font-semibold text-salin-text ring-1 ring-salin-border hover:bg-salin-tile">
                     <RotateCcw className="size-4" /> Retake
                   </button>
                   <button type="button" onClick={keepShot} className="press inline-flex h-11 items-center gap-2 rounded-xl bg-salin-primary px-5 text-sm font-semibold text-white hover:bg-salin-primary-strong">
@@ -261,9 +261,9 @@ export function ScanPage() {
               onClick={capture}
               disabled={!live}
               aria-label="Capture page"
-              className="press grid size-[74px] place-items-center rounded-full bg-white shadow-[0_0_0_4px_var(--color-salin-primary),0_10px_24px_-8px_rgb(1_168_90/0.6)] disabled:opacity-40"
+              className="press grid size-[74px] place-items-center rounded-full bg-salin-surface shadow-[0_0_0_4px_var(--color-salin-primary),0_10px_24px_-8px_rgb(1_168_90/0.6)] disabled:opacity-40"
             >
-              <span className="size-[58px] rounded-full bg-[linear-gradient(150deg,#22C878,#01A85A_55%,#018A4A)]" />
+              <span className="size-[58px] rounded-full bg-salin-primary" />
             </button>
             <button
               type="button"

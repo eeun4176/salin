@@ -316,7 +316,7 @@ function UserMessage({ message }: { message: Extract<ChatMessage, { role: "user"
         <p className="sr-only">You said:</p>
         {message.text && <p className="text-[15px] whitespace-pre-wrap text-salin-text">{message.text}</p>}
         {message.attachments.length > 0 && (
-          <div className="no-scrollbar -mx-4 mt-2.5 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0" data-lenis-prevent-horizontal="">
+          <div className="no-scrollbar -mx-4 mt-1.5 flex gap-2 overflow-x-auto px-4 py-1 sm:mx-0 sm:flex-wrap sm:px-0" data-lenis-prevent-horizontal="">
             {message.attachments.map((f) => (
               <AttachmentChip key={f.id} file={f} />
             ))}

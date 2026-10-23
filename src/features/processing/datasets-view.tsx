@@ -182,7 +182,7 @@ export function DatasetsView() {
 
       {datasets.length > 0 && (
         <div className="mt-5 flex flex-wrap items-center justify-between gap-2">
-          <div role="radiogroup" aria-label="Show" className="no-scrollbar -mx-1 flex max-w-full gap-1 overflow-x-auto px-1" data-lenis-prevent-horizontal="">
+          <div role="radiogroup" aria-label="Show" className="no-scrollbar -m-1 flex max-w-full gap-1 overflow-x-auto p-1" data-lenis-prevent-horizontal="">
             {(["all", "needs_review", "reviewed"] as const).map((key) => (
               <button
                 key={key}

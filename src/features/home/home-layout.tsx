@@ -1,7 +1,7 @@
 /**
  * Home Layout
- * The workspace frame. On phones: the hero banner on top and the rounded
- * white workspace card below it. From 760px wide: the dashboard's list pane
+ * The workspace frame. On phones: the top bar (logo, storage, account) and
+ * the rounded white workspace card floating below it, like the dashboard. From 760px wide: the dashboard's list pane
  * (search, then the open tab or folder) beside the detail pane, which shows
  * the selected file — or, on Datasets, the selected dataset. Dragging the
  * divider between them (or arrow keys on it) sets the list from 260 to 480px.
@@ -10,7 +10,7 @@
 import { useState, type KeyboardEvent, type PointerEvent } from "react";
 import { Outlet, useLocation } from "react-router";
 
-import { Hero } from "@/features/home/hero";
+import { AppHeader } from "@/components/layout/app-header";
 import { DatasetDetail } from "@/features/processing/components/dataset-detail";
 import { FileDetail } from "@/features/workspace/components/file-detail";
 import { WorkspaceToolbar } from "@/features/workspace/components/workspace-toolbar";
@@ -63,7 +63,7 @@ function PaneDivider({ width, onResize }: { width: number; onResize: (px: number
 
 /**
  * The tab content (Workspace, Recents, Favorites, Trash, Datasets) renders
- * in the outlet, so the hero (phones) or the panes (desktop) don't restart
+ * in the outlet, so the top bar (phones) or the panes (desktop) don't restart
  * when switching tabs. `@container`: the list adapts to its pane's width,
  * not the screen's.
  */
@@ -86,17 +86,15 @@ export function HomeLayout() {
   }
 
   return (
-    <>
-      <Hero />
-      <div className="pb-mobile-nav relative z-10 mx-auto -mt-8 max-w-5xl px-3 sm:px-6">
-        <main
-          id="main"
-          className="@container min-h-[24rem] rounded-[28px] bg-salin-surface p-4 shadow-[0_1px_2px_rgb(16_40_28/0.04),0_24px_48px_-28px_rgb(16_40_28/0.18)] ring-1 ring-salin-border/70 sm:p-6"
-        >
-          <WorkspaceToolbar />
-          <Outlet />
-        </main>
-      </div>
-    </>
+    <div className="pb-mobile-nav mx-auto max-w-5xl px-3 pt-[calc(12px+env(safe-area-inset-top))] sm:px-6">
+      <AppHeader className="mb-3 px-1" />
+      <main
+        id="main"
+        className="@container min-h-[24rem] rounded-[28px] bg-salin-surface p-4 shadow-[0_1px_2px_rgb(16_40_28/0.04),0_24px_48px_-28px_rgb(16_40_28/0.18)] ring-1 ring-salin-border/70 sm:p-6"
+      >
+        <WorkspaceToolbar />
+        <Outlet />
+      </main>
+    </div>
   );
 }

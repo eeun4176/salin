@@ -1,13 +1,15 @@
 /**
  * Mobile Navigation
- * The phone-only bottom tab bar (Workspace · Recents · + · Favorites ·
- * Trash) with the raised + button that fans out the Scan and Import quick
- * actions over a white scrim.
+ * The phone-only floating bottom bar, in two pieces 10px above the screen
+ * edge: a white pill with the four workspace tabs (Workspace · Recents ·
+ * Favorites · Trash) and a glass lens that swells as it slides to the active
+ * tab, and a separate green + circle beside it that fans out the Scan,
+ * Import and AI Studio quick actions over a white scrim.
  */
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
-import { Camera, Plus, Upload, type LucideIcon } from "lucide-react";
+import { Camera, Plus, Sparkles, Upload, type LucideIcon } from "lucide-react";
 
 import { SECTION_LINKS, isSectionActive } from "@/features/workspace/section-links";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
@@ -18,34 +20,68 @@ const SPRING = "var(--ease-spring)";
 const SPRING_MS = 594;
 const FADE_MS = 180;
 const STAGGER_MS = 40;
-const FAB = 60;
+const FAB = 56;
 const ACTION = 58;
+/** The lens swells while it travels, then settles back with a short spring. */
+const SWELL_MS = 200;
+const SETTLE_MS = 170;
+const SETTLE_EASE = "linear(0, 0.457 16.7%, 0.876 33.3%, 1.008 50%, 1.02 61.1%, 1)";
 
+// Offsets from the compose circle's centre: a quarter arc (radius 126px, 30° apart) up and to the left,
+// clear of the tabs pill, since the circle sits at the right edge.
 const ACTIONS: { label: string; to: string; icon: LucideIcon; x: number; y: number }[] = [
-  { label: "Scan", to: "/scan", icon: Camera, x: -60, y: -76 },
-  { label: "Import", to: "/import", icon: Upload, x: 60, y: -76 },
+  { label: "Scan", to: "/scan", icon: Camera, x: -109, y: -63 },
+  { label: "Import", to: "/import", icon: Upload, x: -63, y: -109 },
+  { label: "AI Studio", to: "/ai-studio", icon: Sparkles, x: 0, y: -126 },
 ];
 
-function TabLink({ to, label, icon: Icon, pathname }: (typeof SECTION_LINKS)[number] & { pathname: string }) {
-  const isActive = isSectionActive(to, pathname);
+function TabLink({ to, label, icon: Icon, active }: (typeof SECTION_LINKS)[number] & { active: boolean }) {
   return (
     <Link
       to={to}
-      aria-current={isActive ? "page" : undefined}
+      aria-current={active ? "page" : undefined}
       className={cn(
-        "flex flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors",
-        isActive ? "text-salin-primary" : "text-salin-muted active:text-salin-text",
+        "relative z-10 flex flex-col items-center justify-center gap-0.5 rounded-full text-[10.5px] font-medium transition-colors duration-200",
+        active ? "text-salin-primary" : "text-salin-muted active:text-salin-text",
       )}
     >
-      <Icon className="size-[22px]" strokeWidth={isActive ? 2.2 : 1.8} />
+      <Icon aria-hidden="true" className="size-5" strokeWidth={active ? 2.2 : 1.8} />
       <span>{label}</span>
     </Link>
   );
 }
 
+/** The glass lens behind the active tab; hidden on pages that aren't a tab (Scan, Settings…). */
+function TabLens({ index }: { index: number }) {
+  const reduced = useReducedMotion();
+  const [shown, setShown] = useState(index);
+  const [swelling, setSwelling] = useState(false);
+  // Start the swell during render when the tab changes (no flash of the settled lens at the new spot).
+  if (shown !== index) {
+    setShown(index);
+    if (!reduced && shown >= 0 && index >= 0) setSwelling(true);
+  }
+  useEffect(() => {
+    if (!swelling) return;
+    const timer = window.setTimeout(() => setSwelling(false), SWELL_MS);
+    return () => window.clearTimeout(timer);
+  }, [swelling, index]);
+
+  const style: CSSProperties = {
+    transform: `translateX(${Math.max(index, 0) * 100}%) scale(${swelling ? "1.16, 1.1" : "1"})`,
+    transition: reduced ? "opacity 150ms ease" : swelling ? `transform ${SWELL_MS}ms var(--ease-out-soft), opacity 150ms ease` : `transform ${SETTLE_MS}ms ${SETTLE_EASE}, opacity 150ms ease`,
+    opacity: index < 0 ? 0 : 1,
+  };
+  return (
+    <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-0 w-1/4 p-0.5" style={style}>
+      <span className="block size-full rounded-full bg-salin-primary/10 shadow-[inset_0_0_0_1px_rgb(255_255_255/0.9),0_4px_12px_-4px_rgb(16_40_28/0.22)] backdrop-blur-sm dark:shadow-[inset_0_0_0_1px_rgb(255_255_255/0.12),0_4px_12px_-4px_rgb(0_0_0/0.5)]" />
+    </span>
+  );
+}
+
 /**
- * Phone tab bar: Workspace · Recents · [raised +] · Favorites · Trash.
- * The centre toggle turns into an X and fans Scan / Import out on an arc.
+ * Phone bottom bar: the tabs pill, then the compose circle, which turns into
+ * an X and fans Scan / Import out above itself.
  */
 export function MobileNav() {
   const { pathname } = useLocation();
@@ -57,6 +93,7 @@ export function MobileNav() {
   const toggleRef = useRef<HTMLButtonElement>(null);
   const navigate = useNavigate();
   const reduced = useReducedMotion();
+  const activeIndex = SECTION_LINKS.findIndex((link) => isSectionActive(link.to, pathname));
 
   useEffect(() => {
     if (!open) return;
@@ -78,8 +115,6 @@ export function MobileNav() {
     navigate(to);
   };
 
-  const [left, right] = [SECTION_LINKS.slice(0, 2), SECTION_LINKS.slice(2)];
-
   return (
     <div className="nav:hidden">
       {/* 72% white scrim under the menu; tapping it closes the actions */}
@@ -92,86 +127,78 @@ export function MobileNav() {
         )}
       />
 
-      <nav
-        aria-label="Primary"
-        className="fixed inset-x-0 bottom-0 z-50 border-t border-salin-border bg-salin-bar pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_-16px_rgb(16_40_28/0.18)]"
-      >
-        <div className="grid h-(--mobile-nav-h) grid-cols-5">
-          {left.map((link) => (
-            <TabLink key={link.to} {...link} pathname={pathname} />
-          ))}
-          <div aria-hidden="true" />
-          {right.map((link) => (
-            <TabLink key={link.to} {...link} pathname={pathname} />
-          ))}
-        </div>
-      </nav>
-
-      {/* Zero-size anchor at the top-centre edge of the bar; FAB + actions hang off it */}
-      <div className="fixed bottom-[calc(var(--mobile-nav-h)+env(safe-area-inset-bottom))] left-1/2 z-[70] size-0">
-        <div id="quick-actions" role="group" aria-label="Quick actions" aria-hidden={!open}>
-          {ACTIONS.map((action, i) => {
-            const delay = (open ? i : ACTIONS.length - 1 - i) * STAGGER_MS;
-            const offset = `translate(${action.x}px, ${action.y}px)`;
-            // Reduced motion: actions live at their arc position and only fade.
-            const transform = reduced ? offset : open ? `${offset} scale(1)` : "translate(0px, 0px) scale(0.5)";
-            const style: CSSProperties = {
-              width: ACTION,
-              height: ACTION,
-              top: -24 + FAB / 2 - ACTION / 2,
-              left: -ACTION / 2,
-              transform,
-              opacity: open ? 1 : 0,
-              transition: reduced
-                ? `opacity ${FADE_MS}ms ease ${delay}ms`
-                : `transform ${SPRING_MS}ms ${SPRING} ${delay}ms, opacity ${FADE_MS}ms ease ${delay}ms`,
-            };
-            const Icon = action.icon;
-            return (
-              <button
-                key={action.to}
-                type="button"
-                tabIndex={open ? 0 : -1}
-                onClick={() => go(action.to)}
-                style={style}
-                className={cn(
-                  "absolute flex flex-col items-center justify-center gap-0.5 rounded-full bg-salin-surface text-salin-primary",
-                  "shadow-[0_10px_24px_-8px_rgb(16_40_28/0.3),0_0_0_1px_var(--color-salin-border)] active:bg-salin-primary-soft",
-                  !open && "pointer-events-none",
-                )}
-              >
-                <Icon className="size-5" strokeWidth={2.1} />
-                <span className="text-[10.5px] leading-none font-semibold text-salin-text">{action.label}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        <button
-          ref={toggleRef}
-          type="button"
-          aria-expanded={open}
-          aria-controls="quick-actions"
-          aria-label={open ? "Close quick actions" : "Open quick actions"}
-          onClick={() => setOpen(!open)}
-          style={{ width: FAB, height: FAB, top: -24, left: -FAB / 2 }}
-          className={cn(
-            "absolute grid place-items-center rounded-full text-white",
-            "bg-[linear-gradient(150deg,#22C878_0%,#01A85A_52%,#018A4A_100%)]",
-            "shadow-[0_0_0_7px_var(--color-salin-canvas),0_12px_22px_-6px_rgb(1_168_90/0.55)]",
-            "transition-transform duration-150 active:scale-95 motion-reduce:transition-none",
-          )}
+      <div className="pointer-events-none fixed inset-x-2.5 bottom-[calc(10px+env(safe-area-inset-bottom))] z-[95] flex items-end justify-between">
+        <nav
+          aria-label="Primary"
+          className="pointer-events-auto h-14 w-[calc(100%-66px)] rounded-full bg-salin-bar p-1 shadow-[inset_0_0_0_1px_var(--color-salin-border),0_10px_28px_-12px_rgb(16_40_28/0.28)]"
         >
-          <Plus
-            aria-hidden="true"
-            className="size-7"
-            strokeWidth={2.4}
-            style={{
-              transform: open ? "rotate(45deg)" : "rotate(0deg)",
-              transition: reduced ? "none" : `transform ${SPRING_MS}ms ${SPRING}`,
-            }}
-          />
-        </button>
+          <div className="relative grid h-full grid-cols-4">
+            <TabLens index={activeIndex} />
+            {SECTION_LINKS.map((link, i) => (
+              <TabLink key={link.to} {...link} active={i === activeIndex} />
+            ))}
+          </div>
+        </nav>
+
+        <div className="pointer-events-auto relative" style={{ width: FAB, height: FAB }}>
+          <div id="quick-actions" role="group" aria-label="Quick actions" aria-hidden={!open}>
+            {ACTIONS.map((action, i) => {
+              const delay = (open ? i : ACTIONS.length - 1 - i) * STAGGER_MS;
+              const offset = `translate(${action.x}px, ${action.y}px)`;
+              // Reduced motion: actions live at their final position and only fade.
+              const transform = reduced ? offset : open ? `${offset} scale(1)` : "translate(0px, 0px) scale(0.5)";
+              const style: CSSProperties = {
+                width: ACTION,
+                height: ACTION,
+                top: FAB / 2 - ACTION / 2,
+                left: FAB / 2 - ACTION / 2,
+                transform,
+                opacity: open ? 1 : 0,
+                transition: reduced
+                  ? `opacity ${FADE_MS}ms ease ${delay}ms`
+                  : `transform ${SPRING_MS}ms ${SPRING} ${delay}ms, opacity ${FADE_MS}ms ease ${delay}ms`,
+              };
+              const Icon = action.icon;
+              return (
+                <button
+                  key={action.to}
+                  type="button"
+                  tabIndex={open ? 0 : -1}
+                  onClick={() => go(action.to)}
+                  style={style}
+                  className={cn(
+                    "absolute flex flex-col items-center justify-center gap-0.5 rounded-full bg-salin-surface text-salin-primary",
+                    "shadow-[0_10px_24px_-8px_rgb(16_40_28/0.3),0_0_0_1px_var(--color-salin-border)] active:bg-salin-primary-soft",
+                    !open && "pointer-events-none",
+                  )}
+                >
+                  <Icon className="size-5" strokeWidth={2.1} />
+                  <span className="text-[10.5px] leading-none font-semibold text-salin-text">{action.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <button
+            ref={toggleRef}
+            type="button"
+            aria-expanded={open}
+            aria-controls="quick-actions"
+            aria-label={open ? "Close quick actions" : "Open quick actions"}
+            onClick={() => setOpen(!open)}
+            className={cn(
+              "relative grid size-full place-items-center rounded-full bg-salin-primary text-white shadow-[0_10px_22px_-8px_rgb(1_168_90/0.6)]",
+              "transition-transform duration-[520ms] ease-spring active:scale-90 active:duration-[90ms] active:ease-out motion-reduce:transition-none",
+            )}
+          >
+            <Plus
+              aria-hidden="true"
+              className="size-7"
+              strokeWidth={2.4}
+              style={{ transform: open ? "rotate(45deg)" : "rotate(0deg)", transition: reduced ? "none" : `transform ${SPRING_MS}ms ${SPRING}` }}
+            />
+          </button>
+        </div>
       </div>
     </div>
   );
