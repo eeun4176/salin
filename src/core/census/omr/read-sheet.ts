@@ -74,18 +74,18 @@ function codeSquareFill(mask: Uint8Array, width: number, box: Rect) {
   return best;
 }
 
-/** Points (mm) along a box's printed outline: its square edge, or its circle for bubbles. */
+/** Points (mm) along a box's printed outline — its square edge, or its circle for bubbles — tagged with their side (0 top/right … 3): sides 0 and 2, and 1 and 3, face each other. */
 function outline(box: Rect, round: boolean) {
-  const points: { x: number; y: number }[] = [];
+  const points: { x: number; y: number; side: number }[] = [];
   const cx = box.x + box.width / 2;
   const cy = box.y + box.height / 2;
   for (let i = 0; i < 32; i++) {
     const t = i / 32;
-    if (round) points.push({ x: cx + (Math.cos(t * 2 * Math.PI) * box.width) / 2, y: cy + (Math.sin(t * 2 * Math.PI) * box.height) / 2 });
+    const side = Math.floor(t * 4);
+    if (round) points.push({ x: cx + (Math.cos(t * 2 * Math.PI) * box.width) / 2, y: cy + (Math.sin(t * 2 * Math.PI) * box.height) / 2, side });
     else {
-      const side = Math.floor(t * 4);
       const f = t * 4 - side;
-      points.push([{ x: box.x + f * box.width, y: box.y }, { x: box.x + box.width, y: box.y + f * box.height }, { x: box.x + (1 - f) * box.width, y: box.y + box.height }, { x: box.x, y: box.y + (1 - f) * box.height }][side]);
+      points.push({ ...[{ x: box.x + f * box.width, y: box.y }, { x: box.x + box.width, y: box.y + f * box.height }, { x: box.x + (1 - f) * box.width, y: box.y + box.height }, { x: box.x, y: box.y + (1 - f) * box.height }][side], side });
     }
   }
   return points;
@@ -94,12 +94,13 @@ function outline(box: Rect, round: boolean) {
 /**
  * The small shift (mm) that best lines a row of boxes up with their printed
  * outlines, so each mark is measured inside its own box and not on its
- * neighbour's edge.
+ * neighbour's edge. A box only counts where opposite sides both meet ink, so
+ * a printed label just above the row or a grid line just below it can't pull
+ * the boxes onto itself.
  */
-function alignment(mask: Uint8Array, width: number, boxes: Rect[], round: boolean) {
-  const reach = 1.2;
+function alignment(mask: Uint8Array, width: number, boxes: Rect[], round: boolean, reach = 1.2) {
   const height = mask.length / width;
-  const points = boxes.flatMap((b) => outline(b, round));
+  const outlines = boxes.map((b) => outline(b, round));
   const inkAt = (x: number, y: number) => {
     const px = Math.round(x * SHEET_SCALE);
     const py = Math.round(y * SHEET_SCALE);
@@ -109,7 +110,11 @@ function alignment(mask: Uint8Array, width: number, boxes: Rect[], round: boolea
   for (let dx = -reach; dx <= reach + 0.0001; dx += 0.2) {
     for (let dy = -reach; dy <= reach + 0.0001; dy += 0.2) {
       let score = 0;
-      for (const p of points) score += inkAt(p.x + dx, p.y + dy);
+      for (const points of outlines) {
+        const sides = [0, 0, 0, 0];
+        for (const p of points) sides[p.side] += inkAt(p.x + dx, p.y + dy);
+        score += Math.min(sides[0], sides[2]) + Math.min(sides[1], sides[3]);
+      }
       // Ties go to the smaller shift.
       if (score > best.score || (score === best.score && Math.hypot(dx, dy) < Math.hypot(best.dx, best.dy))) best = { dx, dy, score };
     }
@@ -117,10 +122,24 @@ function alignment(mask: Uint8Array, width: number, boxes: Rect[], round: boolea
   return best;
 }
 
+/**
+ * Where each box of a row really is: the row's shift, then each box settles on
+ * its own outline near it (±1.2 mm) — paper that isn't quite flat can tilt a
+ * long row by a millimetre or more from one end to the other.
+ */
+function placeRow(mask: Uint8Array, width: number, boxes: Rect[], round: boolean): Rect[] {
+  const row = alignment(mask, width, boxes, round);
+  return boxes.map((box) => {
+    const moved = { ...box, x: box.x + row.dx, y: box.y + row.dy };
+    const own = alignment(mask, width, [moved], round);
+    return { ...moved, x: moved.x + own.dx, y: moved.y + own.dy };
+  });
+}
+
 function answer(mask: Uint8Array, width: number, options: { value: string; box: Rect }[], round = false): AnswerRead {
-  const { dx, dy } = alignment(mask, width, options.map((o) => o.box), round);
+  const placed = placeRow(mask, width, options.map((o) => o.box), round);
   // A bubble's inner square reaches close to its circle, so measure a smaller middle.
-  const states = options.map((o) => markState(inkInBox(mask, width, inner({ ...o.box, x: o.box.x + dx, y: o.box.y + dy }, round ? 0.3 : 0.2))));
+  const states = placed.map((box) => markState(inkInBox(mask, width, inner(box, round ? 0.3 : 0.2))));
   const marked = options.filter((_, i) => states[i] === "checked").map((o) => o.value);
   const box = union(options.map((o) => o.box));
   if (marked.length > 1) return { value: null, state: "multiple", marked, box };

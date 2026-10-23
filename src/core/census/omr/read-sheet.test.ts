@@ -12,7 +12,7 @@ import { describe, expect, it } from "vitest";
 import { layoutFor, PAGE } from "@/core/census/census-layout";
 import type { SheetCode } from "@/core/census/code-strip";
 import { createGray } from "@/core/ocr/imaging/pixels";
-import { drawSheet, photograph } from "@/test/census-fixtures";
+import { bend, drawSheet, photograph } from "@/test/census-fixtures";
 
 import { handwritingOnly, locateAndRead, readFlatSheet } from "./read-sheet";
 
@@ -156,4 +156,26 @@ describe("v3 sheets", () => {
     expect(found.read.inked["owner.address"]).toEqual([[true]]);
     expect([found.read.inked["pet0.other_vaccines"], found.read.inked["pet0.remarks"]]).toEqual([[[false]], [[true]]]);
   });
+
+  // A real printed sheet: category names sit just above each row and a grid line just below it, and paravets tick with one thin "/".
+  const ticked = {
+    "pet0.type": "DOG", "pet0.sex": "FEMALE", "pet0.sterilized": "NO", "pet0.breed": "PURE", "pet0.classification": "SEMI-CONFINED",
+    "pet0.vaccination": "1ST", "pet0.laps": "NO", "pet0.color": "BROWN", "pet0.registered": "YEAR-5",
+    "pet1.type": "CAT", "pet1.sex": "MALE", "pet1.sterilized": "YES", "pet1.breed": "MIX", "pet1.classification": "CONFINED",
+    "pet1.vaccination": "1ST", "pet1.laps": "YES", "pet1.color": "WHITE", "pet1.registered": "YEAR-0",
+  };
+  const printed = drawSheet({ code: v3, answers: ticked, printed: true, tickStyle: "slash" });
+
+  it.each([
+    ["sharp", 0.04, 0, 0],
+    ["at a steeper angle", 0.08, 0, 0],
+    ["slightly out of focus", 0.04, 2, 0],
+    // The middle of the page bows 1.5 mm: rows tilt a millimetre end to end, so each box finds its own outline.
+    ["on paper that isn't flat", 0.04, 0, 1.5],
+  ] as const)("reads thin slash ticks on a printed sheet, %s, without pulling boxes onto labels or grid lines", (_, tilt, soft, bow) => {
+    const { read } = locateAndRead(photograph(bow ? bend(printed, bow) : printed, 0, tilt, soft))!;
+    for (const [key, value] of Object.entries(ticked)) expect(read.answers[key], key).toMatchObject({ value, state: "answered" });
+    // The empty third pet stays blank, row by row, rather than "unclear".
+    for (const key of ["type", "sex", "sterilized", "laps", "color"]) expect(read.answers[`pet2.${key}`].state, key).toBe("unanswered");
+  }, 30_000);
 });
