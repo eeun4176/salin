@@ -8,7 +8,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import { AdminApiError, adminRequest } from "./admin-api";
+import { AdminApiError, adminRequest, apiBase } from "./admin-api";
 
 const reply = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 const schema = z.object({ ok: z.literal(true) });
@@ -26,6 +26,12 @@ describe("adminRequest", () => {
     expect(await adminRequest("/auth/me", { method: "POST", token: "abc", body: { a: 1 }, schema })).toEqual({ ok: true });
     expect(fetch).toHaveBeenCalledWith("https://ekapon.test/api/v1/auth/me", expect.objectContaining({ method: "POST", credentials: "omit", body: '{"a":1}' }));
     expect((fetch.mock.calls[0] as unknown as [string, RequestInit])[1].headers).toMatchObject({ Authorization: "Bearer abc", "Content-Type": "application/json" });
+  });
+
+  it("reads the server address with or without https://", () => {
+    expect(apiBase("city-vet-admin.vercel.app/")).toBe("https://city-vet-admin.vercel.app");
+    expect(apiBase(" http://127.0.0.1:5176 ")).toBe("http://127.0.0.1:5176");
+    expect(apiBase("")).toBeNull();
   });
 
   it("refuses to run when no City Vet server is configured", async () => {

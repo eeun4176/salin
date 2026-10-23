@@ -11,7 +11,14 @@
 
 import type { z } from "zod";
 
-export const CITY_VET_API_URL = (((import.meta.env?.VITE_CITY_VET_API_URL as string | undefined) ?? "").trim().replace(/\/+$/, "")) || null;
+/** The server's origin: no trailing slash, and https:// added when the setting leaves it out ("city-vet-admin.vercel.app"). */
+export function apiBase(setting: string | undefined) {
+  const value = (setting ?? "").trim().replace(/\/+$/, "");
+  if (!value) return null;
+  return /^https?:\/\//i.test(value) ? value : `https://${value}`;
+}
+
+export const CITY_VET_API_URL = apiBase(import.meta.env?.VITE_CITY_VET_API_URL as string | undefined);
 
 export type AdminErrorKind = "not_configured" | "offline" | "unauthenticated" | "refused" | "conflict" | "invalid" | "server";
 
