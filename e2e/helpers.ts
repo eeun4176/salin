@@ -2,7 +2,7 @@
  * E2E Helpers
  * Shared steps for the Playwright tests: sample files (including real
  * text PDFs and Excel workbooks), uploading through the workspace menu,
- * creating folders, the temporary sign-in account, using an item's ⋮ menu, reading downloads, and waiting
+ * creating folders, a stand-in City Vet API for signing in, using an item's ⋮ menu, reading downloads, and waiting
  * until the app works offline.
  */
 
@@ -58,8 +58,34 @@ export function detailPane(page: Page) {
   return page.getByRole("region", { name: "Document details" });
 }
 
-/** The temporary paravet account (see src/core/auth/local-auth.ts). */
-export const ACCOUNT = { key: "PV2026-TMP001-3023", password: "changeme123" };
+/** The placeholder City Vet API the e2e build points at (VITE_CITY_VET_API_URL in playwright.config.ts). */
+export const CITY_VET_API = "https://ekapon.test";
+
+/** The paravet account the stand-in City Vet API knows. */
+export const ACCOUNT = { key: "PV2026-TMP001-3023", password: "changeme123", name: "Temporary Paravet", barangay: "Assumption" };
+
+const cityVetAccount = { id: 7, type: "Paravet", name: ACCOUNT.name, username: null, accountKey: ACCOUNT.key, barangayId: 4, barangay: ACCOUNT.barangay };
+
+/**
+ * Answers Salin's sign-in calls the way e-Kapon does: ACCOUNT's password signs in (token in the body), any other is
+ * refused; /auth/me returns the account. `routes` adds or overrides replies by path (e.g. first sign-in).
+ */
+export async function mockCityVet(page: Page, routes: Record<string, (body: Record<string, unknown>) => { status?: number; json: unknown }> = {}) {
+  await page.route(`${CITY_VET_API}/api/v1/**`, async (route) => {
+    const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "Content-Type, Authorization", "Access-Control-Allow-Methods": "GET, POST" };
+    if (route.request().method() === "OPTIONS") return route.fulfill({ status: 204, headers: cors });
+    const path = new URL(route.request().url()).pathname.replace("/api/v1", "");
+    const body = (route.request().postDataJSON() ?? {}) as Record<string, unknown>;
+    const signedIn = { json: { account: cityVetAccount, token: "e2e-token", expiresAt: new Date(Date.now() + 14 * 86_400_000).toISOString() } };
+    const handlers: typeof routes = {
+      "/auth/login": (b) => (b.password === ACCOUNT.password ? signedIn : { status: 401, json: { error: { code: "INVALID_CREDENTIALS", message: "The username/account key or password is incorrect." } } }),
+      "/auth/me": () => ({ json: { account: cityVetAccount } }),
+      ...routes,
+    };
+    const reply = handlers[path]?.(body) ?? { status: 404, json: { error: { code: "NOT_FOUND", message: "Not found." } } };
+    await route.fulfill({ status: reply.status ?? 200, contentType: "application/json", json: reply.json, headers: cors });
+  });
+}
 
 /** Opens the app and waits until the workspace has loaded from IndexedDB. */
 export async function openWorkspace(page: Page, path = "/") {

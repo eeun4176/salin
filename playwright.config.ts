@@ -34,6 +34,8 @@ export default defineConfig({
     command: `npx vite build && npx vite preview --port ${PORT} --strictPort`,
     url: `http://localhost:${PORT}`,
     reuseExistingServer: !process.env.CI,
+    // Sign-in goes to a placeholder City Vet API that the specs answer with page.route (e2e/helpers.ts mockCityVet).
+    env: { VITE_CITY_VET_API_URL: "https://ekapon.test" },
     timeout: 180_000,
   },
 });

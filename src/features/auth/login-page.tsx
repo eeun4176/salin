@@ -1,28 +1,40 @@
 /**
  * Login Page
- * Where a paravet unlocks their local workspace with an Account Key and
- * password, in floating-label fields. Checks run on the device (see
- * local-auth.ts), so it works with no connection. Wrong or missing entries shake the field and explain what
- * to fix; a correct sign-in shows a short welcome while the workspace
- * opens, then returns to the page the user was trying to reach.
+ * Where a paravet (or City Vet staff member) signs in with the Account Key
+ * (staff: username) and password the City Veterinary Office issued, in
+ * floating-label fields. The first sign-in on a phone needs the internet;
+ * after that the workspace opens, and signing in again works, offline (see
+ * local-auth.ts). New accounts take a first
+ * sign-in: the one-time temporary password, then their own password and the
+ * paravet terms (English or Filipino). Wrong or missing entries shake the
+ * field and explain what to fix; a correct sign-in shows a short welcome
+ * while the workspace opens, then returns to the page the user wanted.
  */
 
 import { useEffect, useId, useState, type FormEvent, type ReactNode } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router";
-import { Check, CircleCheck, Eye, EyeOff, Key, Lock } from "lucide-react";
+import { Check, CircleCheck, Eye, EyeOff, Key, Lock, WifiOff } from "lucide-react";
 
 import { Logo } from "@/components/brand/logo";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
-import { validateLogin, type LoginErrors } from "@/core/auth/local-auth";
+import { startFirstSignIn, validateLogin, validateNewPassword, type LoginErrors, type ParavetPolicy } from "@/core/auth/local-auth";
+import { useOnline } from "@/hooks/use-online";
 import { prefersReducedMotion } from "@/hooks/use-reduced-motion";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
 
 type Phase = "form" | "checking" | "accepted" | "welcome";
+/** signin: Account Key + password · first: temporary password · password: new password + terms. */
+type Mode = "signin" | "first" | "password";
 
-const WRONG_CREDENTIALS = "That Account Key and password don't match. Check them and try again.";
 // How long the workspace "loads" on the welcome view before it opens.
 const WELCOME_MS = 1400;
+
+const COPY: Record<Mode, { title: string; help: string; submit: string }> = {
+  signin: { title: "Access Your Workspace", help: "Sign in with your City Vet account.", submit: "Unlock Workspace" },
+  first: { title: "First sign-in", help: "Use the temporary password from the office.", submit: "Continue" },
+  password: { title: "Create your password", help: "8+ characters, with a letter and a number.", submit: "Save password and sign in" },
+};
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, prefersReducedMotion() ? 0 : ms));
 
@@ -33,17 +45,26 @@ export function LoginPage() {
   const session = useAuthStore((state) => state.session);
   const ready = useAuthStore((state) => state.status === "ready");
   const signIn = useAuthStore((state) => state.signIn);
+  const finishFirstSignIn = useAuthStore((state) => state.finishFirstSignIn);
+  const online = useOnline();
 
+  const [mode, setMode] = useState<Mode>("signin");
   const [phase, setPhase] = useState<Phase>("form");
   const [key, setKey] = useState("");
   const [password, setPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<LoginErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   // Bumped on every failed attempt so the shake restarts even when the same field fails twice.
   const [attempt, setAttempt] = useState(0);
   const [forgotOpen, setForgotOpen] = useState(false);
   const [focusId, setFocusId] = useState<string | null>(null);
+  const [reset, setReset] = useState<{ token: string; policy: ParavetPolicy } | null>(null);
+  const [language, setLanguage] = useState<"en" | "fil">("en");
+  const [agreed, setAgreed] = useState({ terms: false, privacy: false });
 
   // After render: the shaking field was re-mounted, so focus it only now.
   useEffect(() => {
@@ -59,29 +80,81 @@ export function LoginPage() {
   // Already signed in (e.g. Back from the workspace): skip the form.
   if (ready && session && phase === "form") return <Navigate to={from} replace />;
 
+  function switchMode(next: Mode, message: string | null = null) {
+    setMode(next);
+    setPassword("");
+    setErrors({});
+    setFormError(null);
+    setNotice(message);
+    setFocusId(next === "password" ? "new-password" : key ? "password" : "account-key");
+  }
+
+  function fail(message: string, field?: string) {
+    setPhase("form");
+    setFormError(message);
+    setAttempt((n) => n + 1);
+    if (field) setFocusId(field);
+  }
+
+  async function welcome() {
+    setPhase("accepted");
+    await wait(450);
+    setPhase("welcome");
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (phase !== "form") return;
-    const found = validateLogin({ key, password });
-    setErrors(found);
     setFormError(null);
+    if (mode === "password") {
+      const problem = validateNewPassword(newPassword, confirmPassword) ?? (!agreed.terms || !agreed.privacy ? "Accept the terms and acknowledge the privacy notice to continue." : null);
+      if (problem) return fail(problem, agreed.terms && agreed.privacy ? "new-password" : undefined);
+      setPhase("checking");
+      const [result] = await Promise.all([finishFirstSignIn(reset!.token, { newPassword, confirmPassword, policyVersion: reset!.policy.version, policyLanguage: language }), wait(650)]);
+      if (result.ok) return welcome();
+      // The 10-minute reset token ran out: start over with a new temporary password.
+      if (result.ended) {
+        setPhase("form");
+        return switchMode("first", "That took longer than 10 minutes. Ask the office for a new temporary password and start again.");
+      }
+      return fail(result.message);
+    }
+    const found = mode === "first" ? { ...(key.trim() ? {} : { key: "Enter your Account Key." }), ...(password ? {} : { password: "Enter the temporary password." }) } : validateLogin({ key, password });
+    setErrors(found);
     if (Object.keys(found).length > 0) {
       setAttempt((n) => n + 1);
       setFocusId(found.key ? "account-key" : "password");
       return;
     }
     setPhase("checking");
-    const [ok] = await Promise.all([signIn({ key, password }), wait(650)]);
-    if (!ok) {
+    if (mode === "first") {
+      const [result] = await Promise.all([startFirstSignIn({ key, password }), wait(650)]);
+      if (!result.ok) return fail(result.message, "password");
+      setReset({ token: result.resetToken, policy: result.policy });
       setPhase("form");
-      setFormError(WRONG_CREDENTIALS);
-      setAttempt((n) => n + 1);
-      return;
+      return switchMode("password");
     }
-    setPhase("accepted");
-    await wait(450);
-    setPhase("welcome");
+    const [result] = await Promise.all([signIn({ key, password }), wait(650)]);
+    if (result.ok) return welcome();
+    if (result.firstSignIn) {
+      setPhase("form");
+      return switchMode("first", "This account still has its temporary password. Enter it below to create your own password.");
+    }
+    fail(result.message, "password");
   }
+
+  const copy = COPY[mode];
+  const passwordToggle = (
+    <button
+      type="button"
+      onClick={() => setShowPassword((shown) => !shown)}
+      aria-label={showPassword ? "Hide password" : "Show password"}
+      aria-pressed={showPassword}
+      className="grid size-9 place-items-center rounded-lg text-salin-subtle hover:bg-salin-tile hover:text-salin-text [&_svg]:size-[18px]"
+    >
+      {showPassword ? <EyeOff /> : <Eye />}
+    </button>
+  );
 
   return (
     <div className="relative isolate flex min-h-[100dvh] flex-col overflow-hidden bg-salin-canvas">
@@ -102,64 +175,78 @@ export function LoginPage() {
             <WelcomeView name={session?.name ?? ""} />
           ) : (
             <>
-              <h1 className="text-[22px] font-semibold tracking-[-0.01em] text-salin-text">Access Your Workspace</h1>
-              <p className="mt-1.5 text-sm text-salin-muted">Enter your Account Key and password to unlock your local workspace.</p>
+              <h1 className="text-[22px] font-semibold tracking-[-0.01em] text-salin-text">{copy.title}</h1>
+              <p className="mt-1.5 text-sm text-salin-muted">{copy.help}</p>
+              {!online && (
+                <p role="status" className="mt-4 flex items-start gap-2 rounded-xl bg-salin-tile px-3 py-2.5 text-sm text-salin-text">
+                  <WifiOff aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-salin-muted" /> You're offline. If you've signed in on this phone before, you can sign in now; a first sign-in needs the internet.
+                </p>
+              )}
+              {notice && (
+                <p role="status" className="mt-4 rounded-xl bg-salin-primary-soft px-3 py-2.5 text-sm text-salin-primary-ink">
+                  {notice}
+                </p>
+              )}
 
-              <form noValidate onSubmit={submit} className="mt-6 space-y-4">
-                <Field id="account-key" label="Account Key" hint="e.g. PV2026-XXXXXX-0000" icon={<Key />} error={errors.key} shake={attempt}>
-                  {(props) => (
-                    <input
-                      {...props}
-                      name="account-key"
-                      autoComplete="username"
-                      autoCapitalize="characters"
-                      spellCheck={false}
-                      value={key}
-                      onChange={(event) => {
-                        setKey(event.target.value);
-                        if (errors.key) setErrors((e) => ({ ...e, key: undefined }));
-                      }}
-                    />
-                  )}
-                </Field>
+              <form noValidate onSubmit={submit} className="mt-5 space-y-4">
+                {mode !== "password" && (
+                  <Field id="account-key" label="Account Key" icon={<Key />} error={errors.key} shake={attempt}>
+                    {(props) => (
+                      <input
+                        {...props}
+                        name="account-key"
+                        autoComplete="username"
+                        autoCapitalize={mode === "first" ? "characters" : "none"}
+                        spellCheck={false}
+                        value={key}
+                        onChange={(event) => {
+                          setKey(event.target.value);
+                          if (errors.key) setErrors((e) => ({ ...e, key: undefined }));
+                        }}
+                      />
+                    )}
+                  </Field>
+                )}
 
-                <Field
-                  id="password"
-                  label="Password"
-                  icon={<Lock />}
-                  error={errors.password}
-                  shake={attempt}
-                  aside={
-                    <button type="button" onClick={() => setForgotOpen(true)} className="rounded text-xs font-medium text-salin-primary-ink hover:underline">
-                      Forgot key?
-                    </button>
-                  }
-                  trailing={
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword((shown) => !shown)}
-                      aria-label={showPassword ? "Hide password" : "Show password"}
-                      aria-pressed={showPassword}
-                      className="grid size-9 place-items-center rounded-lg text-salin-subtle hover:bg-salin-tile hover:text-salin-text [&_svg]:size-[18px]"
-                    >
-                      {showPassword ? <EyeOff /> : <Eye />}
-                    </button>
-                  }
-                >
-                  {(props) => (
-                    <input
-                      {...props}
-                      name="password"
-                      type={showPassword ? "text" : "password"}
-                      autoComplete="current-password"
-                      value={password}
-                      onChange={(event) => {
-                        setPassword(event.target.value);
-                        if (errors.password) setErrors((e) => ({ ...e, password: undefined }));
-                      }}
-                    />
-                  )}
-                </Field>
+                {mode !== "password" ? (
+                  <Field
+                    id="password"
+                    label={mode === "first" ? "Temporary password" : "Password"}
+                    icon={<Lock />}
+                    error={errors.password}
+                    shake={attempt}
+                    aside={
+                      <button type="button" onClick={() => setForgotOpen(true)} className="rounded text-xs font-medium text-salin-primary-ink hover:underline">
+                        Forgot key?
+                      </button>
+                    }
+                    trailing={passwordToggle}
+                  >
+                    {(props) => (
+                      <input
+                        {...props}
+                        name="password"
+                        type={showPassword ? "text" : "password"}
+                        autoComplete={mode === "first" ? "one-time-code" : "current-password"}
+                        value={password}
+                        onChange={(event) => {
+                          setPassword(event.target.value);
+                          if (errors.password) setErrors((e) => ({ ...e, password: undefined }));
+                        }}
+                      />
+                    )}
+                  </Field>
+                ) : (
+                  <>
+                    <Field id="new-password" label="New password" icon={<Lock />} shake={attempt} trailing={passwordToggle}>
+                      {(props) => <input {...props} name="new-password" type={showPassword ? "text" : "password"} autoComplete="new-password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} />}
+                    </Field>
+                    <Field id="confirm-password" label="Confirm new password" icon={<Lock />} shake={attempt}>
+                      {(props) => <input {...props} name="confirm-password" type={showPassword ? "text" : "password"} autoComplete="new-password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} />}
+                    </Field>
+                    {reset && <TermsAgreement policy={reset.policy} language={language} onLanguage={setLanguage} agreed={agreed} onAgreed={setAgreed} />}
+                  </>
+                )}
 
                 {formError && (
                   <p key={attempt} role="alert" className="animate-shake rounded-xl bg-[#FEF2F2] px-3 py-2.5 text-sm text-[#B91C1C] ring-1 ring-[#FECACA]">
@@ -167,8 +254,18 @@ export function LoginPage() {
                   </p>
                 )}
 
-                <SubmitButton phase={phase} />
+                <SubmitButton phase={phase} label={copy.submit} />
               </form>
+
+              {mode !== "password" && (
+                <button
+                  type="button"
+                  onClick={() => switchMode(mode === "signin" ? "first" : "signin")}
+                  className="mt-3 h-9 w-full rounded-lg text-center text-[13px] font-medium text-salin-muted hover:text-salin-primary-ink"
+                >
+                  {mode === "signin" ? "First time? Use your temporary password" : "Back to sign in"}
+                </button>
+              )}
             </>
           )}
         </div>
@@ -178,7 +275,7 @@ export function LoginPage() {
         <DialogContent>
           <DialogTitle>Forgot your key?</DialogTitle>
           <DialogDescription>
-            Contact the City Veterinary Office to get your Account Key or reset your password. Your scans and datasets stay on this device.
+            Contact the City Veterinary Office to get your Account Key or a new temporary password. Your scans and datasets stay on this device.
           </DialogDescription>
           <div className="mt-5 flex justify-end">
             <DialogClose className="press h-10 rounded-xl bg-salin-primary px-4 text-sm font-semibold text-white hover:bg-salin-primary-strong">OK</DialogClose>
@@ -186,6 +283,66 @@ export function LoginPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+const TERMS_COPY = {
+  en: { read: "Read the terms and privacy notice", terms: "I accept the Paravet Terms of Use.", privacy: "I have read and acknowledge the Privacy Notice, including its draft items.", close: "Close" },
+  fil: { read: "Basahin ang tuntunin at abiso", terms: "Tinatanggap ko ang mga tuntunin sa paggamit para sa Paravet.", privacy: "Nabasa at kinikilala ko ang abiso sa pagkapribado, kasama ang mga hindi pa kumpletong detalye.", close: "Isara" },
+};
+
+/** The office's paravet terms (as e-Kapon serves them), in English or Filipino, with the two acknowledgements set-password requires. */
+function TermsAgreement({ policy, language, onLanguage, agreed, onAgreed }: {
+  policy: ParavetPolicy;
+  language: "en" | "fil";
+  onLanguage: (language: "en" | "fil") => void;
+  agreed: { terms: boolean; privacy: boolean };
+  onAgreed: (agreed: { terms: boolean; privacy: boolean }) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const text = policy[language];
+  const words = TERMS_COPY[language];
+  const checkbox = "mt-0.5 size-[18px] shrink-0 accent-[var(--color-salin-primary)]";
+  return (
+    <section aria-label="Paravet terms" className="space-y-3 rounded-xl p-3.5 ring-1 ring-salin-border">
+      <div role="radiogroup" aria-label="Terms language" className="flex gap-1 rounded-full bg-salin-tile p-1 text-[13px] font-medium">
+        {(["en", "fil"] as const).map((value) => (
+          <button key={value} type="button" role="radio" aria-checked={language === value} onClick={() => onLanguage(value)} className={cn("h-8 flex-1 rounded-full", language === value ? "bg-salin-surface text-salin-text shadow-sm" : "text-salin-muted hover:text-salin-text")}>
+            {value === "en" ? "English" : "Filipino"}
+          </button>
+        ))}
+      </div>
+      <button type="button" onClick={() => setOpen(true)} className="text-sm font-semibold text-salin-primary-ink hover:underline">
+        {words.read}
+      </button>
+      <p className="text-xs text-salin-muted">{text.draft}</p>
+      <label className="flex items-start gap-2.5 text-sm text-salin-text">
+        <input type="checkbox" checked={agreed.terms} onChange={(event) => onAgreed({ ...agreed, terms: event.target.checked })} className={checkbox} />
+        {words.terms}
+      </label>
+      <label className="flex items-start gap-2.5 text-sm text-salin-text">
+        <input type="checkbox" checked={agreed.privacy} onChange={(event) => onAgreed({ ...agreed, privacy: event.target.checked })} className={checkbox} />
+        {words.privacy}
+      </label>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-h-[85dvh] overflow-y-auto">
+          <DialogTitle>{text.title}</DialogTitle>
+          <DialogDescription>City Veterinary Office · {policy.version}</DialogDescription>
+          <div className="mt-4 space-y-4">
+            <p className="rounded-xl bg-salin-tile p-3 text-sm text-salin-text">{text.draft}</p>
+            {text.sections.map(([title, body]) => (
+              <section key={title}>
+                <h3 className="text-sm font-semibold text-salin-text">{title}</h3>
+                <p className="mt-1 text-sm leading-6 text-salin-muted">{body}</p>
+              </section>
+            ))}
+          </div>
+          <div className="mt-5 flex justify-end">
+            <DialogClose className="press h-10 rounded-xl bg-salin-primary px-4 text-sm font-semibold text-white hover:bg-salin-primary-strong">{words.close}</DialogClose>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </section>
   );
 }
 
@@ -266,7 +423,7 @@ function Field({ id, label, hint, icon, error, shake, aside, trailing, children 
   );
 }
 
-function SubmitButton({ phase }: { phase: Phase }) {
+function SubmitButton({ phase, label }: { phase: Phase; label: string }) {
   const accepted = phase === "accepted";
   return (
     <button
@@ -286,7 +443,7 @@ function SubmitButton({ phase }: { phase: Phase }) {
       ) : phase === "checking" ? (
         "Checking…"
       ) : (
-        "Unlock Workspace"
+        label
       )}
     </button>
   );

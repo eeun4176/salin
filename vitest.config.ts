@@ -22,5 +22,7 @@ export default defineConfig({
     environment: "node",
     include: ["src/**/*.test.ts"],
     setupFiles: ["src/test/setup.ts"],
+    // A placeholder City Vet API; tests stub fetch, nothing is contacted.
+    env: { VITE_CITY_VET_API_URL: "https://ekapon.test" },
   },
 });

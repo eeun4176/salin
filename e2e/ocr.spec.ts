@@ -14,7 +14,7 @@
 
 import { expect, test, type Browser, type Page } from "@playwright/test";
 
-import { downloadText, openWorkspace, uploadFiles, waitForOfflineReady, type SampleFile } from "./helpers";
+import { CITY_VET_API, downloadText, openWorkspace, uploadFiles, waitForOfflineReady, type SampleFile } from "./helpers";
 
 // Downloading the model and reading pages takes a while on a busy machine.
 test.describe.configure({ timeout: 180_000 });
@@ -69,6 +69,8 @@ test("a printed registration form is read on the device, reviewed against the pa
   page.on("request", (request) => {
     const url = new URL(request.url());
     if (!["http:", "https:"].includes(url.protocol)) return;
+    // Only the sign-in check may go to the City Vet API; nothing about the document leaves the device.
+    if (url.origin === CITY_VET_API && url.pathname.startsWith("/api/v1/auth/")) return;
     if (url.origin !== "http://localhost:4173") foreign.push(request.url());
   });
   void origin;

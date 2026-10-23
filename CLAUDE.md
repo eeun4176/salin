@@ -8,7 +8,7 @@ Full product spec: `d:\MyProgrammingDictionary\SALIN Project Documentation\SALIN
 
 ## Product rules (never break these)
 
-- **Local-first, no uploads.** Documents, drafts and datasets stay on the device (IndexedDB). No backend, no analytics with document text, no cloud AI. Sign-in is checked on the device (`src/core/auth/local-auth.ts`, one temporary account) until the City Vet admin system exists; sending datasets to it is a later step — build only its UI, never a real upload.
+- **Local-first, no uploads.** Documents, drafts and datasets stay on the device (IndexedDB). No analytics with document text, no cloud AI. Salin's only server is the City Vet admin system (e-Kapon), reached only through `src/core/admin/admin-api.ts` at `VITE_CITY_VET_API_URL` with a Bearer token: sign-in (`src/core/auth/local-auth.ts`; the session is kept on the device so Salin opens offline) and, as they are built, explicit Send actions. Never upload documents or images.
 - **AI proposes, validation checks, the user approves.** AI output is a suggestion with a source (`rule` / `handwriting` / `ai`), never written silently into a dataset. Values not found on the page are flagged "Not found on page".
 - **AI never runs code.** Natural-language requests become a zod-validated command from a fixed list (`src/core/processing/dataset-commands.ts`): filter, sort, rename_column, change_type, summarize, normalize, set_value, find_duplicates, delete_rows, keep_columns. TypeScript executes them, after a preview, with Undo.
 - **Progressive enhancement.** Workspace, imports, exports and rule-based extraction must work with no model downloaded and on devices without WebGPU. Show "unsupported on this device" instead of failing.
@@ -53,7 +53,8 @@ src/
     processing/   parsers/, excel/, dataset-*.ts (inference, validation, transform, export, commands), value-normalizers, column-naming
     ocr/          imaging/, layout/, engine/ (Tesseract), models/ (capabilities, model-assets, model-manager), templates/, review/, benchmark/
     ai/           ai-models (pinned catalog), ai.worker, ai-runtime, handwriting, llm-tasks, grounding, suggestions
-    auth/         local-auth (on-device sign-in, session in the settings table)
+    admin/        admin-api (the City Vet / e-Kapon API client)
+    auth/         local-auth (sign-in and first sign-in via the City Vet API, session cached in the settings table)
     census/       census-layout (CVO-CENSUS v1–v3 sheet geometry), code-strip, omr/ (markers, OMR), census-extraction, census-records, summary-workbook, xlsx-patch
   features/       UI per area: auth (login), home, workspace, import, capture, ocr (scan workflow), processing (dataset review), census (records, print forms), ai (review assist), ai-studio, settings, backup
   stores/         zustand stores (workspace, ocr, ai, ui, toast…)
