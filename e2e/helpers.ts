@@ -66,11 +66,13 @@ export const ACCOUNT = { key: "PV2026-TMP001-3023", password: "changeme123", nam
 
 const cityVetAccount = { id: 7, type: "Paravet", name: ACCOUNT.name, username: null, accountKey: ACCOUNT.key, barangayId: 4, barangay: ACCOUNT.barangay };
 
+export type CityVetRoute = (body: Record<string, unknown>, request: { method: string; query: URLSearchParams }) => { status?: number; json: unknown };
+
 /**
  * Answers Salin's sign-in calls the way e-Kapon does: ACCOUNT's password signs in (token in the body), any other is
  * refused; /auth/me returns the account. `routes` adds or overrides replies by path (e.g. first sign-in).
  */
-export async function mockCityVet(page: Page, routes: Record<string, (body: Record<string, unknown>) => { status?: number; json: unknown }> = {}) {
+export async function mockCityVet(page: Page, routes: Record<string, CityVetRoute> = {}) {
   await page.route(`${CITY_VET_API}/api/v1/**`, async (route) => {
     const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "Content-Type, Authorization", "Access-Control-Allow-Methods": "GET, POST" };
     if (route.request().method() === "OPTIONS") return route.fulfill({ status: 204, headers: cors });
@@ -82,7 +84,8 @@ export async function mockCityVet(page: Page, routes: Record<string, (body: Reco
       "/auth/me": () => ({ json: { account: cityVetAccount } }),
       ...routes,
     };
-    const reply = handlers[path]?.(body) ?? { status: 404, json: { error: { code: "NOT_FOUND", message: "Not found." } } };
+    const url = new URL(route.request().url());
+    const reply = handlers[path]?.(body, { method: route.request().method(), query: url.searchParams }) ?? { status: 404, json: { error: { code: "NOT_FOUND", message: "Not found." } } };
     await route.fulfill({ status: reply.status ?? 200, contentType: "application/json", json: reply.json, headers: cors });
   });
 }

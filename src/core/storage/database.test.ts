@@ -32,7 +32,8 @@ it("upgrades a v2 workspace to the current version without losing folders or fil
   v2.close();
 
   await db.open();
-  expect(db.verno).toBe(5);
+  expect(db.verno).toBe(6);
+  expect(await db.outbox.count()).toBe(0);
   expect((await db.folders.get("f1"))?.name).toBe("Census");
   expect(await db.datasets.count()).toBe(0);
   expect(await db.processingJobs.count()).toBe(0);

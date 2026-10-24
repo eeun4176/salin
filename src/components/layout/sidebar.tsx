@@ -11,11 +11,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
-import { ClipboardList, Download, HardDrive, LogOut, PanelLeft, Settings, Sparkles, type LucideIcon } from "lucide-react";
+import { CalendarHeart, ClipboardList, Download, HardDrive, Landmark, LogOut, PanelLeft, Settings, Sparkles, type LucideIcon } from "lucide-react";
 
 import { Logo } from "@/components/brand/logo";
 import { NewDocumentMenu } from "@/components/layout/new-document-menu";
+import { SyncStatus } from "@/components/layout/sync-status";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { roleLabel } from "@/core/auth/local-auth";
 import { getStorageStatus } from "@/core/storage/storage-health";
 import { SECTION_LINKS, isSectionActive } from "@/features/workspace/section-links";
 import { formatBytes } from "@/features/workspace/query";
@@ -34,6 +36,8 @@ const wipe =
 
 const OTHER_LINKS: { to: string; label: string; icon: LucideIcon }[] = [
   { to: "/census", label: "Census", icon: ClipboardList },
+  { to: "/programs", label: "Programs", icon: CalendarHeart },
+  { to: "/city-vet", label: "City Vet", icon: Landmark },
   { to: "/ai-studio", label: "AI Studio", icon: Sparkles },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
@@ -129,12 +133,18 @@ export function AccountMenu({ compact = false }: { compact?: boolean }) {
         {!compact && (
           <span className={cn(wipe, "flex-1")}>
             <span className="block truncate text-sm font-medium text-salin-text">{session.name}</span>
-            <span className="block truncate text-[11px] text-salin-subtle">{session.key}</span>
+            <span className="block truncate text-[11px] text-salin-subtle">{session.barangay ? `${roleLabel(session.role)} · ${session.barangay}` : session.key}</span>
           </span>
         )}
       </DropdownMenuTrigger>
       <DropdownMenuContent side={compact ? "bottom" : "top"} align={compact ? "end" : "start"} className="w-60 rounded-xl p-1.5">
-        <DropdownMenuLabel className="truncate">{session.name}</DropdownMenuLabel>
+        <DropdownMenuLabel className="font-normal">
+          <span className="block truncate font-semibold">{session.name}</span>
+          <span className="block truncate text-xs text-salin-muted">
+            {roleLabel(session.role)}
+            {session.barangay ? ` · ${session.barangay}` : ""} · {session.key}
+          </span>
+        </DropdownMenuLabel>
         {/* Phones have no sidebar, so these areas are reached from here. */}
         {compact &&
           OTHER_LINKS.map(({ to, label, icon: Icon }) => (
@@ -242,6 +252,7 @@ export function Sidebar() {
           ))}
         </nav>
         <div className="space-y-2">
+          <SyncStatus className="w-full" />
           <StorageBadge />
           <AccountMenu />
         </div>

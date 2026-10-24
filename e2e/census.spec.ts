@@ -104,14 +104,14 @@ test("a printed census sheet is scanned, reviewed, counted once, and exported to
   await uploadFiles(page, [photo]);
 
   await scan(page, photo.name);
-  // From the code strip, not handwriting.
-  await expect(page.getByRole("textbox", { name: "Barangay" })).toHaveValue("Poblacion");
+  // From the code strip, not handwriting (the print page starts on the paravet's barangay).
+  await expect(page.getByRole("textbox", { name: "Barangay" })).toHaveValue("Assumption");
   await expect(page.getByRole("textbox", { name: "Sheet no." })).toHaveValue("7");
   await checkOwner(page);
   await page.getByRole("button", { name: "Save to census records" }).click();
   await expect(page).toHaveURL(/\/census$/, { timeout: 30_000 });
 
-  const card = page.getByRole("listitem").filter({ hasText: "Census · Poblacion · Oct 22, 2026" });
+  const card = page.getByRole("listitem").filter({ hasText: "Census · Assumption · Oct 22, 2026" });
   await expect(card).toContainText("1 Validated");
   await expect(card).toContainText("1 Unreadable");
   await expect(card).toContainText("2 pets");
@@ -127,7 +127,7 @@ test("a printed census sheet is scanned, reviewed, counted once, and exported to
   await expect(card).toContainText("2 pets");
 
   const [download] = await Promise.all([page.waitForEvent("download"), card.getByRole("button", { name: "Export official workbook" }).click()]);
-  expect(download.suggestedFilename()).toBe("Census - Poblacion - 2026-10-22.xlsx");
+  expect(download.suggestedFilename()).toBe("Census - Assumption - 2026-10-22.xlsx");
   const book = XLSX.read(await downloadBytes(download), { type: "buffer" });
   const summary = book.Sheets["SUMMARY OF CENSUS"];
   expect([summary.B8?.v, summary.C8?.v, summary.D8?.v, summary.E9?.v, summary.Q9?.v, summary.S9?.v, summary.C29?.v]).toEqual(["JUAN CRUZ", 1, 0, 1, 1, 1, 1]);

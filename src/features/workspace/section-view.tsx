@@ -10,7 +10,7 @@
 
 import { useMemo } from "react";
 import { Link, useParams } from "react-router";
-import { ChevronRight, ClipboardList, FolderOpen, FolderSearch, Heart, House, RotateCcw, RotateCcwClock, Table2, Trash, TriangleAlert } from "lucide-react";
+import { CalendarHeart, ChevronRight, ClipboardList, FolderOpen, FolderSearch, Heart, House, RotateCcw, RotateCcwClock, Table2, Trash, TriangleAlert } from "lucide-react";
 
 import { useDatasets } from "@/features/processing/hooks/use-datasets";
 import { FilterBar } from "@/features/workspace/components/filter-bar";
@@ -61,6 +61,20 @@ function CensusEntry() {
       <span className="min-w-0 flex-1">
         <span className="block text-sm font-semibold">Census</span>
         <span className="block truncate text-xs text-salin-muted">Print working sheets, scan them, export the official workbook</span>
+      </span>
+      <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-salin-muted" />
+    </Link>
+  );
+}
+
+/** Phones only: the barangay's program request (Kapon, anti-rabies, microchip); the sidebar has it on wider screens. */
+function ProgramsEntry() {
+  return (
+    <Link to="/programs" className="press mt-2 flex items-center gap-3 rounded-2xl bg-salin-tile px-3.5 py-3 text-salin-text transition-colors hover:bg-salin-tile-hover nav:hidden">
+      <CalendarHeart aria-hidden="true" className="size-5 shrink-0 text-salin-primary" />
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold">Programs</span>
+        <span className="block truncate text-xs text-salin-muted">Your barangay's request for Kapon, anti-rabies and microchip</span>
       </span>
       <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-salin-muted" />
     </Link>
@@ -291,6 +305,7 @@ export function SectionView({ section }: { section: WorkspaceSection }) {
           <>
             <DatasetsEntry />
             <CensusEntry />
+            <ProgramsEntry />
           </>
         )}
 

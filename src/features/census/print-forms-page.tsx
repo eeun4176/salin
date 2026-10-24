@@ -19,6 +19,7 @@ import { BARANGAYS } from "@/core/census/barangays";
 import { FORM_VERSION, MAX_SHEET_NUMBER, type SheetCode } from "@/core/census/code-strip";
 import { CensusSheet } from "@/features/census/components/census-sheet";
 import { cn } from "@/lib/utils";
+import { useAuthStore } from "@/stores/auth-store";
 
 const MAX_COPIES = 50;
 const today = () => new Date().toLocaleDateString("en-CA");
@@ -36,7 +37,11 @@ const PRINT_CSS = `
 `;
 
 export function PrintFormsPage() {
-  const [barangay, setBarangay] = useState("0");
+  const session = useAuthStore((state) => state.session);
+  // A paravet prints for their own barangay, signed with their name.
+  const own = BARANGAYS.findIndex((b) => b.name.toLowerCase() === session?.barangay?.toLowerCase());
+  const preparedBy = session?.role === "Paravet" ? session.name : undefined;
+  const [barangay, setBarangay] = useState(String(Math.max(0, own)));
   const [date, setDate] = useState(today);
   const [firstSheet, setFirstSheet] = useState(1);
   const [copies, setCopies] = useState(10);
@@ -125,14 +130,14 @@ export function PrintFormsPage() {
 
         <div className="min-w-0">
           <p className="mb-2 text-sm font-medium text-salin-text">Preview of sheet {error ? "" : firstSheet}</p>
-          <div className="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-salin-border">{codes[0] && <CensusSheet code={codes[0]} className="h-auto w-full" />}</div>
+          <div className="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-salin-border">{codes[0] && <CensusSheet code={codes[0]} preparedBy={preparedBy} className="h-auto w-full" />}</div>
         </div>
       </div>
 
       {createPortal(
         <div className="census-print">
           {codes.map((code) => (
-            <CensusSheet key={code.sheetNumber} code={code} />
+            <CensusSheet key={code.sheetNumber} code={code} preparedBy={preparedBy} />
           ))}
         </div>,
         document.body,

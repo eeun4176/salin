@@ -1,13 +1,15 @@
 /**
  * App Header
  * The phone top bar, matching the desktop sidebar's footer: the Salin AI
- * wordmark, how much Salin stores on this device ("12.4 MB Local", links to
- * Settings) and the account menu (Census, AI Studio, Settings, install,
- * sign out).
+ * wordmark, changes waiting to go to City Vet (sync-status.tsx), how much
+ * Salin stores on this device ("12.4 MB Local", links to Settings; on the
+ * narrowest phones it gives way while changes are waiting) and the account
+ * menu (Census, Programs, AI Studio, Settings, install, sign out).
  */
 
 import { Logo } from "@/components/brand/logo";
 import { AccountMenu, StorageBadge } from "@/components/layout/sidebar";
+import { SyncStatus } from "@/components/layout/sync-status";
 import { cn } from "@/lib/utils";
 
 /** Logo + storage + account row at the top of phone screens. */
@@ -20,8 +22,9 @@ export function AppHeader({ className }: { className?: string }) {
           AI
         </span>
       </span>
-      <div className="flex min-w-0 items-center gap-2">
-        <StorageBadge className="h-8 rounded-full bg-salin-surface" />
+      <div className="group/bar flex min-w-0 items-center gap-2">
+        <SyncStatus className="h-8 max-w-40 rounded-full bg-salin-surface" />
+        <StorageBadge className="h-8 rounded-full bg-salin-surface max-[400px]:group-has-[[data-sync-status]]/bar:hidden" />
         <AccountMenu compact />
       </div>
     </header>

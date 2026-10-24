@@ -6,12 +6,14 @@
  * processingJobs, extractedDocuments, datasets, datasetRows. OCR tables
  * (Phase 4): ocrDocuments, ocrPages, templates (saved document templates),
  * benchmarks. Derived: thumbnails. OCR model files live in Cache Storage.
+ * Sync (City Vet integration): outbox — changes waiting to be sent.
  */
 
 import Dexie, { type EntityTable, type Transaction } from "dexie";
 
 import type { AppSetting, FileBlob, Folder, Thumbnail, WorkspaceFile } from "@/types/domain";
 import type { BenchmarkRecord, OcrDocument, OcrPage, StoredTemplate } from "@/types/ocr";
+import type { OutboxItem } from "@/types/sync";
 import type { Dataset, DatasetRow, ExtractedDocument, ProcessingJob } from "@/types/processing";
 
 export type SalinDatabase = Dexie & {
@@ -28,6 +30,7 @@ export type SalinDatabase = Dexie & {
   ocrPages: EntityTable<OcrPage, "id">;
   benchmarks: EntityTable<BenchmarkRecord, "id">;
   settings: EntityTable<AppSetting, "key">;
+  outbox: EntityTable<OutboxItem, "id">;
 };
 
 export const db = new Dexie("SalinAI") as SalinDatabase;
@@ -82,6 +85,9 @@ db.version(5)
     modelMetadata: null,
   })
   .upgrade((tx) => tx.table("templates").clear());
+
+// v6 — City Vet integration: changes made offline wait in the outbox until they are sent.
+db.version(6).stores({ outbox: "id, status, createdAt" });
 
 const TIMESTAMP_FIELDS = ["createdAt", "updatedAt", "lastOpenedAt", "deletedAt"] as const;
 

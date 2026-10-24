@@ -49,14 +49,16 @@ src/
   app/            router.tsx, pwa.ts
   components/     layout/ (AppShell, AppHeader, MobileNav), ui/ (shadcn), common/ (ChoiceMenu, ConfirmDialog, StepFooter…), brand/
   core/           framework-free logic, unit-tested
-    storage/      database.ts (Dexie, schema v5 — add a new db.version() for any schema change), repositories/, backup.ts
+    storage/      database.ts (Dexie, schema v6 — add a new db.version() for any schema change), repositories/, backup.ts
     processing/   parsers/, excel/, dataset-*.ts (inference, validation, transform, export, commands), value-normalizers, column-naming
     ocr/          imaging/, layout/, engine/ (Tesseract), models/ (capabilities, model-assets, model-manager), templates/, review/, benchmark/
     ai/           ai-models (pinned catalog), ai.worker, ai-runtime, handwriting, llm-tasks, grounding, suggestions
-    admin/        admin-api (the City Vet / e-Kapon API client)
+    admin/        admin-api (the City Vet / e-Kapon API client), city-vet (inbox, records search, data-quality flags, issue reports, records as datasets)
+    sync/         outbox (changes for City Vet saved first, sent in order when online)
+    programs/     program-requests (the barangay's shared program request), stubs (stub sheets, day pack, offline scans and walk-ins), owner-suggestions, qr.worker
     auth/         local-auth (sign-in and first sign-in via the City Vet API, session cached in the settings table)
     census/       census-layout (CVO-CENSUS v1–v3 sheet geometry), code-strip, omr/ (markers, OMR), census-extraction, census-records, summary-workbook, xlsx-patch
-  features/       UI per area: auth (login), home, workspace, import, capture, ocr (scan workflow), processing (dataset review), census (records, print forms), ai (review assist), ai-studio, settings, backup
+  features/       UI per area: auth (login), programs (/programs tabs: requests, stubs, attendance), city-vet (/city-vet: inbox, records, data quality, report), home, workspace, import, capture, ocr (scan workflow), processing (dataset review), census (records, print forms), ai (review assist), ai-studio, settings, backup
   stores/         zustand stores (workspace, ocr, ai, ui, toast…)
   types/          shared domain types
 e2e/              Playwright specs

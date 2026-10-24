@@ -10,7 +10,7 @@ import { expect, test } from "@playwright/test";
 
 import { card, createFolder, openWorkspace, sample, uploadFiles } from "./helpers";
 
-for (const path of ["/", "/recents", "/trash", "/datasets", "/import", "/scan", "/ai-studio", "/settings", "/census", "/census/print"]) {
+for (const path of ["/", "/recents", "/trash", "/datasets", "/import", "/scan", "/ai-studio", "/settings", "/census", "/census/print", "/programs", "/programs?tab=stubs", "/programs?tab=attendance", "/city-vet"]) {
   test(`no horizontal overflow on ${path}`, async ({ page }) => {
     await page.goto(path);
     await page.waitForLoadState("networkidle");

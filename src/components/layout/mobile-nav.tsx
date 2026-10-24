@@ -127,7 +127,8 @@ export function MobileNav() {
         )}
       />
 
-      <div className="pointer-events-none fixed inset-x-2.5 bottom-[calc(10px+env(safe-area-inset-bottom))] z-[95] flex items-end justify-between">
+      {/* Under dialogs (z-50) normally; above the toasts while the quick actions are open. */}
+      <div className={cn("pointer-events-none fixed inset-x-2.5 bottom-[calc(10px+env(safe-area-inset-bottom))] flex items-end justify-between", open ? "z-[95]" : "z-40")}>
         <nav
           aria-label="Primary"
           className="pointer-events-auto h-14 w-[calc(100%-66px)] rounded-full bg-salin-bar p-1 shadow-[inset_0_0_0_1px_var(--color-salin-border),0_10px_28px_-12px_rgb(16_40_28/0.28)]"

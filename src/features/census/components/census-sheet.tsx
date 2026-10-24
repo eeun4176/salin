@@ -34,7 +34,7 @@ function sheetLabel(code: SheetCode) {
   return `CVO-CENSUS v${code.version} · ${BARANGAYS[code.barangay]?.name.toUpperCase()} · ${m}/${d}/${y} · SHEET ${pad(code.sheetNumber)}${code.continuation ? " · CONTINUATION" : ""}`;
 }
 
-export function CensusSheet({ code, className }: { code: SheetCode; className?: string }) {
+export function CensusSheet({ code, className, preparedBy }: { code: SheetCode; className?: string; preparedBy?: string }) {
   const layout = layoutFor(code.version);
   const bits = encodeSheetCode(code);
   const barangay = BARANGAYS[code.barangay];
@@ -121,7 +121,7 @@ export function CensusSheet({ code, className }: { code: SheetCode; className?: 
         ))}
 
       <text x={22} y={320.5} fontSize={2.6} fill={INK}>
-        Prepared by: ________________________________ (Paravet)
+        Prepared by: {preparedBy || "________________________________"} (Paravet)
       </text>
       <text x={194} y={320.5} fontSize={2.2} textAnchor="end" fill={INK}>
         Do not write outside the boxes · Don't fold over the black corner squares

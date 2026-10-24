@@ -21,6 +21,8 @@ import { forgetSealedSession, openSealedSession, sealSession } from "@/core/auth
 import { db } from "@/core/storage/database";
 
 export type Role = "Paravet" | "Admin" | "SuperAdmin";
+/** City Vet keeps one staff role: SuperAdmin is shown as "Admin". */
+export const roleLabel = (role: Role) => (role === "SuperAdmin" ? "Admin" : role);
 
 export interface Account {
   /** Account Key (paravets) or username (staff), shown under the name. */
