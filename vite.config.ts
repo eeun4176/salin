@@ -10,16 +10,62 @@
  * on demand, into its own Cache Storage (see model-manager.ts). So is the
  * WebLLM engine (6.6 MB), which only the laptop build of the assistant uses.
  * User documents are never put in these caches — they live in IndexedDB.
+ * Builds carry a Content Security Policy (see contentSecurityPolicy below).
  */
 
-import { defineConfig } from "vite";
+import { createHash } from "node:crypto";
+import { defineConfig, loadEnv, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
 import path from "path";
 
-export default defineConfig({
+/** "city-vet.vercel.app/" or "https://city-vet.vercel.app" → "https://city-vet.vercel.app" ("" when unset or not a URL). */
+function originOf(setting: string | undefined) {
+  const value = setting?.trim() ?? "";
+  try {
+    return value ? new URL(/^https?:\/\//i.test(value) ? value : `https://${value}`).origin : "";
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * The built app's Content Security Policy, as a <meta> tag so it follows each
+ * build's VITE_CITY_VET_API_URL and VITE_AI_MODEL_HOST. The session token
+ * lives in IndexedDB, so scripts come only from Salin itself (plus blob: and
+ * WebAssembly for the OCR engine, and the hashed theme script in index.html),
+ * and network calls go only to Salin, the City Vet server and the model host
+ * with its download CDN.
+ */
+function contentSecurityPolicy(env: Record<string, string>): Plugin {
+  return {
+    name: "salin-csp",
+    apply: "build",
+    transformIndexHtml(html) {
+      const inline = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => `'sha256-${createHash("sha256").update(m[1]).digest("base64")}'`);
+      const connect = ["'self'", originOf(env.VITE_CITY_VET_API_URL), originOf(env.VITE_AI_MODEL_HOST) || "https://huggingface.co", "https://*.huggingface.co", "https://*.hf.co", "blob:", "data:"];
+      const policy = [
+        "default-src 'self'",
+        `script-src 'self' 'wasm-unsafe-eval' blob: ${inline.join(" ")}`,
+        "worker-src 'self' blob:",
+        "style-src 'self' 'unsafe-inline'",
+        "img-src 'self' data: blob:",
+        "font-src 'self' data:",
+        "media-src 'self' blob:",
+        `connect-src ${connect.filter(Boolean).join(" ")}`,
+        "object-src 'none'",
+        "base-uri 'self'",
+        "form-action 'self'",
+      ].join("; ");
+      return [{ tag: "meta", attrs: { "http-equiv": "Content-Security-Policy", content: policy }, injectTo: "head-prepend" }];
+    },
+  };
+}
+
+export default defineConfig(({ mode }) => ({
   plugins: [
+    contentSecurityPolicy(loadEnv(mode, process.cwd(), "VITE_")),
     react(),
     tailwindcss(),
     VitePWA({
@@ -66,4 +112,4 @@ export default defineConfig({
       "@": path.resolve(import.meta.dirname, "./src"),
     },
   },
-});
+}));

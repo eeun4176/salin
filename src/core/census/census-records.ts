@@ -165,3 +165,13 @@ export function sheetNumbersIn(content: DatasetContent) {
   const sheet = columnId(content, COLUMN.sheet);
   return new Set(sheet ? content.rows.map((r) => Number(r.values[sheet])) : []);
 }
+
+/** Records (rows by column name) grouped by owner, in sheet order: a continuation sheet's pets belong to the sheet they continue. */
+export function byOwner<T extends Record<string, CellValue>>(records: T[]): T[][] {
+  const owners = new Map<number, T[]>();
+  for (const r of records) {
+    const sheet = Number(r[COLUMN.continuedFrom] ?? r[COLUMN.sheet]);
+    owners.set(sheet, [...(owners.get(sheet) ?? []), r]);
+  }
+  return [...owners.entries()].sort(([a], [b]) => a - b).map(([, pets]) => pets);
+}

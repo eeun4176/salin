@@ -218,7 +218,8 @@ function PrivacyCard() {
   return (
     <SectionCard icon={ShieldCheck} title="Privacy" id="privacy-heading">
       <ul className="space-y-1.5 text-sm text-salin-muted">
-        <li>Your documents are stored only in this browser on this device. Nothing is uploaded.</li>
+        <li>Your documents, scans and photos are stored only in this browser on this device. They're never uploaded.</li>
+        <li>Salin sends the City Veterinary Office only what you choose to send: program request lists, stub and program-day updates, and census records (the values, not the scans).</li>
         <li>Anyone using this browser profile can open them. On a shared device, delete your data when you're done.</li>
       </ul>
       <button

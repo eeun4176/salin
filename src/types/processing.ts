@@ -204,6 +204,8 @@ export interface Dataset {
   createdAt: Timestamp;
   updatedAt: Timestamp;
   lastExportedAt: Timestamp | null;
+  /** When it was last queued to send to City Vet (census records). */
+  lastSentAt?: Timestamp | null;
   /** Set for datasets made from scanned documents (OCR). */
   origin?: DatasetOrigin;
 }

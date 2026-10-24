@@ -3,18 +3,21 @@
  * What the Census screens do: a live list of the census records (one dataset
  * per barangay and census date) with how many pets are Validated, Pending
  * or Unreadable and which scans to reopen for the open ones; and exporting
- * the office's official workbook filled from them.
+ * the office's official workbook filled from them, or sending them to City Vet
+ * (queued in the outbox, so it works offline).
  */
 
 import { liveQuery } from "dexie";
 import { useEffect, useState } from "react";
 
+import { censusChanges, planCensusSubmission, type CensusSendPlan } from "@/core/census/admin-submission";
 import { COLUMN, type RecordStatus } from "@/core/census/census-records";
 import type { CensusRecord } from "@/core/census/summary-workbook";
 import { errorMessage } from "@/core/storage/errors";
 import { censusContent, listCensusDatasets, type CensusDataset } from "@/core/storage/repositories/census.repository";
-import { markDatasetExported } from "@/core/storage/repositories/dataset.repository";
+import { markDatasetExported, markDatasetSent } from "@/core/storage/repositories/dataset.repository";
 import { downloadBlob } from "@/lib/download";
+import { queueChange } from "@/stores/sync-store";
 import { toast } from "@/stores/toast-store";
 import type { DatasetContent } from "@/types/processing";
 
@@ -96,4 +99,16 @@ export async function exportOfficialWorkbook(dataset: CensusDataset) {
   } catch (error) {
     toast(errorMessage(error, error instanceof Error ? error.message : "The workbook couldn't be made."));
   }
+}
+
+/** What "Send to City Vet" would send for this census (its Validated records). */
+export async function censusSendPlan(dataset: CensusDataset): Promise<CensusSendPlan> {
+  const { barangay, censusDate } = dataset.origin;
+  return planCensusSubmission({ name: dataset.name, barangay, censusDate }, records(await censusContent(dataset)));
+}
+
+/** Queues the plan's submissions for City Vet: sent now when online, or when the signal comes back. */
+export async function sendCensus(dataset: CensusDataset, plan: CensusSendPlan) {
+  for (const change of censusChanges(plan)) await queueChange(change);
+  await markDatasetSent(dataset.id);
 }

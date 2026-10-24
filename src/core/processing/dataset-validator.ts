@@ -66,6 +66,7 @@ export const datasetSchema = z.object({
   createdAt: timestamp,
   updatedAt: timestamp,
   lastExportedAt: timestamp.nullable(),
+  lastSentAt: timestamp.nullable().optional(),
   origin: z
     .discriminatedUnion("kind", [
       z.object({ kind: z.literal("ocr"), documentId: id, templateId: z.string().min(1).max(100) }),

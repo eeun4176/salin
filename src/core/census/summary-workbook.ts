@@ -9,7 +9,7 @@
  * sheet. More than 20 owners or pets continue on copies of the sheets.
  */
 
-import { COLUMN } from "@/core/census/census-records";
+import { byOwner, COLUMN } from "@/core/census/census-records";
 import { Workbook, type CellInput } from "@/core/census/xlsx-patch";
 import type { CellValue } from "@/types/processing";
 
@@ -67,16 +67,6 @@ function extras(r: CensusRecord, includeRemarks: boolean) {
     text(r, "Registered in") && `Registered ${text(r, "Registered in")}`,
     includeRemarks && text(r, "Remarks"),
   ].filter(Boolean) as string[];
-}
-
-/** Owners in sheet order (a continuation sheet's pets belong to the sheet they continue). */
-function byOwner(records: CensusRecord[]) {
-  const owners = new Map<number, CensusRecord[]>();
-  for (const r of records) {
-    const sheet = Number(r[COLUMN.continuedFrom] ?? r[COLUMN.sheet]);
-    owners.set(sheet, [...(owners.get(sheet) ?? []), r]);
-  }
-  return [...owners.entries()].sort(([a], [b]) => a - b).map(([, pets]) => pets);
 }
 
 function age(r: CensusRecord) {

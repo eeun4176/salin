@@ -202,6 +202,13 @@ export function markDatasetExported(id: string) {
   });
 }
 
+export function markDatasetSent(id: string) {
+  return db.transaction("rw", db.datasets, async () => {
+    await getDatasetOrThrow(id);
+    await db.datasets.update(id, { lastSentAt: Date.now() });
+  });
+}
+
 export interface DatasetSnapshot {
   dataset: Dataset;
   rows: DatasetRow[];
