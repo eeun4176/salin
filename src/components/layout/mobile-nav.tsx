@@ -41,12 +41,13 @@ function TabLink({ to, label, icon: Icon, active }: (typeof SECTION_LINKS)[numbe
       to={to}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "relative z-10 flex flex-col items-center justify-center gap-0.5 rounded-full text-[10.5px] font-medium transition-colors duration-200",
+        "relative z-10 flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-full px-1 text-[10.5px] font-medium tracking-[-0.01em] transition-colors duration-200",
         active ? "text-salin-primary" : "text-salin-muted active:text-salin-text",
       )}
     >
       <Icon aria-hidden="true" className="size-5" strokeWidth={active ? 2.2 : 1.8} />
-      <span>{label}</span>
+      {/* Stays inside the lens with large phone text: shortens instead of spilling past it. */}
+      <span className="max-w-full truncate">{label}</span>
     </Link>
   );
 }

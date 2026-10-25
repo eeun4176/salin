@@ -16,10 +16,11 @@ import { cn } from "@/lib/utils";
 export function AppHeader({ className }: { className?: string }) {
   return (
     <header className={cn("relative z-10 flex items-center justify-between gap-3", className)}>
-      <Logo subtitleClassName="max-[520px]:hidden" />
+      {/* The logo keeps its size; the storage badge is what shortens when large text leaves no room. */}
+      <Logo className="shrink-0" subtitleClassName="max-[520px]:hidden" />
       <div className="group/bar flex min-w-0 items-center gap-2">
         <SyncStatus className="h-8 max-w-40 rounded-full bg-salin-surface" />
-        <StorageBadge className="h-8 rounded-full bg-salin-surface max-[400px]:group-has-[[data-sync-status]]/bar:hidden" />
+        <StorageBadge className="h-8 min-w-0 rounded-full bg-salin-surface max-[400px]:group-has-[[data-sync-status]]/bar:hidden" />
         <AccountMenu compact />
       </div>
     </header>

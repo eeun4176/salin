@@ -104,7 +104,10 @@ export function StorageBadge({ className }: { className?: string }) {
       className={cn("flex h-9 items-center gap-2 overflow-hidden rounded-xl px-3 text-xs text-salin-muted ring-1 ring-salin-border hover:text-salin-text", className)}
     >
       <HardDrive aria-hidden="true" className="size-4 shrink-0" />
-      <span className={cn(wipe, "tabular-nums")}>{formatBytes(usage)} Local</span>
+      <span className={cn(wipe, "truncate tabular-nums")}>
+        {formatBytes(usage)}
+        <span className="max-[440px]:hidden"> Local</span>
+      </span>
     </Link>
   );
 }
@@ -142,7 +145,7 @@ export function AccountMenu({ compact = false }: { compact?: boolean }) {
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger
         aria-label={`Account: ${session.name}`}
-        className={cn("flex items-center gap-2.5 overflow-hidden rounded-xl p-1 text-left outline-none hover:bg-salin-tile focus-visible:ring-2 focus-visible:ring-salin-primary", compact ? "rounded-full" : "w-full")}
+        className={cn("flex items-center gap-2.5 overflow-hidden rounded-xl p-1 text-left outline-none hover:bg-salin-tile focus-visible:ring-2 focus-visible:ring-salin-primary", compact ? "shrink-0 rounded-full" : "w-full")}
       >
         {photo ? (
           <img src={photo} alt="" className="size-8 shrink-0 rounded-full object-cover" />
