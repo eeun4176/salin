@@ -6,26 +6,28 @@
  * after that the workspace opens, and signing in again works, offline (see
  * local-auth.ts). New accounts take a first
  * sign-in: the one-time temporary password, then their own password and the
- * paravet terms (English or Filipino). Wrong or missing entries shake the
+ * paravet terms (English or Filipino). A forgotten password is reset with a
+ * 6-digit code emailed to the paravet's confirmed email (set in Settings),
+ * which needs the internet. Wrong or missing entries shake the
  * field and explain what to fix; a correct sign-in shows a short welcome
  * while the workspace opens, then returns to the page the user wanted.
  */
 
 import { useEffect, useId, useState, type FormEvent, type ReactNode } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router";
-import { Check, CircleCheck, Eye, EyeOff, Key, Lock, WifiOff } from "lucide-react";
+import { Check, CircleCheck, Eye, EyeOff, Key, Lock, Mail, WifiOff } from "lucide-react";
 
 import { APP_SUBTITLE, Logo } from "@/components/brand/logo";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
-import { startFirstSignIn, validateLogin, validateNewPassword, type LoginErrors, type ParavetPolicy } from "@/core/auth/local-auth";
+import { requestPasswordReset, resetPassword, startFirstSignIn, validateLogin, validateNewPassword, type LoginErrors, type ParavetPolicy } from "@/core/auth/local-auth";
 import { useOnline } from "@/hooks/use-online";
 import { prefersReducedMotion } from "@/hooks/use-reduced-motion";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
 
 type Phase = "form" | "checking" | "accepted" | "welcome";
-/** signin: Account Key + password · first: temporary password · password: new password + terms. */
-type Mode = "signin" | "first" | "password";
+/** signin: Account Key + password · first: temporary password · password: new password + terms · forgot: Account Key → emailed code · reset: code + new password. */
+type Mode = "signin" | "first" | "password" | "forgot" | "reset";
 
 // How long the workspace "loads" on the welcome view before it opens.
 const WELCOME_MS = 1400;
@@ -34,6 +36,8 @@ const COPY: Record<Mode, { title: string; help: string; submit: string }> = {
   signin: { title: "Access Your Workspace", help: "Sign in with your City Vet account.", submit: "Unlock Workspace" },
   first: { title: "First sign-in", help: "Use the temporary password from the office.", submit: "Continue" },
   password: { title: "Create your password", help: "8+ characters, with a letter and a number.", submit: "Save password and sign in" },
+  forgot: { title: "Reset your password", help: "Enter your Account Key. City Vet emails a 6-digit code to the email you confirmed in Settings.", submit: "Email me a code" },
+  reset: { title: "Enter the code", help: "Type the code from the email, then choose a new password: 8+ characters, with a letter and a number.", submit: "Save password and sign in" },
 };
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, prefersReducedMotion() ? 0 : ms));
@@ -54,6 +58,7 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [code, setCode] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<LoginErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -86,7 +91,7 @@ export function LoginPage() {
     setErrors({});
     setFormError(null);
     setNotice(message);
-    setFocusId(next === "password" ? "new-password" : key ? "password" : "account-key");
+    setFocusId(next === "password" ? "new-password" : next === "reset" ? "reset-code" : key && next !== "forgot" ? "password" : "account-key");
   }
 
   function fail(message: string, field?: string) {
@@ -118,6 +123,33 @@ export function LoginPage() {
         return switchMode("first", "That took longer than 10 minutes. Ask the office for a new temporary password and start again.");
       }
       return fail(result.message);
+    }
+    if (mode === "forgot") {
+      if (!key.trim()) {
+        setErrors({ key: "Enter your Account Key." });
+        setAttempt((n) => n + 1);
+        return setFocusId("account-key");
+      }
+      setPhase("checking");
+      const [result] = await Promise.all([requestPasswordReset(key), wait(650)]);
+      if (!result.ok) return fail(result.message);
+      setPhase("form");
+      setCode("");
+      setNewPassword("");
+      setConfirmPassword("");
+      return switchMode("reset", result.message);
+    }
+    if (mode === "reset") {
+      const codeOk = /^\d{6}$/.test(code.trim());
+      const problem = codeOk ? validateNewPassword(newPassword, confirmPassword) : "Enter the 6-digit code from the email.";
+      if (problem) return fail(problem, codeOk ? "new-password" : "reset-code");
+      setPhase("checking");
+      const [result] = await Promise.all([resetPassword(key, code, newPassword), wait(650)]);
+      if (!result.ok) return fail(result.message, "reset-code");
+      const signedIn = await signIn({ key, password: newPassword });
+      if (signedIn.ok) return welcome();
+      setPhase("form");
+      return switchMode("signin", "Your password was changed. Sign in with the new password.");
     }
     const found = mode === "first" ? { ...(key.trim() ? {} : { key: "Enter your Account Key." }), ...(password ? {} : { password: "Enter the temporary password." }) } : validateLogin({ key, password });
     setErrors(found);
@@ -191,8 +223,21 @@ export function LoginPage() {
               )}
 
               <form noValidate onSubmit={submit} className="mt-5 space-y-4">
-                {mode !== "password" && (
-                  <Field id="account-key" label="Account Key" icon={<Key />} error={errors.key} shake={attempt}>
+                {(mode === "signin" || mode === "first" || mode === "forgot") && (
+                  <Field
+                    id="account-key"
+                    label="Account Key"
+                    icon={<Key />}
+                    error={errors.key}
+                    shake={attempt}
+                    aside={
+                      mode === "forgot" && (
+                        <button type="button" onClick={() => setForgotOpen(true)} className="rounded text-xs font-medium text-salin-primary-ink hover:underline">
+                          Forgot key?
+                        </button>
+                      )
+                    }
+                  >
                     {(props) => (
                       <input
                         {...props}
@@ -210,7 +255,7 @@ export function LoginPage() {
                   </Field>
                 )}
 
-                {mode !== "password" ? (
+                {mode === "forgot" ? null : mode === "signin" || mode === "first" ? (
                   <Field
                     id="password"
                     label={mode === "first" ? "Temporary password" : "Password"}
@@ -218,9 +263,15 @@ export function LoginPage() {
                     error={errors.password}
                     shake={attempt}
                     aside={
-                      <button type="button" onClick={() => setForgotOpen(true)} className="rounded text-xs font-medium text-salin-primary-ink hover:underline">
-                        Forgot key?
-                      </button>
+                      mode === "signin" ? (
+                        <button type="button" onClick={() => switchMode("forgot")} className="rounded text-xs font-medium text-salin-primary-ink hover:underline">
+                          Forgot password?
+                        </button>
+                      ) : (
+                        <button type="button" onClick={() => setForgotOpen(true)} className="rounded text-xs font-medium text-salin-primary-ink hover:underline">
+                          Forgot key?
+                        </button>
+                      )
                     }
                     trailing={passwordToggle}
                   >
@@ -240,13 +291,28 @@ export function LoginPage() {
                   </Field>
                 ) : (
                   <>
+                    {mode === "reset" && (
+                      <Field id="reset-code" label="6-digit code from the email" icon={<Mail />} shake={attempt}>
+                        {(props) => (
+                          <input
+                            {...props}
+                            name="reset-code"
+                            inputMode="numeric"
+                            autoComplete="one-time-code"
+                            maxLength={6}
+                            value={code}
+                            onChange={(event) => setCode(event.target.value.replace(/\D/g, ""))}
+                          />
+                        )}
+                      </Field>
+                    )}
                     <Field id="new-password" label="New password" icon={<Lock />} shake={attempt} trailing={passwordToggle}>
                       {(props) => <input {...props} name="new-password" type={showPassword ? "text" : "password"} autoComplete="new-password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} />}
                     </Field>
                     <Field id="confirm-password" label="Confirm new password" icon={<Lock />} shake={attempt}>
                       {(props) => <input {...props} name="confirm-password" type={showPassword ? "text" : "password"} autoComplete="new-password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} />}
                     </Field>
-                    {reset && <TermsAgreement policy={reset.policy} language={language} onLanguage={setLanguage} agreed={agreed} onAgreed={setAgreed} />}
+                    {mode === "password" && reset && <TermsAgreement policy={reset.policy} language={language} onLanguage={setLanguage} agreed={agreed} onAgreed={setAgreed} />}
                   </>
                 )}
 
@@ -268,6 +334,11 @@ export function LoginPage() {
                   {mode === "signin" ? "First time? Use your temporary password" : "Back to sign in"}
                 </button>
               )}
+              {mode === "reset" && (
+                <button type="button" onClick={() => switchMode("forgot")} className="h-9 w-full rounded-lg text-center text-[13px] font-medium text-salin-muted hover:text-salin-primary-ink">
+                  No email? Send a new code
+                </button>
+              )}
             </>
           )}
         </div>
@@ -277,7 +348,7 @@ export function LoginPage() {
         <DialogContent>
           <DialogTitle>Forgot your key?</DialogTitle>
           <DialogDescription>
-            Contact the City Veterinary Office to get your Account Key or a new temporary password. Your scans and datasets stay on this device.
+            Contact the City Veterinary Office to get your Account Key or a new temporary password. They can also reset your password if you haven't confirmed an email in Settings. Your scans and datasets stay on this device.
           </DialogDescription>
           <div className="mt-5 flex justify-end">
             <DialogClose className="press h-10 rounded-xl bg-salin-primary px-4 text-sm font-semibold text-white hover:bg-salin-primary-strong">OK</DialogClose>
