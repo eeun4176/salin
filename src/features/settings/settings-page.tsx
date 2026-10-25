@@ -60,8 +60,8 @@ function StorageCard() {
     setRequesting(false);
     toast(
       granted
-        ? "Storage is now protected. The browser won't clear Salin's data to save space."
-        : "The browser didn't allow protected storage yet. Installing Salin usually allows it — and keep regular backups.",
+        ? "Storage is now protected. The browser won't clear e-Vet's data to save space."
+        : "The browser didn't allow protected storage yet. Installing e-Vet usually allows it — and keep regular backups.",
     );
     void refresh();
   }
@@ -83,7 +83,7 @@ function StorageCard() {
             {!status
               ? "Checking storage…"
               : status.supported
-                ? `${formatBytes(status.usage)} used of ${formatBytes(status.quota)} available to Salin`
+                ? `${formatBytes(status.usage)} used of ${formatBytes(status.quota)} available to e-Vet`
                 : "This browser doesn't report storage usage."}
           </p>
         </div>
@@ -109,7 +109,7 @@ function StorageCard() {
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-salin-border pt-4">
         <p className="max-w-md text-sm text-salin-muted">
           {status?.persisted
-            ? "Protected storage is on: the browser won't clear Salin's data automatically."
+            ? "Protected storage is on: the browser won't clear e-Vet's data automatically."
             : "Browsers may clear site data when the device runs low on space. Protect it, and keep regular backups."}
         </p>
         {status?.persisted === false && (
@@ -219,7 +219,7 @@ function PrivacyCard() {
     <SectionCard icon={ShieldCheck} title="Privacy" id="privacy-heading">
       <ul className="space-y-1.5 text-sm text-salin-muted">
         <li>Your documents, scans and photos are stored only in this browser on this device. They're never uploaded.</li>
-        <li>Salin sends the City Veterinary Office only what you choose to send: program request lists, stub and program-day updates, and census records (the values, not the scans).</li>
+        <li>e-Vet sends the City Veterinary Office only what you choose to send: program request lists, stub and program-day updates, and census records (the values, not the scans).</li>
         <li>Anyone using this browser profile can open them. On a shared device, delete your data when you're done.</li>
       </ul>
       <button

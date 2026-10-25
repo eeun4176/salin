@@ -89,7 +89,7 @@ function ModelCard({ id, storage }: { id: AiModelId; storage: StorageStatus | nu
       )}
       {tooBig && (
         <p className="mt-3 flex gap-2 text-sm text-amber-800 dark:text-amber-300">
-          <TriangleAlert className="mt-0.5 size-4 shrink-0" /> This needs {formatBytes(needed)}, but only about {formatBytes(Math.max(0, free!))} is free for Salin. Free up space first.
+          <TriangleAlert className="mt-0.5 size-4 shrink-0" /> This needs {formatBytes(needed)}, but only about {formatBytes(Math.max(0, free!))} is free for e-Vet. Free up space first.
         </p>
       )}
       {slow && state.status !== "unsupported" && (
@@ -272,7 +272,7 @@ export function AiSettingsCard() {
         ))}
       </ul>
       <p className="mt-3 text-xs text-salin-muted">
-        Model files download only from {new URL(AI_MODEL_HOST).host}, at the exact versions Salin was tested with, and are checked for size before use. {caps ? `This device: WebGPU ${caps.webGpu === "available" ? `available${caps.webGpuF16 ? " (16-bit)" : ""}` : "not available"} · memory ${caps.deviceMemoryGb ? `about ${caps.deviceMemoryGb} GB` : "not reported"}.` : ""}
+        Model files download only from {new URL(AI_MODEL_HOST).host}, at the exact versions e-Vet was tested with, and are checked for size before use. {caps ? `This device: WebGPU ${caps.webGpu === "available" ? `available${caps.webGpuF16 ? " (16-bit)" : ""}` : "not available"} · memory ${caps.deviceMemoryGb ? `about ${caps.deviceMemoryGb} GB` : "not reported"}.` : ""}
       </p>
 
       <details className="mt-4">

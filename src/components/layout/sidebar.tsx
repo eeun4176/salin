@@ -13,7 +13,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import { CalendarHeart, ClipboardList, Download, HardDrive, Landmark, LogOut, PanelLeft, Settings, Sparkles, type LucideIcon } from "lucide-react";
 
-import { Logo } from "@/components/brand/logo";
+import { APP_SUBTITLE, Logo } from "@/components/brand/logo";
 import { NewDocumentMenu } from "@/components/layout/new-document-menu";
 import { SyncStatus } from "@/components/layout/sync-status";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -118,7 +118,7 @@ export function AccountMenu({ compact = false }: { compact?: boolean }) {
       toast("To install, use your browser menu → “Install app”.");
       return;
     }
-    if ((await promptInstall()) === "accepted") toast("Salin is installed. Open it from your desktop or home screen.");
+    if ((await promptInstall()) === "accepted") toast("e-Vet is installed. Open it from your desktop or home screen.");
   }
 
   return (
@@ -154,7 +154,7 @@ export function AccountMenu({ compact = false }: { compact?: boolean }) {
           ))}
         {!installed && (
           <DropdownMenuItem className="gap-2.5 py-2" onSelect={() => void install()}>
-            <Download /> Install Salin
+            <Download /> Install e-Vet
           </DropdownMenuItem>
         )}
         <DropdownMenuSeparator />
@@ -226,8 +226,9 @@ export function Sidebar() {
         )}
       >
         <div className="relative flex h-10 items-center">
-          <div inert={collapsed} className={cn(wipe, "px-2")}>
-            <Logo />
+          <div inert={collapsed} className={cn(wipe, "pr-11 pl-2")}>
+            {/* The subtitle is too long for this row beside the fold button: it gets its own line below. */}
+            <Logo subtitleClassName="hidden" />
           </div>
           <button
             type="button"
@@ -241,6 +242,9 @@ export function Sidebar() {
             <PanelLeft aria-hidden="true" className="size-[18px]" strokeWidth={1.9} />
           </button>
         </div>
+        <p aria-hidden={collapsed || undefined} className={cn(wipe, "-mt-3.5 truncate px-2 text-[11px] font-medium text-salin-muted")}>
+          {APP_SUBTITLE}
+        </p>
         <NewDocumentMenu collapsed={collapsed} />
         <nav aria-label="Primary" className="flex flex-1 flex-col gap-1">
           {SECTION_LINKS.map((link) => (

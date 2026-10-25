@@ -72,12 +72,13 @@ export default defineConfig(({ mode }) => ({
       // The app shows its own "new version ready" toast (src/app/pwa.ts).
       registerType: "prompt",
       injectRegister: false,
-      includeAssets: ["favicon.svg", "icons/apple-touch-icon.png"],
+      includeAssets: ["favicon.png", "icons/apple-touch-icon.png"],
       manifest: {
+        // id stays "/" so phones that installed Salin update in place to e-Vet.
         id: "/",
-        name: "Salin AI",
-        short_name: "Salin",
-        description: "Turn documents into structured data, on your device.",
+        name: "e-Vet Field",
+        short_name: "e-Vet",
+        description: "The City Veterinary Office's field app for paravets, City of San Jose del Monte.",
         start_url: "/",
         scope: "/",
         display: "standalone",

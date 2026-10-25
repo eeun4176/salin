@@ -42,7 +42,7 @@ for (const profile of ["laptop-browser", "phone-emulation"] as const) {
     ]) {
       await page.getByRole("button", { name: /^Source:/ }).click();
       await page.getByRole("menuitemradio", { name: new RegExp(source.replaceAll(".", "\\.")) }).click();
-      await page.getByRole("textbox", { name: "Ask Salin AI", exact: true }).fill(question);
+      await page.getByRole("textbox", { name: "Ask e-Vet AI", exact: true }).fill(question);
       const started = performance.now();
       await page.getByRole("button", { name: "Send", exact: true }).click();
       await expect(page.getByRole("log")).toContainText(value);
@@ -54,10 +54,10 @@ for (const profile of ["laptop-browser", "phone-emulation"] as const) {
     }
     await page.getByRole("button", { name: /^Source:/ }).click();
     await page.getByRole("menuitemradio", { name: /registrations.csv/ }).click();
-    await page.getByRole("textbox", { name: "Ask Salin AI", exact: true }).fill("How many of those?");
+    await page.getByRole("textbox", { name: "Ask e-Vet AI", exact: true }).fill("How many of those?");
     await page.getByRole("button", { name: "Send", exact: true }).click();
     await expect(page.getByRole("log")).toContainText("2 rows match.");
-    await page.getByRole("textbox", { name: "Ask Salin AI", exact: true }).fill("export names");
+    await page.getByRole("textbox", { name: "Ask e-Vet AI", exact: true }).fill("export names");
     await page.getByRole("button", { name: "Send", exact: true }).click();
     const download = page.waitForEvent("download");
     await page.getByRole("button", { name: "Download displayed table (CSV)" }).click();
@@ -91,7 +91,7 @@ test("a raster form reaches Ask SALIN through real OCR and answers offline", asy
   await expect(page.getByRole("checkbox", { name: "Only show what needs a look" })).toBeVisible({ timeout: 150_000 });
   await page.goto("/ai-studio");
   await context.setOffline(true);
-  await page.getByRole("textbox", { name: "Ask Salin AI", exact: true }).fill("What is the contact number?");
+  await page.getByRole("textbox", { name: "Ask e-Vet AI", exact: true }).fill("What is the contact number?");
   const started = performance.now();
   await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByRole("log")).toContainText("09171234567");

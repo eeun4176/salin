@@ -167,6 +167,6 @@ test("a damaged backup is refused and the workspace is kept", async ({ page }) =
   await openWorkspace(page);
   await uploadFiles(page, [sample.pdf()]);
   await page.getByTestId("restore-input").setInputFiles({ name: "broken.zip", mimeType: "application/zip", buffer: Buffer.from("PK\x03\x04garbage") });
-  await expect(page.getByText(/damaged|isn't a Salin backup/)).toBeVisible();
+  await expect(page.getByText(/damaged|isn't an e-Vet backup/)).toBeVisible();
   await expect(card(page, "Census Form.pdf")).toBeVisible();
 });

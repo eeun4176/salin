@@ -14,10 +14,10 @@ export function registerServiceWorker() {
   const updateServiceWorker = registerSW({
     immediate: true,
     onNeedRefresh() {
-      toast("A new version of Salin is ready.", { label: "Reload", onClick: () => void updateServiceWorker(true) }, { duration: null });
+      toast("A new version of e-Vet is ready.", { label: "Reload", onClick: () => void updateServiceWorker(true) }, { duration: null });
     },
     onOfflineReady() {
-      toast("Salin is ready to work offline.");
+      toast("e-Vet is ready to work offline.");
     },
     onRegisterError(error: unknown) {
       console.error("Service worker registration failed", error);

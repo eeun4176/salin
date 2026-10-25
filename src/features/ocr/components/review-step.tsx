@@ -566,7 +566,7 @@ export function ReviewStep({ doc, pages, onBack, onFixPages }: ReviewStepProps) 
         open={naming}
         onOpenChange={setNaming}
         title="Save as a template"
-        description="Next time, pick this template and Salin looks for these fields in the same places."
+        description="Next time, pick this template and e-Vet looks for these fields in the same places."
         initialValue={`${doc.name} form`}
         confirmLabel="Save template"
         onSubmit={saveAsTemplate}

@@ -161,7 +161,7 @@ describe("workspace backup", () => {
   it("rejects other formats and versions with a clear reason", async () => {
     const phase1 = new Blob([JSON.stringify({ app: "salin", version: 1, items: [] })]);
     await expect(readBackupArchive(phase1)).rejects.toThrow("Phase 1 preview backup");
-    await expect(readBackupArchive(new Blob(["not a zip"]))).rejects.toThrow("isn't a Salin backup");
+    await expect(readBackupArchive(new Blob(["not a zip"]))).rejects.toThrow("isn't an e-Vet backup");
     await expect(readBackupArchive(new Blob([]))).rejects.toThrow("empty");
 
     const newer = await tamper(await createBackupArchive(), (entries) =>

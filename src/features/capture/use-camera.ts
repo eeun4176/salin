@@ -83,7 +83,7 @@ export function useCamera(videoRef: RefObject<HTMLVideoElement | null>) {
 }
 
 export const CAMERA_ERROR_COPY: Record<CameraError, { title: string; body: string }> = {
-  insecure: { title: "Camera needs a secure connection", body: "Open Salin over HTTPS (or localhost) to use the camera. You can still upload a photo." },
+  insecure: { title: "Camera needs a secure connection", body: "Open e-Vet over HTTPS (or localhost) to use the camera. You can still upload a photo." },
   unsupported: { title: "Camera not available", body: "This browser can't open the camera. Upload a photo of the document instead." },
   denied: { title: "Camera permission is off", body: "Allow camera access in your browser's site settings, then try again." },
   "not-found": { title: "No camera found", body: "Connect a camera or upload a photo of the document." },

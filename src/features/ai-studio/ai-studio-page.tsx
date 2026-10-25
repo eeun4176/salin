@@ -209,7 +209,7 @@ function AssistantMessage({ message, active, onCite }: { message: Extract<ChatMe
         <Bot className="size-5" />
       </span>
       <div className="min-w-0 flex-1 pt-1.5">
-        <p className="sr-only">Salin AI said:</p>
+        <p className="sr-only">e-Vet AI said:</p>
         {message.kind === "text" && (
           <>
             <StreamedText text={message.text} />
@@ -504,7 +504,7 @@ export function AiStudioPage() {
             <Bot className="size-5" />
           </span>
           <div className="min-w-0 flex-1 basis-44">
-            <h1 className="sr-only">Ask Salin AI</h1>
+            <h1 className="sr-only">Ask e-Vet AI</h1>
             {sourceOptions.length ? (
               <ChoiceMenu variant="cell" label="Source" heading="Ask about" value={datasetId ?? ""} options={sourceOptions} onChange={setChosen} disabled={status !== null} className="-ml-1.5 h-7 w-auto max-w-full min-w-0 rounded-lg px-1.5 text-[15px] font-semibold" />
             ) : (
@@ -621,7 +621,7 @@ export function AiStudioPage() {
                     "peer-[:not(:placeholder-shown)]:-translate-y-[10px] peer-[:not(:placeholder-shown)]:scale-[0.74] peer-[:not(:placeholder-shown)]:text-salin-primary",
                   )}
                 >
-                  Ask Salin AI
+                  Ask e-Vet AI
                 </label>
               </div>
               <button

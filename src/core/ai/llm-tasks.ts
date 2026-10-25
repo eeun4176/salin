@@ -254,11 +254,11 @@ export function parseCommandReply(reply: string, columns: DatasetColumn[], reque
   try {
     json = extractJson(reply);
   } catch {
-    return { ok: false, message: "The assistant's answer wasn't a command Salin can run. Try rewording, or use the Transform tools." };
+    return { ok: false, message: "The assistant's answer wasn't a command e-Vet can run. Try rewording, or use the Transform tools." };
   }
   const unsupported = z.object({ action: z.literal("unsupported"), reason: z.string().max(300).optional() }).safeParse(json);
   if (unsupported.success) {
-    return { ok: false, unsupported: true, message: `That isn't something Salin can do with this table${unsupported.data.reason ? `: ${unsupported.data.reason}` : "."}` };
+    return { ok: false, unsupported: true, message: `That isn't something e-Vet can do with this table${unsupported.data.reason ? `: ${unsupported.data.reason}` : "."}` };
   }
   const resolved = resolveCommand(withOperatorAliases(json), columns);
   if (!resolved.ok) return { ok: false, message: resolved.message };

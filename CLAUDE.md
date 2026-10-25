@@ -4,6 +4,8 @@
 A mobile-first, local-first PWA for City Vet paravets that turns paper forms, PDFs and spreadsheets into reviewed, structured, exportable data.
 Workflow: **capture/import → parse/extract → structure → review → save → organize → search → export** (XLSX / CSV / JSON).
 
+**Users see it as e-Vet** ("Field | City of San Jose del Monte", the City Vet seal; the admin system e-Kapon shows "e-Vet · Admin | City of San Jose del Monte"). The name and subtitle live in `src/components/brand/logo.tsx`, the manifest in `vite.config.ts`. Code, docs and storage names (`SalinAI` database, `salin*` keys and caches) keep "Salin": renaming storage would lose users' data.
+
 Full product spec: `d:\MyProgrammingDictionary\SALIN Project Documentation\SALIN AI.md` (outside the repo). Phase specs live in `d:\MyProgrammingDictionary\`.
 
 ## Product rules (never break these)

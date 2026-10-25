@@ -57,7 +57,7 @@ export async function readOnCityVetServer(rows: ServerRow[], options: { url?: st
   });
   if (!response.ok) throw new CityVetReaderError(`The City Vet server couldn't read these boxes (${response.status}).`);
   const parsed = responseSchema.safeParse(await response.json().catch(() => null));
-  if (!parsed.success) throw new CityVetReaderError("The City Vet server sent an answer Salin doesn't understand.");
+  if (!parsed.success) throw new CityVetReaderError("The City Vet server sent an answer e-Vet doesn't understand.");
   const byId = new Map(rows.map((r) => [r.id, r]));
   return parsed.data.rows.filter((reading) => {
     const row = byId.get(reading.id);

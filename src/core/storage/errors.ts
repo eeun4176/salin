@@ -18,7 +18,7 @@ export class WorkspaceError extends Error {
 }
 
 export const QUOTA_MESSAGE =
-  "This device is out of storage space for Salin. Delete files from Trash or free up space, then try again.";
+  "This device is out of storage space for e-Vet. Delete files from Trash or free up space, then try again.";
 
 /** True for IndexedDB/Dexie quota failures, including ones wrapped in a transaction abort. */
 export function isQuotaError(error: unknown): boolean {

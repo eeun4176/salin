@@ -41,7 +41,7 @@ test("the web app manifest is served with installable icons", async ({ page, req
   const href = await page.locator('link[rel="manifest"]').getAttribute("href");
   expect(href).toBeTruthy();
   const manifest = await (await request.get(href!)).json();
-  expect(manifest).toMatchObject({ name: "Salin AI", short_name: "Salin", display: "standalone", start_url: "/" });
+  expect(manifest).toMatchObject({ name: "e-Vet Field", short_name: "e-Vet", display: "standalone", start_url: "/" });
   for (const icon of manifest.icons as { src: string }[]) {
     expect((await request.get(`/${icon.src}`)).status()).toBe(200);
   }

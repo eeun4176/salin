@@ -248,7 +248,7 @@ export async function readBackupArchive(file: Blob): Promise<ParsedBackup> {
   if (bytes[0] === 0x7b /* "{" */) {
     reject("This is a Phase 1 preview backup. It has no file contents, so it can't be restored.");
   }
-  if (bytes[0] !== 0x50 || bytes[1] !== 0x4b /* "PK" */) reject("That file isn't a Salin backup.");
+  if (bytes[0] !== 0x50 || bytes[1] !== 0x4b /* "PK" */) reject("That file isn't an e-Vet backup.");
 
   let entries: Record<string, Uint8Array>;
   try {
@@ -258,7 +258,7 @@ export async function readBackupArchive(file: Blob): Promise<ParsedBackup> {
   }
 
   const manifestBytes = entries[MANIFEST_PATH];
-  if (!manifestBytes) reject("That file isn't a Salin backup.");
+  if (!manifestBytes) reject("That file isn't an e-Vet backup.");
   let json: unknown;
   try {
     json = JSON.parse(strFromU8(manifestBytes));
@@ -266,8 +266,8 @@ export async function readBackupArchive(file: Blob): Promise<ParsedBackup> {
     reject("That backup's manifest is damaged.");
   }
   const versionCheck = z.object({ app: z.literal("salin"), version: z.number() }).safeParse(json);
-  if (!versionCheck.success) reject("That file isn't a Salin backup.");
-  if (versionCheck.data.version > BACKUP_VERSION) reject("This backup was made by a newer version of Salin. Update the app, then try again.");
+  if (!versionCheck.success) reject("That file isn't an e-Vet backup.");
+  if (versionCheck.data.version > BACKUP_VERSION) reject("This backup was made by a newer version of e-Vet. Update the app, then try again.");
   if (versionCheck.data.version < OLDEST_SUPPORTED_VERSION) reject("This backup format is no longer supported.");
 
   const parsed = manifestSchema.safeParse(json);

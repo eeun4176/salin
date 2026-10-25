@@ -61,7 +61,7 @@ export function QrScanner({ onCode, onClose }: { onCode: (code: string) => void;
       try {
         stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
       } catch {
-        return live && setProblem("Salin couldn't use the camera. Allow camera access, or type the code printed under the QR.");
+        return live && setProblem("e-Vet couldn't use the camera. Allow camera access, or type the code printed under the QR.");
       }
       if (!live || !video.current) return stream.getTracks().forEach((track) => track.stop());
       video.current.srcObject = stream;

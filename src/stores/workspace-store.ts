@@ -62,7 +62,7 @@ export function startWorkspaceSync() {
       useWorkspaceStore.setState({
         status: "error",
         error:
-          "Salin couldn't open its storage on this device. Private browsing or blocked site data can cause this — allow site data and try again.",
+          "e-Vet couldn't open its storage on this device. Private browsing or blocked site data can cause this — allow site data and try again.",
       });
     },
   });

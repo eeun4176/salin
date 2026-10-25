@@ -364,7 +364,7 @@ export function censusExtraction(pages: CensusPage[]): Extraction {
     const barangay = barangayName(code.barangay);
     const [y, m, d] = code.censusDate.split("-");
     const fields = [
-      field(SHEET_FIELDS[0], barangay ? known(SHEET_FIELDS[0], barangay, page, null) : makeValue(SHEET_FIELDS[0], null, ["type-mismatch"], "This sheet names a barangay Salin doesn't know.")),
+      field(SHEET_FIELDS[0], barangay ? known(SHEET_FIELDS[0], barangay, page, null) : makeValue(SHEET_FIELDS[0], null, ["type-mismatch"], "This sheet names a barangay e-Vet doesn't know.")),
       field(SHEET_FIELDS[1], known(SHEET_FIELDS[1], `${m}/${d}/${y}`, page, null)),
       field(SHEET_FIELDS[2], known(SHEET_FIELDS[2], String(code.sheetNumber), page, null)),
     ];
@@ -394,7 +394,7 @@ export function censusExtraction(pages: CensusPage[]): Extraction {
     forms,
     tables: [{ key: "pets", label: "Pets", columns: PET_COLUMNS, rows }],
     summaries: [],
-    unsupported: pages.length ? null : "These pages aren't Salin census sheets. Print the census form from Census → Print forms, then scan it.",
+    unsupported: pages.length ? null : "These pages aren't e-Vet census sheets. Print the census form from Census → Print forms, then scan it.",
     warnings,
   };
 }

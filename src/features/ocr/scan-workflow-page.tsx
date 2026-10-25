@@ -33,7 +33,7 @@ import { toast } from "@/stores/toast-store";
 import type { OcrStage } from "@/types/ocr";
 
 const HINT: Record<number, string> = {
-  1: "Salin reads the pages on this device, then you check what it found.",
+  1: "e-Vet reads the pages on this device, then you check what it found.",
   2: "Check each value against the page, then save it as a dataset.",
 };
 

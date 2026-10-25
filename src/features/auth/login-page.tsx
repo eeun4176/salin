@@ -15,7 +15,7 @@ import { useEffect, useId, useState, type FormEvent, type ReactNode } from "reac
 import { Navigate, useLocation, useNavigate } from "react-router";
 import { Check, CircleCheck, Eye, EyeOff, Key, Lock, WifiOff } from "lucide-react";
 
-import { Logo } from "@/components/brand/logo";
+import { APP_SUBTITLE, Logo } from "@/components/brand/logo";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { startFirstSignIn, validateLogin, validateNewPassword, type LoginErrors, type ParavetPolicy } from "@/core/auth/local-auth";
 import { useOnline } from "@/hooks/use-online";
@@ -161,8 +161,8 @@ export function LoginPage() {
       <div aria-hidden="true" className="pointer-events-none absolute -top-40 -left-40 -z-10 size-[520px] rounded-full bg-[radial-gradient(closest-side,rgb(1_168_90/0.10),transparent)]" />
       <div aria-hidden="true" className="pointer-events-none absolute -right-40 -bottom-40 -z-10 size-[560px] rounded-full bg-[radial-gradient(closest-side,rgb(1_168_90/0.10),transparent)]" />
 
-      <header className="flex h-16 items-center justify-between px-4 sm:px-8">
-        <Logo />
+      <header className="flex h-16 items-center justify-between gap-3 px-4 sm:px-8">
+        <Logo subtitleClassName="max-[600px]:hidden" />
         <div className="flex items-center gap-2 text-xs font-medium text-salin-muted">
           <OfflineBadge />
           <span className="rounded-full bg-salin-surface px-2.5 py-1 ring-1 ring-salin-border">Filipino / EN</span>
@@ -175,6 +175,8 @@ export function LoginPage() {
             <WelcomeView name={session?.name ?? ""} />
           ) : (
             <>
+              {/* The header hides the subtitle on phones: show it here instead. */}
+              <p className="mb-1 text-xs font-medium text-salin-muted min-[601px]:hidden">{APP_SUBTITLE}</p>
               <h1 className="text-[22px] font-semibold tracking-[-0.01em] text-salin-text">{copy.title}</h1>
               <p className="mt-1.5 text-sm text-salin-muted">{copy.help}</p>
               {!online && (

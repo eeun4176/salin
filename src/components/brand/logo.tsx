@@ -1,27 +1,27 @@
 /**
- * Salin Logo
- * The "≡Salin" wordmark that links back to the home screen.
+ * e-Vet Logo
+ * The City Veterinary Office seal with the app's name, e-Vet, and its
+ * subtitle ("Field | City of San Jose del Monte"); links back to the home
+ * screen. Where space is tight the subtitle can be hidden or shown on its
+ * own line.
  */
 
 import { Link } from "react-router";
 
+import sealUrl from "@/assets/brand/cityvet-logo.png";
 import { cn } from "@/lib/utils";
 
-/** "≡Salin" wordmark: speed lines feeding into the green S. */
-export function Logo({ className }: { className?: string }) {
+export const APP_NAME = "e-Vet";
+export const APP_SUBTITLE = "Field | City of San Jose del Monte";
+
+export function Logo({ className, subtitleClassName }: { className?: string; subtitleClassName?: string }) {
   return (
-    <Link
-      to="/"
-      aria-label="Salin home"
-      className={cn("inline-flex items-center rounded-md text-[26px] leading-none font-extrabold tracking-[-0.04em] text-salin-text", className)}
-    >
-      <span aria-hidden="true" className="mr-[3px] flex flex-col items-end gap-[3.5px] pt-[2px]">
-        <span className="h-[3px] w-[15px] rounded-full bg-salin-text" />
-        <span className="h-[3px] w-[10px] rounded-full bg-salin-text" />
-        <span className="h-[3px] w-[15px] rounded-full bg-salin-text" />
+    <Link to="/" aria-label={`${APP_NAME} home`} className={cn("inline-flex max-w-full min-w-0 items-center gap-2.5 rounded-md", className)}>
+      <img src={sealUrl} alt="" className="size-9 shrink-0" />
+      <span aria-hidden="true" className="min-w-0 leading-tight">
+        <span className="block text-[19px] font-extrabold tracking-[-0.02em] text-salin-text">{APP_NAME}</span>
+        <span className={cn("block truncate text-[11px] font-medium text-salin-muted", subtitleClassName)}>{APP_SUBTITLE}</span>
       </span>
-      <span aria-hidden="true" className="text-salin-primary">S</span>
-      <span aria-hidden="true">alin</span>
     </Link>
   );
 }

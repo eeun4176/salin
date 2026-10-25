@@ -87,7 +87,7 @@ export async function exportOfficialWorkbook(dataset: CensusDataset) {
     const [{ buildCensusWorkbook }, template, content] = await Promise.all([
       import("@/core/census/summary-workbook"),
       fetch(templateUrl).then((r) => {
-        if (!r.ok) throw new Error("The census workbook template couldn't be loaded. Open Salin online once so it's saved for offline use.");
+        if (!r.ok) throw new Error("The census workbook template couldn't be loaded. Open e-Vet online once so it's saved for offline use.");
         return r.arrayBuffer();
       }),
       censusContent(dataset),

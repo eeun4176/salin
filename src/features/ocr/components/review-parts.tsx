@@ -143,7 +143,7 @@ export function FieldRow({ refId, spec, value, selected, picking, pageImage, sug
         {value.ocrText !== null ? (
           <>
             <span title="How sure the text recognition was about the characters">Read {percent(value.ocrConfidence) ?? "—"}</span>
-            {value.mappingConfidence !== null && <span title="How sure Salin is that this text belongs to this field">Match {percent(value.mappingConfidence, 100)}</span>}
+            {value.mappingConfidence !== null && <span title="How sure e-Vet is that this text belongs to this field">Match {percent(value.mappingConfidence, 100)}</span>}
             {value.page && <span>Page {value.page}</span>}
           </>
         ) : (

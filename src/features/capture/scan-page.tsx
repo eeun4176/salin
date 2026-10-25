@@ -327,7 +327,7 @@ export function ScanPage() {
               onClick={askAi}
               className="press inline-flex h-12 items-center justify-center gap-2 rounded-xl text-sm font-semibold text-salin-text ring-1 ring-salin-border hover:bg-salin-tile disabled:opacity-45"
             >
-              <Sparkles className="size-[18px]" /> Ask Salin AI
+              <Sparkles className="size-[18px]" /> Ask e-Vet AI
             </button>
             <button
               type="button"

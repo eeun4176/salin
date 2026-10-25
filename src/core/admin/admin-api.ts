@@ -57,7 +57,7 @@ export interface AdminRequest<T> {
 
 /** One call to `/api/v1${path}`; resolves to the checked reply or throws AdminApiError. */
 export async function adminRequest<T>(path: string, { method = "GET", token, body, schema, signal }: AdminRequest<T>, base = CITY_VET_API_URL): Promise<T> {
-  if (!base) throw new AdminApiError("not_configured", "NOT_CONFIGURED", "This copy of Salin isn't connected to the City Veterinary Office yet.");
+  if (!base) throw new AdminApiError("not_configured", "NOT_CONFIGURED", "This copy of e-Vet isn't connected to the City Veterinary Office yet.");
   if (typeof navigator !== "undefined" && navigator.onLine === false) throw new AdminApiError("offline", "OFFLINE", OFFLINE);
   const headers: Record<string, string> = { Accept: "application/json" };
   if (body !== undefined) headers["Content-Type"] = "application/json";
@@ -75,6 +75,6 @@ export async function adminRequest<T>(path: string, { method = "GET", token, bod
     throw new AdminApiError(kindOf(response.status), failure?.code ?? `HTTP_${response.status}`, failure?.message ?? "The City Veterinary Office server couldn't complete this request.", failure?.details);
   }
   const parsed = schema.safeParse(data);
-  if (!parsed.success) throw new AdminApiError("server", "BAD_REPLY", "The City Veterinary Office server sent a reply Salin doesn't understand. Try again later.");
+  if (!parsed.success) throw new AdminApiError("server", "BAD_REPLY", "The City Veterinary Office server sent a reply e-Vet doesn't understand. Try again later.");
   return parsed.data;
 }
