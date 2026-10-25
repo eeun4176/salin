@@ -15,6 +15,7 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { ArrowLeft, ArrowRight, FileSpreadsheet, LoaderCircle, Plus, TriangleAlert } from "lucide-react";
 
+import { LoadingSkeleton } from "@/components/common/loading-skeleton";
 import { primaryButton, secondaryButton, StepFooter } from "@/components/common/step-footer";
 import { Stepper, type StepInfo } from "@/components/common/stepper";
 import { PageFrame } from "@/components/layout/page-frame";
@@ -158,7 +159,7 @@ function SectionsStep({
   return (
     <div className="space-y-4">
       {sheetNames.length > 1 && (
-        <div role="tablist" aria-label="Sheets" className="no-scrollbar flex gap-1 overflow-x-auto rounded-xl bg-salin-tile p-1">
+        <div role="tablist" aria-label="Sheets" className="seg-track no-scrollbar flex gap-1 overflow-x-auto rounded-xl bg-salin-tile p-1">
           {sheetNames.map((name) => {
             const count = sections.filter((s) => s.draft.sheet === name && s.draft.include).length;
             return (
@@ -467,9 +468,7 @@ export function ChooseTablesPage() {
   return (
     <PageFrame title="Extract from Excel" description="Three quick steps: choose sheets, pick the sections you want, then create your datasets.">
       {state.status === "loading" ? (
-        <p role="status" className="flex items-center justify-center gap-2 py-14 text-sm text-salin-muted">
-          <LoaderCircle className="size-4 animate-spin motion-reduce:animate-none" /> Reading workbook…
-        </p>
+        <LoadingSkeleton label="Reading workbook" />
       ) : state.status === "error" ? (
         <div role="alert" className="py-12 text-center">
           <p className="font-semibold text-salin-text">Can't open this workbook</p>

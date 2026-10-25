@@ -2,7 +2,8 @@
  * Dataset Detail Pane
  * The dashboard's right pane on Datasets (760px and wider): the dataset
  * picked in the list (the `?dataset=` URL parameter) as an editable table —
- * click a cell to fix it; changes autosave — with Export (Excel, CSV, JSON)
+ * click a cell to fix it; changes autosave — beside a live chart of its
+ * number columns, with Export (Excel, CSV, JSON)
  * and a link to the full review screen for Transform, Ask and the rest.
  * Phones open datasets on the full review screen instead.
  */
@@ -11,7 +12,9 @@ import { useCallback, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { CircleCheck, Maximize2, ScanText, Table2, TriangleAlert, X } from "lucide-react";
 
+import { LoadingSkeleton } from "@/components/common/loading-skeleton";
 import { OcrSourceDialog } from "@/features/ocr/components/ocr-source-dialog";
+import { DatasetChart } from "@/features/processing/components/dataset-chart";
 import { DatasetTable } from "@/features/processing/components/dataset-table";
 import { ExportMenu, SaveIndicator } from "@/features/processing/dataset-review-page";
 import { useDatasetReview } from "@/features/processing/hooks/use-dataset-review";
@@ -38,6 +41,7 @@ function DatasetDetailView({ datasetId, onClose }: { datasetId: string; onClose:
   );
   const { dataset, draft } = review;
 
+  if (review.load.status === "loading") return <LoadingSkeleton label="Opening dataset" rows={4} className="p-4" />;
   if (review.load.status !== "ready") {
     return (
       <p role={review.load.status === "error" ? "alert" : "status"} className="grid h-full place-items-center px-6 text-center text-sm text-salin-muted">
@@ -87,8 +91,13 @@ function DatasetDetailView({ datasetId, onClose }: { datasetId: string; onClose:
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto px-6 pb-6" data-lenis-prevent="">
-        <DatasetTable review={review} issuesOnly={false} sourceNames={sourceNames} onViewSource={onViewSource} />
+      <div className="@container min-h-0 flex-1 overflow-auto px-6 pb-6" data-lenis-prevent="">
+        <div className="grid items-start gap-4 @3xl:grid-cols-[minmax(0,1fr)_17rem]">
+          <div className="min-w-0">
+            <DatasetTable review={review} issuesOnly={false} sourceNames={sourceNames} onViewSource={onViewSource} />
+          </div>
+          <DatasetChart columns={draft.columns} rows={draft.rows} className="@3xl:sticky @3xl:top-0" />
+        </div>
       </div>
 
       <OcrSourceDialog

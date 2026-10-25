@@ -11,8 +11,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { CircleCheck, Clock, LoaderCircle, Printer, Ticket } from "lucide-react";
+import { CircleCheck, Clock, Printer, Ticket } from "lucide-react";
 
+import { LoadingSkeleton } from "@/components/common/loading-skeleton";
 import { primaryButton, secondaryButton } from "@/components/common/step-footer";
 import { PROCESS_LABEL } from "@/core/programs/program-requests";
 import { confirmOwner, markPrinted, type PrintStub, type StubSheet } from "@/core/programs/stubs";
@@ -36,9 +37,7 @@ export function StubsTab() {
 
   if (state.status === "loading") {
     return (
-      <p role="status" className="flex items-center justify-center gap-2 py-16 text-sm text-salin-muted">
-        <LoaderCircle aria-hidden="true" className="size-5 animate-spin motion-reduce:animate-none" /> Loading your stubs…
-      </p>
+      <LoadingSkeleton label="Loading your stubs" />
     );
   }
   if (state.status === "unavailable") return <p className="py-14 text-center text-sm text-salin-muted">Connect to the internet once to load your barangay's stubs.</p>;

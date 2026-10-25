@@ -13,6 +13,7 @@
 import { createBrowserRouter, Navigate } from "react-router";
 
 import { AppShell } from "@/components/layout/app-shell";
+import { AccountPage } from "@/features/account/account-page";
 import { AiStudioPage } from "@/features/ai-studio/ai-studio-page";
 import { LoginPage } from "@/features/auth/login-page";
 import { RequireSession } from "@/features/auth/require-session";
@@ -64,6 +65,7 @@ export const router = createBrowserRouter([
       { path: "city-vet", Component: CityVetPage },
       { path: "ai-studio", Component: AiStudioPage },
       { path: "settings", Component: SettingsPage },
+      { path: "account", Component: AccountPage },
       { path: "*", element: <Navigate to="/" replace /> },
     ],
   },

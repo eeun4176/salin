@@ -142,14 +142,24 @@ test("stubs: the written name is confirmed; program day: a stub is scanned offli
   await page.getByRole("button", { name: "Find" }).click();
   await expect(page.getByText("Stub 101 was already used.")).toBeVisible();
 
-  await page.getByRole("button", { name: "Walk-in" }).click();
-  await dialog.getByLabel("Owner name").fill("Pedro Reyes");
-  await dialog.getByLabel("Pet 1 name").fill("Tagpi");
-  await dialog.getByRole("button", { name: "Record attendance" }).click();
+  // Walk-ins go in like a spreadsheet: a blank owner cell is another pet of the owner above.
+  await page.getByRole("button", { name: "Walk-ins" }).click();
+  await dialog.getByLabel("Row 1 owner").fill("Pedro Reyes");
+  await dialog.getByLabel("Row 1 pet").fill("Tagpi");
+  await dialog.getByLabel("Row 2 pet").fill("Mingming");
+  await dialog.getByRole("radio", { name: "Cat" }).nth(1).click();
+  await expect(dialog.getByText("1 owner · 2 pets")).toBeVisible();
+  await dialog.getByRole("button", { name: "Record walk-ins" }).click();
+  await expect(page.getByText("1 walk-in recorded. They will be sent when you're back online.")).toBeVisible();
   expect(server.posts).toHaveLength(1);
+
+  // The calendar lists today's program and links back to its attendance.
+  await page.getByRole("tab", { name: "Calendar" }).click();
+  await page.getByRole("complementary", { name: "Programs this month" }).getByRole("link", { name: /Kapon Day/ }).first().click();
+  await expect(page.getByRole("tab", { name: "Attendance" })).toHaveAttribute("aria-selected", "true");
 
   await context.setOffline(false);
   await expect.poll(() => server.posts.map((p) => p.action)).toEqual(["confirm-owner", "redeem", "walk-in"]);
   expect(server.posts[1]).toMatchObject({ stubId: 101, owner: { name: "Maria Santos", barangayId: 4 }, pets: [{ name: "Bantay", outcome: "Completed" }], requestId: expect.stringMatching(/^[0-9a-f-]{36}$/) });
-  expect(server.posts[2]).toMatchObject({ campaignId: 21, owner: { name: "Pedro Reyes", barangayId: 4 }, pets: [{ name: "Tagpi", species: "Dog", processes: ["Neuter/Spay", "Anti-Rabies Vaccine"], outcome: "Completed" }] });
+  expect(server.posts[2]).toMatchObject({ campaignId: 21, owner: { name: "Pedro Reyes", barangayId: 4 }, pets: [{ name: "Tagpi", species: "Dog", processes: ["Neuter/Spay", "Anti-Rabies Vaccine"], outcome: "Completed" }, { name: "Mingming", species: "Cat" }] });
 });

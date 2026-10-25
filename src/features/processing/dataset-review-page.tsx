@@ -16,6 +16,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router";
 import { Check, ChevronDown, CircleAlert, Download, Filter, LoaderCircle, RotateCcw, Undo2, Wand2, X } from "lucide-react";
 
+import { LoadingSkeleton } from "@/components/common/loading-skeleton";
 import { ColumnsBar } from "@/components/common/columns-bar";
 import { PageFrame } from "@/components/layout/page-frame";
 import {
@@ -28,6 +29,7 @@ import type { ExportFormat } from "@/core/processing/dataset-export";
 import { listExtractionsForBlobs } from "@/core/storage/repositories/processing.repository";
 import { OcrSourceDialog } from "@/features/ocr/components/ocr-source-dialog";
 import { scanUrl } from "@/features/ocr/ocr-actions";
+import { DatasetChart } from "@/features/processing/components/dataset-chart";
 import { DatasetTable } from "@/features/processing/components/dataset-table";
 import { AskBox } from "@/features/processing/components/ask-box";
 import { CommandPreview } from "@/features/processing/components/command-preview";
@@ -271,9 +273,7 @@ export function DatasetReviewPage() {
     return (
       <PageFrame {...frame}>
         {review.load.status === "loading" ? (
-          <p role="status" className="py-12 text-center text-sm text-salin-muted">
-            Opening dataset…
-          </p>
+          <LoadingSkeleton label="Opening dataset" rows={4} />
         ) : (
           <div role="alert" className="py-12 text-center">
             <p className="font-semibold text-salin-text">Can't open this dataset</p>
@@ -362,8 +362,11 @@ export function DatasetReviewPage() {
         </details>
       )}
 
-      <div className="mt-4">
-        <DatasetTable review={review} issuesOnly={issuesOnly && issueCount > 0} onlyRows={view?.rowIds ?? null} sourceNames={sourceNames} onViewSource={onViewRowSource} />
+      <div className="mt-4 grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_18rem]">
+        <div className="min-w-0">
+          <DatasetTable review={review} issuesOnly={issuesOnly && issueCount > 0} onlyRows={view?.rowIds ?? null} sourceNames={sourceNames} onViewSource={onViewRowSource} />
+        </div>
+        <DatasetChart columns={review.draft.columns} rows={review.draft.rows} className="xl:sticky xl:top-4" />
       </div>
 
       {transforming && <TransformDialog open onOpenChange={setTransforming} columns={review.draft.columns} onPreview={(command) => previewCommand(command, false)} />}

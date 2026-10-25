@@ -15,6 +15,7 @@ import { useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
 import { ChevronRight, CircleCheck, House, Plus, ScanText, Table2, TriangleAlert } from "lucide-react";
 
+import { LoadingSkeleton } from "@/components/common/loading-skeleton";
 import { ChoiceMenu } from "@/components/common/choice-menu";
 import { DatasetActions } from "@/features/processing/components/dataset-actions";
 import { DATASET_PARAM } from "@/features/processing/components/dataset-detail";
@@ -205,9 +206,7 @@ export function DatasetsView() {
 
       <div className="mt-3">
         {state.status === "loading" ? (
-          <p role="status" className="py-14 text-center text-sm text-salin-muted">
-            Loading datasets…
-          </p>
+          <LoadingSkeleton label="Loading datasets" />
         ) : state.status === "error" ? (
           <p role="alert" className="py-14 text-center text-sm text-salin-muted">
             Datasets couldn't be loaded. Reload the page to try again.

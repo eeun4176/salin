@@ -1,9 +1,11 @@
 /**
  * Toaster
  * Renders the toast notifications from the toast store at the bottom of the
- * screen, above the mobile tab bar.
+ * screen, above the mobile tab bar. A thin green line along the bottom of each
+ * toast shrinks over the time it stays.
  */
 
+import type { CSSProperties } from "react";
 import { X } from "lucide-react";
 
 import { useToastStore } from "@/stores/toast-store";
@@ -22,7 +24,8 @@ export function Toaster() {
       {toasts.map((t) => (
         <div
           key={t.id}
-          className="pointer-events-auto flex max-w-md items-center gap-3 rounded-xl bg-salin-toast px-4 py-3 text-sm text-white shadow-lg ring-white/10 dark:ring-1 animate-in fade-in-0 slide-in-from-bottom-2 motion-reduce:animate-none"
+          style={t.duration ? ({ "--toast-ms": `${t.duration}ms` } as CSSProperties) : undefined}
+          className="pointer-events-auto relative flex max-w-md items-center gap-3 overflow-hidden rounded-xl bg-salin-toast px-4 py-3 text-sm text-white shadow-lg ring-white/10 dark:ring-1 animate-in fade-in-0 slide-in-from-bottom-2 motion-reduce:animate-none"
         >
           <span className="min-w-0 flex-1">{t.message}</span>
           {t.action && (
@@ -40,6 +43,7 @@ export function Toaster() {
           <button type="button" aria-label="Dismiss" onClick={() => dismiss(t.id)} className="shrink-0 rounded-md p-0.5 text-white/60 hover:text-white">
             <X className="size-4" />
           </button>
+          {t.duration && <span aria-hidden="true" className="toast-timer absolute inset-x-0 bottom-0 h-[3px] bg-[#5BE3A0]" />}
         </div>
       ))}
     </div>

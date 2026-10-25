@@ -32,7 +32,7 @@ export class ModelError extends Error {
 }
 
 export const OFFLINE_MISSING_MESSAGE =
-  "The text-recognition files aren't on this device yet, and you're offline. Connect to the internet once, then download them in Settings → Text recognition (or start reading again). Your pages are saved — you can also type the values yourself.";
+  "The text-recognition files aren't on this device yet, and you're offline. Connect to the internet once, then download them in Settings → Reading scanned pages (or start reading again). Your pages are saved — you can also type the values yourself.";
 
 function openCache(name = MODEL_CACHE) {
   if (typeof caches === "undefined") throw new ModelError("unavailable", "This browser can't store recognition files (Cache Storage is unavailable — private browsing?).");

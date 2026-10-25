@@ -17,6 +17,8 @@ export interface Toast {
   id: string;
   message: string;
   action?: ToastAction;
+  /** Milliseconds it stays; null until dismissed (no timer line). */
+  duration: number | null;
 }
 
 interface ToastOptions {
@@ -37,8 +39,8 @@ export const useToastStore = create<ToastState>()((set, get) => ({
   toasts: [],
   show: (message, action, options = {}) => {
     const id = crypto.randomUUID();
-    set((s) => ({ toasts: [...s.toasts.slice(-2), { id, message, action }] }));
     const duration = options.duration === undefined ? DEFAULT_DURATION : options.duration;
+    set((s) => ({ toasts: [...s.toasts.slice(-2), { id, message, action, duration }] }));
     if (duration !== null) window.setTimeout(() => get().dismiss(id), duration);
     return id;
   },

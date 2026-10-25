@@ -1,29 +1,25 @@
 /**
- * On-device AI Settings
- * Settings → On-device AI: the processing mode (Auto picks Standard, AI
- * Lite or AI Advanced for this device), and each optional model — what it
- * does, download size, languages, device needs, license and its pinned
- * source — with Download (progress, Cancel, resumes per file), Check files
- * (integrity), and Remove. Warns before a download that won't fit or a
- * model this device is too weak for, and benchmarks the models here with
- * results to copy for the Android tests. Documents never leave the device;
- * only model files are downloaded, from the approved host.
+ * AI Helpers Settings
+ * Settings → AI helpers, in plain words: which helpers to use (Automatic,
+ * Off, Handwriting, or Handwriting and assistant), and each optional helper
+ * — what it does — with Download (progress, Cancel, resumes per file),
+ * Check files and Remove. Warns before a download that won't fit or a
+ * helper that will be slow on this device. Documents never leave the
+ * device; only the helpers' files are downloaded.
  */
 
 import { useEffect, useState } from "react";
-import { Bot, Copy, Download, Gauge, LoaderCircle, ShieldCheck, Square, Trash2, TriangleAlert } from "lucide-react";
+import { Bot, Download, LoaderCircle, ShieldCheck, Square, Trash2, TriangleAlert } from "lucide-react";
 
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
-import { AI_MODEL_HOST, AI_MODELS, AI_MODES, AI_RUNTIME, variantFor, variantSource, type AiModelId } from "@/core/ai/ai-models";
+import { AI_MODELS, AI_MODES, variantFor, type AiModelId } from "@/core/ai/ai-models";
 import { aiRuntime } from "@/core/ai/ai-runtime";
 import { totalBytes } from "@/core/ocr/models/model-assets";
 import { errorMessage } from "@/core/storage/errors";
-import { listBenchmarks, saveBenchmark } from "@/core/storage/repositories/ocr.repository";
 import { getStorageStatus, type StorageStatus } from "@/core/storage/storage-health";
-import { aiReportToMarkdown, runAiBenchmark, type AiBenchmarkReport } from "@/features/ai/ai-benchmark";
 import { SectionCard } from "@/features/settings/section-card";
 import { formatBytes } from "@/features/workspace/query";
-import { useAiMode, useAiStore, type AiModeSetting } from "@/stores/ai-store";
+import { useAiStore, type AiModeSetting } from "@/stores/ai-store";
 import { toast } from "@/stores/toast-store";
 import { cn } from "@/lib/utils";
 
@@ -46,17 +42,6 @@ function ModelCard({ id, storage }: { id: AiModelId; storage: StorageStatus | nu
   const free = storage?.supported && storage.quota ? storage.quota - storage.usage : null;
   const tooBig = free !== null && state.status === "missing" && needed * 1.1 > free;
   const slow = id === "assistant" && variant.device === "wasm";
-  const source = variantSource(model, variant);
-
-  const facts: [string, string][] = [
-    ["Download", `${formatBytes(size)}${variant.assets.some((a) => a.id === AI_RUNTIME.id) ? ` (includes the ${formatBytes(AI_RUNTIME.bytes)} AI engine shared by both models)` : ""}`],
-    ["Runs on", variant.device === "webgpu" ? "The GPU (WebGPU)" : "The CPU (WebAssembly)"],
-    ["Languages", model.languages],
-    ["Can do", model.capabilities.join(" · ")],
-    ["Needs", model.requirements],
-    ["License", model.license],
-    ["Source", `${new URL(AI_MODEL_HOST).host} · ${source.repo} @ ${source.revision.slice(0, 7)} (pinned)`],
-  ];
 
   return (
     <li className="rounded-2xl p-4 ring-1 ring-salin-border">
@@ -72,14 +57,6 @@ function ModelCard({ id, storage }: { id: AiModelId; storage: StorageStatus | nu
         </span>
       </div>
       <p className="mt-1 text-sm text-salin-muted">{model.purpose}</p>
-      <dl className="mt-3 grid gap-x-4 gap-y-1 text-xs sm:grid-cols-[7rem_1fr]">
-        {facts.map(([k, v]) => (
-          <div key={k} className="contents">
-            <dt className="text-salin-muted">{k}</dt>
-            <dd className="text-salin-text">{v}</dd>
-          </div>
-        ))}
-      </dl>
 
       {state.status === "unsupported" && <p className="mt-3 text-sm text-red-700 dark:text-red-300">{state.message}</p>}
       {state.status === "error" && (
@@ -94,7 +71,7 @@ function ModelCard({ id, storage }: { id: AiModelId; storage: StorageStatus | nu
       )}
       {slow && state.status !== "unsupported" && (
         <p className="mt-3 flex gap-2 text-sm text-amber-800 dark:text-amber-300">
-          <TriangleAlert className="mt-0.5 size-4 shrink-0" /> No usable WebGPU here, so the assistant runs on the CPU — expect tens of seconds per answer. Run the benchmark below to see.
+          <TriangleAlert className="mt-0.5 size-4 shrink-0" /> This device can't speed up the assistant, so each answer may take tens of seconds.
         </p>
       )}
       {state.status === "downloading" && (
@@ -163,74 +140,15 @@ function ModelCard({ id, storage }: { id: AiModelId; storage: StorageStatus | nu
   );
 }
 
-function AiBenchmark() {
-  const caps = useAiStore((s) => s.caps);
-  const handwriting = useAiStore((s) => s.models.handwriting.status);
-  const assistantState = useAiStore((s) => s.models.assistant.status);
-  const setAssistantSeconds = useAiStore((s) => s.setAssistantSeconds);
-  const [step, setStep] = useState<string | null>(null);
-  const [reports, setReports] = useState<AiBenchmarkReport[]>([]);
-
-  useEffect(() => {
-    void listBenchmarks().then((rows) => {
-      const list = rows.map((r) => r.report as AiBenchmarkReport).filter((r) => r?.kind === "ai");
-      setReports(list);
-      const withAssistant = list.find((r) => r.assistant);
-      if (withAssistant?.assistant) setAssistantSeconds(withAssistant.assistant.perAnswerMs / 1000);
-    });
-  }, [setAssistantSeconds]);
-
-  async function run() {
-    if (!caps) return;
-    setStep("Starting");
-    try {
-      const report = await runAiBenchmark(caps, { assistant: assistantState === "ready" ? variantFor(AI_MODELS.assistant, caps) : null, onStep: setStep });
-      await saveBenchmark(report);
-      setReports((r) => [report, ...r]);
-      if (report.assistant) setAssistantSeconds(report.assistant.perAnswerMs / 1000);
-    } catch (e) {
-      toast(e instanceof Error && e.name === "AiError" ? e.message : errorMessage(e, "The benchmark didn't finish."));
-    } finally {
-      setStep(null);
-    }
-  }
-
-  async function copy(report: AiBenchmarkReport) {
-    try {
-      await navigator.clipboard.writeText(`${aiReportToMarkdown(report)}\n\n<details><summary>JSON</summary>\n\n\`\`\`json\n${JSON.stringify(report, null, 2)}\n\`\`\`\n</details>\n`);
-      toast("AI benchmark results copied.");
-    } catch {
-      toast("Copying isn't allowed here — select the results and copy them instead.");
-    }
-  }
-
-  const latest = reports[0];
-  return (
-    <div>
-      <p className="text-sm text-salin-muted">Times the handwriting reader (and the assistant, if downloaded) on built-in samples. Run it on your Android phone to document real-device speed and memory.</p>
-      <button type="button" onClick={() => void run()} disabled={step !== null || handwriting !== "ready"} title={handwriting !== "ready" ? "Download the handwriting reader first." : undefined} className={cn(button, "mt-3")}>
-        {step ? <LoaderCircle className="size-4 animate-spin" /> : <Gauge className="size-4" />} {step ? `${step}…` : "Test AI on this device"}
-      </button>
-      {latest && (
-        <>
-          <pre className="mt-3 overflow-x-auto rounded-xl bg-salin-tile p-3 text-xs whitespace-pre-wrap text-salin-text" data-lenis-prevent-horizontal="">
-            {aiReportToMarkdown(latest)}
-          </pre>
-          <button type="button" onClick={() => void copy(latest)} className={cn(button, "mt-3")}>
-            <Copy className="size-4" /> Copy results
-          </button>
-        </>
-      )}
-    </div>
-  );
-}
+const MODE_OPTIONS: { value: AiModeSetting; label: string; description: string }[] = [
+  { value: "auto", label: "Automatic (recommended)", description: "e-Vet turns on what this device can run comfortably." },
+  ...(["standard", "lite", "advanced"] as const).map((mode) => ({ value: mode, label: AI_MODES[mode].label, description: AI_MODES[mode].description })),
+];
 
 export function AiSettingsCard() {
   const setting = useAiStore((s) => s.setting);
   const setSetting = useAiStore((s) => s.setSetting);
   const refresh = useAiStore((s) => s.refresh);
-  const caps = useAiStore((s) => s.caps);
-  const choice = useAiMode();
   const [storage, setStorage] = useState<StorageStatus | null>(null);
   const models = useAiStore((s) => s.models);
 
@@ -239,21 +157,16 @@ export function AiSettingsCard() {
     void getStorageStatus().then(setStorage, () => undefined);
   }, [refresh, models.handwriting.status, models.assistant.status]);
 
-  const options: { value: AiModeSetting; label: string; description: string }[] = [
-    { value: "auto", label: `Auto (${AI_MODES[choice.mode].label} here)`, description: setting === "auto" ? choice.reason : "Picks the mode this device can comfortably run." },
-    ...(["standard", "lite", "advanced"] as const).map((mode) => ({ value: mode, label: AI_MODES[mode].label, description: AI_MODES[mode].description })),
-  ];
-
   return (
-    <SectionCard icon={Bot} title="On-device AI" id="ai-heading">
+    <SectionCard icon={Bot} title="AI helpers" id="ai-heading">
       <p className="text-sm text-salin-muted">
-        Optional models that read handwriting and suggest fixes, field matches and dataset actions. They run on this device only — your documents are never uploaded — and they only suggest: you approve every change. Everything else works without them.
+        Optional helpers that read handwriting and suggest fixes. They work on this phone only, your documents are never uploaded, and nothing changes until you approve it. e-Vet works fine without them.
       </p>
 
       <fieldset className="mt-5">
-        <legend className="text-sm font-semibold text-salin-text">Mode</legend>
+        <legend className="text-sm font-semibold text-salin-text">Which helpers to use</legend>
         <div className="mt-2 grid gap-2">
-          {options.map((o) => (
+          {MODE_OPTIONS.map((o) => (
             <label key={o.value} className={cn("flex cursor-pointer gap-3 rounded-xl p-3 ring-1", setting === o.value ? "bg-salin-primary-soft ring-salin-primary" : "ring-salin-border hover:bg-salin-tile")}>
               <input type="radio" name="ai-mode" checked={setting === o.value} onChange={() => setSetting(o.value)} className="mt-0.5 size-4 accent-salin-primary" />
               <span>
@@ -265,22 +178,12 @@ export function AiSettingsCard() {
         </div>
       </fieldset>
 
-      <h3 className="mt-5 text-sm font-semibold text-salin-text">Models</h3>
+      <h3 className="mt-5 text-sm font-semibold text-salin-text">Downloads</h3>
       <ul className="mt-2 space-y-3">
         {(Object.keys(AI_MODELS) as AiModelId[]).map((id) => (
           <ModelCard key={id} id={id} storage={storage} />
         ))}
       </ul>
-      <p className="mt-3 text-xs text-salin-muted">
-        Model files download only from {new URL(AI_MODEL_HOST).host}, at the exact versions e-Vet was tested with, and are checked for size before use. {caps ? `This device: WebGPU ${caps.webGpu === "available" ? `available${caps.webGpuF16 ? " (16-bit)" : ""}` : "not available"} · memory ${caps.deviceMemoryGb ? `about ${caps.deviceMemoryGb} GB` : "not reported"}.` : ""}
-      </p>
-
-      <details className="mt-4">
-        <summary className="cursor-pointer text-sm font-semibold text-salin-text">AI benchmark</summary>
-        <div className="mt-3">
-          <AiBenchmark />
-        </div>
-      </details>
     </SectionCard>
   );
 }

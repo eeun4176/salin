@@ -1,9 +1,10 @@
 /**
  * Programs Page (/programs)
- * City Vet programs for the paravet's barangay, in three tabs: Requests
+ * City Vet programs for the paravet's barangay, in four tabs: Requests
  * (the shared owner list sent to City Vet), Stubs (print the stubs City Vet
- * sent and type in the names owners wrote), and Attendance (program day:
- * scan stubs and record walk-ins, offline). The tab is kept in the URL
+ * sent and type in the names owners wrote), Attendance (program day:
+ * scan stubs and record walk-ins, offline) and Calendar (the programs by
+ * month). The tab is kept in the URL
  * (?tab=stubs) so a notification link can open it directly.
  */
 
@@ -11,6 +12,7 @@ import { useSearchParams } from "react-router";
 
 import { PageFrame } from "@/components/layout/page-frame";
 import { AttendanceTab } from "@/features/programs/attendance-tab";
+import { CalendarTab } from "@/features/programs/calendar-tab";
 import { RequestsTab } from "@/features/programs/requests-page";
 import { StubsTab } from "@/features/programs/stubs-tab";
 import { cn } from "@/lib/utils";
@@ -20,6 +22,7 @@ const TABS = [
   { id: "requests", label: "Requests" },
   { id: "stubs", label: "Stubs" },
   { id: "attendance", label: "Attendance" },
+  { id: "calendar", label: "Calendar" },
 ] as const;
 type Tab = (typeof TABS)[number]["id"];
 
@@ -30,7 +33,7 @@ export function ProgramsPage() {
 
   return (
     <PageFrame title="Programs" description={`${session?.barangay ?? "Your barangay"} · shared with the paravets assigned there.`}>
-      <div role="tablist" aria-label="Programs" className="mb-5 flex gap-1 rounded-xl bg-salin-tile p-1">
+      <div role="tablist" aria-label="Programs" className="seg-track no-scrollbar mb-5 flex gap-1 overflow-x-auto rounded-xl bg-salin-tile p-1" data-lenis-prevent-horizontal="">
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -40,14 +43,14 @@ export function ProgramsPage() {
             aria-selected={tab === t.id}
             aria-controls={`panel-${t.id}`}
             onClick={() => setParams(t.id === "requests" ? {} : { tab: t.id }, { replace: true })}
-            className={cn("h-9 flex-1 rounded-lg text-sm font-medium transition-colors", tab === t.id ? "bg-salin-surface text-salin-text shadow-sm" : "text-salin-muted hover:text-salin-text")}
+            className={cn("h-9 flex-1 shrink-0 rounded-lg px-2 text-sm font-medium whitespace-nowrap transition-colors", tab === t.id ? "bg-salin-surface text-salin-text shadow-sm" : "text-salin-muted hover:text-salin-text")}
           >
             {t.label}
           </button>
         ))}
       </div>
-      <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
-        {tab === "requests" ? <RequestsTab /> : tab === "stubs" ? <StubsTab /> : <AttendanceTab />}
+      <div key={tab} role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} className="motion-safe:animate-page-in">
+        {tab === "requests" ? <RequestsTab /> : tab === "stubs" ? <StubsTab /> : tab === "attendance" ? <AttendanceTab /> : <CalendarTab />}
       </div>
     </PageFrame>
   );

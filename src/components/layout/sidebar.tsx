@@ -4,16 +4,18 @@
  * 12px in from the edges: the logo, the morphing "New Document" menu (scan,
  * import or start a dataset), pill links to every
  * area with item counts, how much this device stores, and the signed-in
- * paravet's menu (install, sign out). The PanelLeft button or Ctrl/Cmd+B folds
- * it from 264px to a 64px icon rail (remembered on this device; screens under
+ * paravet's menu (Account, a Light/Dark/Device switch, install, sign out). The PanelLeft button or Ctrl/Cmd+B folds
+ * it from 264px to a 64px icon rail topped by the city seal, which unfolds it (remembered on this device; screens under
  * 1024px start folded); phones use the bottom bar instead.
  */
 
 import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
-import { CalendarHeart, ClipboardList, Download, HardDrive, Landmark, LogOut, PanelLeft, Settings, Sparkles, type LucideIcon } from "lucide-react";
+import { CalendarHeart, ClipboardList, Download, HardDrive, Landmark, LogOut, Monitor, Moon, PanelLeft, Settings, Sparkles, Sun, UserRound, type LucideIcon } from "lucide-react";
+import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui";
 
-import { APP_SUBTITLE, Logo } from "@/components/brand/logo";
+import sealUrl from "@/assets/brand/cityvet-logo.png";
+import { Logo } from "@/components/brand/logo";
 import { NewDocumentMenu } from "@/components/layout/new-document-menu";
 import { SyncStatus } from "@/components/layout/sync-status";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -24,7 +26,9 @@ import { formatBytes } from "@/features/workspace/query";
 import type { WorkspaceItem } from "@/features/workspace/types";
 import { useInstallPrompt } from "@/hooks/use-install-prompt";
 import { cn } from "@/lib/utils";
+import { useAppearanceStore, type Theme } from "@/stores/appearance-store";
 import { useAuthStore } from "@/stores/auth-store";
+import { useProfilePhotoStore } from "@/stores/profile-photo-store";
 import { toast } from "@/stores/toast-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
@@ -73,6 +77,12 @@ function NavLink({ to, label, icon: Icon, count, active }: { to: string; label: 
   );
 }
 
+const THEME_CHOICES: { value: Theme; label: string; icon: LucideIcon }[] = [
+  { value: "light", label: "Light", icon: Sun },
+  { value: "dark", label: "Dark", icon: Moon },
+  { value: "system", label: "Device", icon: Monitor },
+];
+
 /** "12.4 MB Local": how much Salin keeps on this device, refreshed when the workspace changes. */
 export function StorageBadge({ className }: { className?: string }) {
   const items = useWorkspaceStore((s) => s.items);
@@ -105,6 +115,13 @@ export function AccountMenu({ compact = false }: { compact?: boolean }) {
   const session = useAuthStore((s) => s.session);
   const signOut = useAuthStore((s) => s.signOut);
   const { canPrompt, installed, promptInstall } = useInstallPrompt();
+  const theme = useAppearanceStore((s) => s.theme);
+  const setTheme = useAppearanceStore((s) => s.setTheme);
+  const photo = useProfilePhotoStore((s) => s.photo);
+  const loadPhoto = useProfilePhotoStore((s) => s.load);
+  useEffect(() => {
+    if (session) void loadPhoto(session.key);
+  }, [session, loadPhoto]);
   if (!session) return null;
   const initials = session.name
     .split(/\s+/)
@@ -127,9 +144,13 @@ export function AccountMenu({ compact = false }: { compact?: boolean }) {
         aria-label={`Account: ${session.name}`}
         className={cn("flex items-center gap-2.5 overflow-hidden rounded-xl p-1 text-left outline-none hover:bg-salin-tile focus-visible:ring-2 focus-visible:ring-salin-primary", compact ? "rounded-full" : "w-full")}
       >
-        <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-full bg-salin-primary-soft text-xs font-semibold text-salin-primary-ink">
-          {initials}
-        </span>
+        {photo ? (
+          <img src={photo} alt="" className="size-8 shrink-0 rounded-full object-cover" />
+        ) : (
+          <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-full bg-salin-primary-soft text-xs font-semibold text-salin-primary-ink">
+            {initials}
+          </span>
+        )}
         {!compact && (
           <span className={cn(wipe, "flex-1")}>
             <span className="block truncate text-sm font-medium text-salin-text">{session.name}</span>
@@ -145,6 +166,30 @@ export function AccountMenu({ compact = false }: { compact?: boolean }) {
             {session.barangay ? ` · ${session.barangay}` : ""} · {session.key}
           </span>
         </DropdownMenuLabel>
+        <DropdownMenuItem className="gap-2.5 py-2" onSelect={() => navigate("/account")}>
+          <UserRound /> Account
+        </DropdownMenuItem>
+        {/* Theme as a segmented switch; picking keeps the menu open so the pill can be seen sliding. */}
+        <DropdownMenuPrimitive.RadioGroup
+          aria-label="Theme"
+          value={theme}
+          onValueChange={(value) => setTheme(value as Theme)}
+          className="seg-track mx-1 my-1.5 flex gap-1 rounded-xl bg-salin-tile p-1"
+        >
+          {THEME_CHOICES.map(({ value, label, icon: Icon }) => (
+            <DropdownMenuPrimitive.RadioItem
+              key={value}
+              value={value}
+              onSelect={(event) => event.preventDefault()}
+              className={cn(
+                "flex h-8 flex-1 cursor-default items-center justify-center gap-1.5 rounded-lg text-[13px] font-medium outline-none select-none focus-visible:ring-2 focus-visible:ring-salin-primary",
+                theme === value ? "bg-salin-surface text-salin-primary shadow-sm" : "text-salin-muted data-highlighted:text-salin-text",
+              )}
+            >
+              <Icon aria-hidden="true" className="size-3.5" /> {label}
+            </DropdownMenuPrimitive.RadioItem>
+          ))}
+        </DropdownMenuPrimitive.RadioGroup>
         {/* Phones have no sidebar, so these areas are reached from here. */}
         {compact &&
           OTHER_LINKS.map(({ to, label, icon: Icon }) => (
@@ -226,9 +271,8 @@ export function Sidebar() {
         )}
       >
         <div className="relative flex h-10 items-center">
-          <div inert={collapsed} className={cn(wipe, "pr-11 pl-2")}>
-            {/* The subtitle is too long for this row beside the fold button: it gets its own line below. */}
-            <Logo subtitleClassName="hidden" />
+          <div inert={collapsed} className={cn(wipe, "pr-11 pl-1")}>
+            <Logo />
           </div>
           <button
             type="button"
@@ -239,12 +283,10 @@ export function Sidebar() {
             title={`${collapsed ? "Expand" : "Collapse"} sidebar (${shortcut})`}
             className="absolute top-0 right-0 grid size-10 place-items-center rounded-xl text-salin-muted outline-none hover:bg-salin-tile hover:text-salin-text focus-visible:ring-2 focus-visible:ring-salin-primary"
           >
-            <PanelLeft aria-hidden="true" className="size-[18px]" strokeWidth={1.9} />
+            {/* Folded, the city seal is the expand button. */}
+            {collapsed ? <img src={sealUrl} alt="" className="size-9" /> : <PanelLeft aria-hidden="true" className="size-[18px]" strokeWidth={1.9} />}
           </button>
         </div>
-        <p aria-hidden={collapsed || undefined} className={cn(wipe, "-mt-3.5 truncate px-2 text-[11px] font-medium text-salin-muted")}>
-          {APP_SUBTITLE}
-        </p>
         <NewDocumentMenu collapsed={collapsed} />
         <nav aria-label="Primary" className="flex flex-1 flex-col gap-1">
           {SECTION_LINKS.map((link) => (

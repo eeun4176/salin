@@ -54,6 +54,14 @@
   --animate-draw: draw 520ms var(--ease-out-soft) both;
   --animate-fill-progress: fill-progress 1.4s var(--ease-out-soft) both;
   --animate-detail-in: detail-in 560ms var(--ease-out-soft) both;
+  /* Fade-through between pages and tabs: opacity only, so fixed children keep their place. */
+  --animate-page-in: page-in 320ms var(--ease-out-soft) backwards;
+
+  @keyframes page-in {
+    from {
+      opacity: 0;
+    }
+  }
 
   @keyframes detail-in {
     from {
@@ -307,6 +315,21 @@
     outline: 2px solid var(--color-salin-primary);
     outline-offset: 2px;
   }
+
+  /* Smooth hover, press and selection changes on every control that doesn't set its own transition (not opacity or menu items: that leaves Radix menus unstable to click). */
+  a,
+  button,
+  summary,
+  input,
+  select,
+  textarea,
+  [role="tab"] {
+    transition:
+      color 180ms ease,
+      background-color 180ms ease,
+      border-color 180ms ease,
+      box-shadow 180ms ease;
+  }
 }
 
 /* ---------------------------------------------------------------
@@ -358,5 +381,127 @@
   .animate-draw,
   .animate-fill-progress {
     animation: none;
+  }
+}
+
+/* ---------------------------------------------------------------
+   Toast timer line: shrinks over the time the toast stays (--toast-ms)
+---------------------------------------------------------------- */
+.toast-timer {
+  transform-origin: left center;
+  animation: toast-timer var(--toast-ms, 4200ms) linear both;
+}
+@keyframes toast-timer {
+  to {
+    transform: scaleX(0);
+  }
+}
+
+/* ---------------------------------------------------------------
+   Dropdown menus open like the New Document menu: the panel unfolds
+   from its trigger with a spring and the rows fan in one by one
+---------------------------------------------------------------- */
+.menu-pop[data-state="open"] {
+  animation: menu-pop 360ms var(--ease-spring) both;
+}
+.menu-pop[data-state="open"][data-side="top"] {
+  animation-name: menu-pop-up;
+}
+@keyframes menu-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.97);
+    clip-path: inset(0 0 70% 0 round 14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    clip-path: inset(0 0 0 0 round 14px);
+  }
+}
+@keyframes menu-pop-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
+    clip-path: inset(70% 0 0 0 round 14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    clip-path: inset(0 0 0 0 round 14px);
+  }
+}
+.menu-pop[data-state="open"] > *,
+.menu-pop[data-state="open"] > [role="group"] > * {
+  animation: menu-item 380ms var(--ease-out-soft) backwards;
+  animation-delay: 60ms;
+}
+.menu-pop[data-state="open"] > :nth-child(2),
+.menu-pop[data-state="open"] > [role="group"] > :nth-child(2) {
+  animation-delay: 85ms;
+}
+.menu-pop[data-state="open"] > :nth-child(3),
+.menu-pop[data-state="open"] > [role="group"] > :nth-child(3) {
+  animation-delay: 110ms;
+}
+.menu-pop[data-state="open"] > :nth-child(4),
+.menu-pop[data-state="open"] > [role="group"] > :nth-child(4) {
+  animation-delay: 135ms;
+}
+.menu-pop[data-state="open"] > :nth-child(5),
+.menu-pop[data-state="open"] > [role="group"] > :nth-child(5) {
+  animation-delay: 160ms;
+}
+.menu-pop[data-state="open"] > :nth-child(n + 6),
+.menu-pop[data-state="open"] > [role="group"] > :nth-child(n + 6) {
+  animation-delay: 185ms;
+}
+@keyframes menu-item {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+/* ---------------------------------------------------------------
+   Segmented switchers (seg-track): lib/segmented-thumbs.ts measures the
+   chosen item and this pill slides to it
+---------------------------------------------------------------- */
+.seg-track {
+  position: relative;
+  isolation: isolate;
+}
+.seg-track[data-thumb]::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  left: 0;
+  width: var(--thumb-w);
+  height: var(--thumb-h);
+  border-radius: var(--thumb-r, 0.5rem);
+  transform: translate(var(--thumb-x), var(--thumb-y));
+  background: var(--color-salin-surface);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08), 0 1px 1px rgb(0 0 0 / 0.04);
+}
+.seg-track[data-thumb="on"]::before {
+  transition:
+    transform 440ms var(--ease-spring),
+    width 440ms var(--ease-spring),
+    height 440ms var(--ease-spring);
+}
+.seg-track[data-thumb] > :is([aria-selected="true"], [aria-checked="true"], [aria-current="page"]) {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast-timer,
+  .menu-pop[data-state="open"],
+  .menu-pop[data-state="open"] * {
+    animation: none;
+  }
+  .seg-track[data-thumb]::before {
+    transition: none;
   }
 }

@@ -1,5 +1,5 @@
 /**
- * Reset Email Card (Settings, paravets only)
+ * Reset Email Card (Account page, paravets only)
  * The email City Vet sends password reset codes to. The paravet types it,
  * gets a 6-digit code there and enters it; only then does City Vet save it,
  * so a mistyped address never receives reset codes. Needs the internet:

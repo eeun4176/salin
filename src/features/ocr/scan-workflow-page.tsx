@@ -14,8 +14,9 @@
 
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { ArrowRight, Crop, LoaderCircle, Pencil, ScanText, Trash2 } from "lucide-react";
+import { ArrowRight, Crop, Pencil, ScanText, Trash2 } from "lucide-react";
 
+import { LoadingSkeleton } from "@/components/common/loading-skeleton";
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { NameDialog } from "@/components/common/name-dialog";
 import { primaryButton, secondaryButton, StepFooter } from "@/components/common/step-footer";
@@ -60,9 +61,7 @@ export function ScanWorkflowPage() {
     return (
       <PageFrame {...frame}>
         {scan.status === "loading" ? (
-          <p role="status" className="flex items-center justify-center gap-2 py-16 text-sm text-salin-muted">
-            <LoaderCircle className="size-5 animate-spin" /> Opening scan…
-          </p>
+          <LoadingSkeleton label="Opening scan" rows={4} />
         ) : (
           <div role="alert" className="py-14 text-center">
             <p className="font-semibold text-salin-text">This scan no longer exists</p>

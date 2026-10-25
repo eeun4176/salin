@@ -448,7 +448,7 @@ describe("AI runtime", () => {
     const error = await runtime.generate([], variantFor(AI_MODELS.assistant, null)).catch((e) => e);
     expect(error).toBeInstanceOf(AiError);
     expect(error.code).toBe("missing-files");
-    expect(error.message).toMatch(/Settings → On-device AI/);
+    expect(error.message).toMatch(/Settings → AI helpers/);
   });
 
   it("stops the worker on cancel, freeing its memory, and starts a fresh one next time", async () => {

@@ -1,8 +1,8 @@
 /**
  * AI Store
  * On-device AI settings and status shared by Settings and every screen
- * that offers AI suggestions: the chosen processing mode (Auto, Standard,
- * AI Lite or AI Advanced — saved in this browser), the recommendation for
+ * that offers AI suggestions: the chosen processing mode (Auto, Off,
+ * Handwriting, or Handwriting and assistant — saved in this browser), the recommendation for
  * this device, and each optional model's state (not downloaded, downloading
  * with progress, ready, damaged or unavailable), so a download started in
  * one place shows everywhere and can be cancelled. Removing a model keeps
@@ -185,8 +185,8 @@ export function useAiFeature(id: AiModelId): AiFeature {
   const variant = variantFor(AI_MODELS[id], caps);
   const included = mode === "advanced" || (mode === "lite" && id === "handwriting");
   if (state.status === "unsupported") return { ready: false, reason: state.message, variant };
-  if (!included) return { ready: false, reason: `Turn on ${id === "handwriting" ? "AI Lite or AI Advanced" : "AI Advanced"} in Settings → On-device AI.`, variant };
-  if (state.status !== "ready") return { ready: false, reason: `Download the ${AI_MODELS[id].name.toLowerCase()} in Settings → On-device AI.`, variant };
+  if (!included) return { ready: false, reason: `Turn on ${id === "handwriting" ? "Handwriting" : "Handwriting and assistant"} in Settings → AI helpers.`, variant };
+  if (state.status !== "ready") return { ready: false, reason: `Download the ${AI_MODELS[id].name.toLowerCase()} in Settings → AI helpers.`, variant };
   return { ready: true, reason: null, variant };
 }
 

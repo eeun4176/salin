@@ -126,7 +126,11 @@ test("a printed census sheet is scanned, reviewed, counted once, and exported to
   await expect(page).toHaveURL(/\/census$/, { timeout: 30_000 });
   await expect(card).toContainText("2 pets");
 
-  const [download] = await Promise.all([page.waitForEvent("download"), card.getByRole("button", { name: "Export official workbook" }).click()]);
+  // Picking the census in the list opens it in the detail pane beside it.
+  await card.getByRole("link").click();
+  const details = page.getByRole("region", { name: "Census details" });
+  await expect(details).toContainText("Census · Assumption · Oct 22, 2026");
+  const [download] = await Promise.all([page.waitForEvent("download"), details.getByRole("button", { name: "Export official workbook" }).click()]);
   expect(download.suggestedFilename()).toBe("Census - Assumption - 2026-10-22.xlsx");
   const book = XLSX.read(await downloadBytes(download), { type: "buffer" });
   const summary = book.Sheets["SUMMARY OF CENSUS"];

@@ -125,7 +125,7 @@ function ViewToggle() {
   ];
 
   return (
-    <div role="radiogroup" aria-label="Layout" className="flex rounded-xl bg-salin-tile p-1">
+    <div role="radiogroup" aria-label="Layout" className="seg-track flex rounded-xl bg-salin-tile p-1">
       {options.map(({ value, label, icon: Icon }) => {
         const selected = viewMode === value;
         return (

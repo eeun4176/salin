@@ -150,8 +150,8 @@ test("a forgotten password is reset with a code sent to the email confirmed in S
   await expect(page.getByText(`Welcome back, ${ACCOUNT.name}`)).toBeVisible();
   await expect(page.getByTestId("section-menu")).toBeVisible();
 
-  // Settings: the email is saved only after the code sent to it is confirmed.
-  await page.goto("/settings");
+  // Account: the email is saved only after the code sent to it is confirmed.
+  await page.goto("/account");
   const card = page.getByRole("region", { name: "Email for password reset" });
   await expect(card.getByText("No email yet.")).toBeVisible();
   await card.getByRole("button", { name: "Add email" }).click();

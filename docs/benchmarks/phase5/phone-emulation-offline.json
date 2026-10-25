@@ -6,7 +6,7 @@
   "offline": true,
   "externalRequests": 0,
   "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.8078.4 Safari/537.36",
-  "usedJsHeapBytes": 16580737,
+  "usedJsHeapBytes": 29202111,
   "results": [
     {
       "source": "notice.pdf",
@@ -14,7 +14,7 @@
       "expected": "2026-11-15",
       "correct": true,
       "citationCorrect": true,
-      "latencyMs": 578.4928
+      "latencyMs": 3614.398599999997
     },
     {
       "source": "notice.pdf",
@@ -22,7 +22,7 @@
       "expected": "09171234567",
       "correct": true,
       "citationCorrect": true,
-      "latencyMs": 271.3600999999999
+      "latencyMs": 788.0482999999986
     },
     {
       "source": "registrations.csv",
@@ -30,7 +30,7 @@
       "expected": "2500",
       "correct": true,
       "citationCorrect": true,
-      "latencyMs": 326.9310000000023
+      "latencyMs": 644.8364000000001
     },
     {
       "source": "registrations.csv",
@@ -38,7 +38,7 @@
       "expected": "2 matching rows",
       "correct": true,
       "citationCorrect": true,
-      "latencyMs": 287.6386999999995
+      "latencyMs": 514.9288000000015
     },
     {
       "source": "registrations.xlsx",
@@ -46,7 +46,7 @@
       "expected": "300",
       "correct": true,
       "citationCorrect": true,
-      "latencyMs": 436.9810000000034
+      "latencyMs": 1660.8869000000013
     }
   ]
 }

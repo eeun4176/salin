@@ -3,9 +3,9 @@
  * Device storage (usage, quota, low-space warning, persistent storage
  * request), workspace backup & restore, privacy controls (delete all data
  * on this device), appearance (light / dark / match device theme,
- * comfortable / compact density), and text recognition (OCR files, profile,
- * languages, device check and benchmark), and on-device AI (mode, optional
- * handwriting and assistant models, integrity checks, AI benchmark).
+ * comfortable / compact density), reading scanned pages (files, languages,
+ * how carefully to read) and the optional AI helpers — all in plain words,
+ * without device details or benchmarks.
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -28,7 +28,6 @@ import {
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { AiSettingsCard } from "@/features/settings/ai-settings-card";
 import { OcrSettingsCard } from "@/features/settings/ocr-settings-card";
-import { ResetEmailCard } from "@/features/settings/reset-email-card";
 import { SectionCard } from "@/features/settings/section-card";
 import { PageFrame } from "@/components/layout/page-frame";
 import { getStorageStatus, isStorageLow, requestPersistentStorage, type StorageStatus } from "@/core/storage/storage-health";
@@ -78,7 +77,7 @@ function StorageCard() {
         </span>
         <div>
           <h2 id="storage-heading" className="font-semibold">
-            Local storage
+            Storage on this device
           </h2>
           <p className="text-sm text-salin-muted" data-testid="storage-usage">
             {!status
@@ -161,7 +160,7 @@ function Segmented<T extends string>({ label, value, options, onChange }: { labe
       <p id={`${label}-label`} className="mb-2 text-sm font-medium text-salin-text">
         {label}
       </p>
-      <div role="radiogroup" aria-labelledby={`${label}-label`} className="inline-flex flex-wrap gap-1 rounded-xl bg-salin-tile p-1">
+      <div role="radiogroup" aria-labelledby={`${label}-label`} className="seg-track inline-flex flex-wrap gap-1 rounded-xl bg-salin-tile p-1">
         {options.map(({ value: option, label: text, icon: Icon }) => (
           <button
             key={option}
@@ -246,13 +245,12 @@ function PrivacyCard() {
 
 export function SettingsPage() {
   return (
-    <PageFrame title="Settings" description="Storage, text recognition, backups, privacy and appearance for this device.">
+    <PageFrame title="Settings" description="Storage, reading scanned pages, backups, privacy and how e-Vet looks on this device.">
       <div className="space-y-5">
         <StorageCard />
         <OcrSettingsCard />
         <AiSettingsCard />
         <BackupCard />
-        <ResetEmailCard />
         <PrivacyCard />
         <AppearanceCard />
       </div>

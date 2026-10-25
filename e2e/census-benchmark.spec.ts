@@ -87,7 +87,7 @@ const normal = (key: string, text: string) => (key === "contact" ? text.replace(
 test("synthetic census sheets: printed-text OCR vs the handwriting reader", async ({ page, browser }) => {
   await serveModels(page);
   await page.goto("/settings");
-  await page.getByRole("radio", { name: /^AI Lite/ }).check();
+  await page.getByRole("radio", { name: /^Handwriting Reads/ }).check();
   const reader = page.getByRole("listitem").filter({ hasText: "Handwriting reader" });
   const download = reader.getByRole("button", { name: /^Download/ });
   if (await download.isVisible()) await download.click();

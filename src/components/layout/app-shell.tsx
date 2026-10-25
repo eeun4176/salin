@@ -2,7 +2,7 @@
  * App Shell
  * The frame around every screen: skip-to-content link, the sidebar (760px
  * and wider; the workspace fills the rest as list + detail panes), smooth scrolling,
- * scroll reset between pages, the file preview (so any screen can open a
+ * a fade-through between pages, scroll reset between pages, the file preview (so any screen can open a
  * document), the mobile bottom bar and the toast area.
  */
 
@@ -34,6 +34,9 @@ function useScrollReset() {
 export function AppShell() {
   useSmoothScroll();
   useScrollReset();
+  const { pathname } = useLocation();
+  // The workspace tabs share one layout that fades its own list, so only other pages restart the fade here.
+  const page = isWorkspaceRoute(pathname) ? "workspace" : pathname;
 
   return (
     <div className="min-h-dvh bg-salin-canvas nav:flex">
@@ -44,7 +47,7 @@ export function AppShell() {
         Skip to content
       </a>
       <Sidebar />
-      <div className="min-w-0 flex-1">
+      <div key={page} className="min-w-0 flex-1 motion-safe:animate-page-in">
         <Outlet />
       </div>
       <FilePreview />

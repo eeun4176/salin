@@ -3,14 +3,16 @@
  * Program day. Salin downloads the program's stubs beforehand, so scanning
  * works with no signal: scan a stub's QR (or type its code), check the pets
  * that came, and the attendance waits in the outbox until there's signal.
- * Owners without a stub are recorded as walk-ins. Scanning counts only on
+ * Owners without a stub are typed in as walk-ins on a sheet, one row per
+ * pet, so a queue of owners goes in at once. Scanning counts only on
  * the program date — before it is too early, after it the day is over —
  * and a stub already used (on the server, or on this phone) is refused.
  */
 
 import { useMemo, useState, type FormEvent } from "react";
-import { CalendarClock, CircleCheck, Clock, LoaderCircle, ScanLine, Trash2, UserPlus } from "lucide-react";
+import { CalendarClock, CircleCheck, Clock, ScanLine, Trash2, UserPlus } from "lucide-react";
 
+import { LoadingSkeleton } from "@/components/common/loading-skeleton";
 import { ChoiceMenu } from "@/components/common/choice-menu";
 import { primaryButton, secondaryButton } from "@/components/common/step-footer";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -21,6 +23,7 @@ import { QrScanner } from "@/features/programs/qr-scanner";
 import { field, SavedCopy, ServiceToggles } from "@/features/programs/requests-page";
 import { useOwnerSuggestions } from "@/features/programs/use-owner-suggestions";
 import { useProgramDay, useStubs } from "@/features/programs/use-stubs";
+import { WalkInSheet } from "@/features/programs/walk-in-sheet";
 import { useOnline } from "@/hooks/use-online";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
@@ -29,19 +32,18 @@ import { toast } from "@/stores/toast-store";
 
 const MOBILE = /^09\d{2}[- ]?\d{3}[- ]?\d{4}$/;
 
-type Attending = { kind: "stub"; stub: PackStub } | { kind: "walk-in" };
+type Attending = { kind: "stub"; stub: PackStub };
 
 export function AttendanceTab() {
   const stubs = useStubs();
   const programs = useMemo(() => stubs.data?.programs ?? [], [stubs.data]);
-  const [chosen, setChosen] = useState<string | null>(null);
+  // The calendar links here with ?program=<id>.
+  const [chosen, setChosen] = useState<string | null>(() => new URLSearchParams(window.location.search).get("program"));
   const program = programs.find((p) => String(p.id) === chosen) ?? pickProgram(programs);
 
   if (stubs.status === "loading") {
     return (
-      <p role="status" className="flex items-center justify-center gap-2 py-16 text-sm text-salin-muted">
-        <LoaderCircle aria-hidden="true" className="size-5 animate-spin motion-reduce:animate-none" /> Loading programs…
-      </p>
+      <LoadingSkeleton label="Loading programs" />
     );
   }
   if (!program) return <p className="py-14 text-center text-sm text-salin-muted">{stubs.status === "unavailable" ? "Connect to the internet once to load your programs." : "No scheduled programs yet."}</p>;
@@ -70,6 +72,10 @@ function ProgramDayPanel({ program }: { program: StubProgram }) {
   const [scanning, setScanning] = useState(false);
   const [typed, setTyped] = useState("");
   const [attending, setAttending] = useState<Attending | null>(null);
+  const [walkIns, setWalkIns] = useState(false);
+  const session = useAuthStore((state) => state.session);
+  // Walk-ins can come from any participating barangay; the paravet's own is listed first.
+  const barangays = [{ id: session?.barangayId ?? program.hostBarangayId, name: session?.barangay ?? program.hostBarangay }, { id: program.hostBarangayId, name: program.hostBarangay }, ...program.allowedBarangays].filter((b, i, all) => all.findIndex((o) => o.id === b.id) === i);
   const when = programDay(program);
   const pack = day.data?.pack ?? null;
   const packIds = useMemo(() => new Set(pack?.stubs.map((s) => s.id)), [pack]);
@@ -120,8 +126,8 @@ function ProgramDayPanel({ program }: { program: StubProgram }) {
             <button type="button" onClick={() => setScanning(true)} className={primaryButton}>
               <ScanLine aria-hidden="true" className="size-4" /> Scan stub
             </button>
-            <button type="button" onClick={() => setAttending({ kind: "walk-in" })} className={secondaryButton}>
-              <UserPlus aria-hidden="true" className="size-4" /> Walk-in
+            <button type="button" onClick={() => setWalkIns(true)} className={secondaryButton}>
+              <UserPlus aria-hidden="true" className="size-4" /> Walk-ins
             </button>
           </div>
           <form
@@ -175,9 +181,21 @@ function ProgramDayPanel({ program }: { program: StubProgram }) {
           pack={pack}
           known={known}
           onClose={() => setAttending(null)}
-          onSave={(owner, pets) =>
-            attending.kind === "stub" ? save(redeemStub(attending.stub, owner, pets), `Stub ${attending.stub.id} recorded.`) : save(walkIn(program.id, owner, pets), "Walk-in recorded.")
-          }
+          onSave={(owner, pets) => save(redeemStub(attending.stub, owner, pets), `Stub ${attending.stub.id} recorded.`)}
+        />
+      )}
+      {walkIns && (
+        <WalkInSheet
+          program={program}
+          barangays={barangays}
+          known={known}
+          onClose={() => setWalkIns(false)}
+          onSave={async (entries) => {
+            for (const entry of entries) await queueChange(walkIn(program.id, entry.owner, entry.pets));
+            setWalkIns(false);
+            const message = `${entries.length} walk-in${entries.length === 1 ? "" : "s"} recorded.`;
+            toast(online ? message : `${message} They will be sent when you're back online.`);
+          }}
         />
       )}
     </div>
@@ -187,19 +205,16 @@ function ProgramDayPanel({ program }: { program: StubProgram }) {
 const newPet = (program: StubProgram): AttendedPet => ({ name: "", species: "Dog", processes: [...program.processes], served: true });
 
 function AttendDialog({ attending, pack, known, onClose, onSave }: { attending: Attending; pack: DayPack; known: ReturnType<typeof useOwnerSuggestions>; onClose: () => void; onSave: (owner: StubOwner, pets: AttendedPet[]) => Promise<void> }) {
-  const session = useAuthStore((state) => state.session);
   const { program } = pack;
-  const issued = attending.kind === "stub" && attending.stub.status === "Issued" ? attending.stub : null;
-  const ownBarangay = session?.barangayId ?? program.hostBarangayId;
-  const barangays = [{ id: ownBarangay, name: session?.barangay ?? program.hostBarangay }, { id: program.hostBarangayId, name: program.hostBarangay }, ...program.allowedBarangays].filter((b, i, all) => all.findIndex((o) => o.id === b.id) === i);
+  const issued = attending.stub.status === "Issued" ? attending.stub : null;
   const [name, setName] = useState(issued?.owner?.name ?? "");
   const [mobile, setMobile] = useState(issued?.owner?.mobile ?? "");
-  // A blank stub belongs to its batch's barangay; a walk-in can come from any participating one.
-  const [barangayId, setBarangayId] = useState(String(attending.kind === "stub" ? attending.stub.barangayId : ownBarangay));
+  // A blank stub belongs to its batch's barangay.
+  const barangayId = attending.stub.barangayId;
   const [pets, setPets] = useState<AttendedPet[]>(issued ? issued.pets.map((p) => ({ ...p, served: true })) : [newPet(program)]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const maxPets = attending.kind === "stub" ? 3 : 10;
+  const maxPets = 3;
   const setPet = (index: number, next: Partial<AttendedPet>) => setPets((all) => all.map((p, i) => (i === index ? { ...p, ...next } : p)));
 
   async function submit(event: FormEvent) {
@@ -210,7 +225,7 @@ function AttendDialog({ attending, pack, known, onClose, onSave }: { attending: 
     if (problem) return setError(problem);
     setBusy(true);
     try {
-      const owner = issued?.owner ?? { name: name.trim(), mobile: mobile.trim(), address: "", barangayId: Number(barangayId) };
+      const owner = issued?.owner ?? { name: name.trim(), mobile: mobile.trim(), address: "", barangayId };
       await onSave(owner, named);
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : "Attendance couldn't be saved.");
@@ -221,8 +236,8 @@ function AttendDialog({ attending, pack, known, onClose, onSave }: { attending: 
   return (
     <Dialog open onOpenChange={(open) => !open && !busy && onClose()}>
       <DialogContent className="max-h-[90dvh] overflow-y-auto">
-        <DialogTitle>{attending.kind === "stub" ? `Stub ${attending.stub.id}` : "Walk-in"}</DialogTitle>
-        <DialogDescription>{issued ? "Check the pets that came, then record." : attending.kind === "stub" ? "A blank stub: enter the owner and pets." : "An owner without a stub."}</DialogDescription>
+        <DialogTitle>{`Stub ${attending.stub.id}`}</DialogTitle>
+        <DialogDescription>{issued ? "Check the pets that came, then record." : "A blank stub: enter the owner and pets."}</DialogDescription>
         <form onSubmit={submit} noValidate className="mt-4 space-y-4">
           {issued ? (
             <div className="rounded-xl bg-salin-tile p-3">
@@ -250,12 +265,6 @@ function AttendDialog({ attending, pack, known, onClose, onSave }: { attending: 
                 Mobile <span className="font-normal text-salin-muted">(optional)</span>
                 <input value={mobile} onChange={(event) => setMobile(event.target.value)} inputMode="tel" placeholder="09XX-XXX-XXXX" className={cn(field, "mt-1.5")} />
               </label>
-              {attending.kind === "walk-in" && barangays.length > 1 && (
-                <div className="grid gap-1.5">
-                  <span className="text-sm font-medium text-salin-text">Barangay</span>
-                  <ChoiceMenu variant="field" label="Barangay" heading="Barangay" value={barangayId} onChange={setBarangayId} options={barangays.map((b) => ({ value: String(b.id), label: b.name }))} />
-                </div>
-              )}
             </>
           )}
 
@@ -276,7 +285,7 @@ function AttendDialog({ attending, pack, known, onClose, onSave }: { attending: 
                 <div key={index} className="space-y-2 rounded-xl p-3 ring-1 ring-salin-border">
                   <div className="flex gap-2">
                     <input aria-label={`Pet ${index + 1} name`} placeholder={`Pet ${index + 1} name`} value={pet.name} onChange={(event) => setPet(index, { name: event.target.value })} maxLength={80} className={cn(field, "h-10 min-w-0 flex-1 text-sm")} />
-                    <div role="radiogroup" aria-label={`Pet ${index + 1} species`} className="flex shrink-0 rounded-xl bg-salin-tile p-1">
+                    <div role="radiogroup" aria-label={`Pet ${index + 1} species`} className="seg-track flex shrink-0 rounded-xl bg-salin-tile p-1">
                       {(["Dog", "Cat"] as const).map((species) => (
                         <button key={species} type="button" role="radio" aria-checked={pet.species === species} onClick={() => setPet(index, { species })} className={cn("h-8 rounded-lg px-3 text-[13px] font-medium", pet.species === species ? "bg-salin-surface text-salin-text shadow-sm" : "text-salin-muted")}>
                           {species}

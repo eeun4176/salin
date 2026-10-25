@@ -11,8 +11,9 @@
  */
 
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
-import { CalendarCheck, CircleCheck, CircleSlash, Clock, CloudOff, GitMerge, LoaderCircle, Pencil, Plus, Search, Send, Trash2, type LucideIcon } from "lucide-react";
+import { CalendarCheck, CircleCheck, CircleSlash, Clock, CloudOff, GitMerge, Pencil, Plus, Search, Send, Trash2, type LucideIcon } from "lucide-react";
 
+import { LoadingSkeleton } from "@/components/common/loading-skeleton";
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { primaryButton, secondaryButton } from "@/components/common/step-footer";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -98,9 +99,7 @@ export function RequestsTab() {
     <>
       {state.fromDevice && state.savedAt && <SavedCopy at={state.savedAt} />}
       {state.status === "loading" ? (
-        <p role="status" className="flex items-center justify-center gap-2 py-16 text-sm text-salin-muted">
-          <LoaderCircle aria-hidden="true" className="size-5 animate-spin motion-reduce:animate-none" /> Loading your barangay's request…
-        </p>
+        <LoadingSkeleton label="Loading your barangay's request" />
       ) : state.status === "unavailable" ? (
         <div role="alert" className="py-14 text-center">
           <CloudOff aria-hidden="true" className="mx-auto size-6 text-salin-muted" />
@@ -430,7 +429,7 @@ function OwnerDialog({ request, owner, listed, onClose, onSave }: { request: Pro
                 <legend className="sr-only">Pet {index + 1}</legend>
                 <div className="flex gap-2">
                   <input aria-label={`Pet ${index + 1} name`} placeholder={`Pet ${index + 1} name`} value={pet.name} onChange={(event) => setPet(index, { name: event.target.value })} maxLength={80} className={cn(field, "h-10 min-w-0 flex-1 text-sm")} />
-                  <div role="radiogroup" aria-label={`Pet ${index + 1} species`} className="flex shrink-0 rounded-xl bg-salin-tile p-1">
+                  <div role="radiogroup" aria-label={`Pet ${index + 1} species`} className="seg-track flex shrink-0 rounded-xl bg-salin-tile p-1">
                     {(["Dog", "Cat"] as const).map((species) => (
                       <button key={species} type="button" role="radio" aria-checked={pet.species === species} onClick={() => setPet(index, { species })} className={cn("h-8 rounded-lg px-3 text-[13px] font-medium", pet.species === species ? "bg-salin-surface text-salin-text shadow-sm" : "text-salin-muted")}>
                         {species}

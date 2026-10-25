@@ -189,12 +189,12 @@ test("recognition works offline once downloaded, and explains what to do when th
   await context.setOffline(true);
   await page.goto("/settings");
   await expect(page.getByText(/Download the text-recognition files once/)).toBeVisible();
-  await page.getByRole("region", { name: "Text recognition" }).getByRole("button", { name: /^Download / }).click();
+  await page.getByRole("region", { name: "Reading scanned pages" }).getByRole("button", { name: /^Download / }).click();
   await expect(page.getByText(/aren't on this device yet, and you're offline/)).toBeVisible();
 
   // Back online: the download is offered again; download once.
   await context.setOffline(false);
-  await page.getByRole("region", { name: "Text recognition" }).getByRole("button", { name: /^Download / }).click();
+  await page.getByRole("region", { name: "Reading scanned pages" }).getByRole("button", { name: /^Download / }).click();
   await expect(page.getByText(/Text recognition is ready/)).toBeVisible({ timeout: 90_000 });
 
   // Airplane mode: open the app, add a page, read it.

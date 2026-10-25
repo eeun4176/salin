@@ -9,8 +9,8 @@
  * downloaded is what was tested, and its integrity can be checked. Model
  * files come only from the configured model host (Hugging Face by default;
  * set VITE_AI_MODEL_HOST to self-host them); the shared ONNX Runtime engine
- * ships with Salin itself. Also the processing modes (Standard, AI Lite,
- * AI Advanced) and which one suits a device.
+ * ships with Salin itself. Also the processing modes (Off, Handwriting,
+ * Handwriting and assistant) and which one suits a device.
  */
 
 import runtimeUrl from "onnxruntime-web/ort-wasm-simd-threaded.asyncify.wasm?url";
@@ -184,9 +184,9 @@ export function modelUnavailableReason(model: AiModel, caps: DeviceCapabilities)
 export type AiMode = "standard" | "lite" | "advanced";
 
 export const AI_MODES: Record<AiMode, { label: string; description: string; models: AiModelId[] }> = {
-  standard: { label: "Standard", description: "Text recognition, templates and rule-based checks. No AI downloads.", models: [] },
-  lite: { label: "AI Lite", description: "Adds the handwriting reader (about 35 MB). Suits most phones.", models: ["handwriting"] },
-  advanced: { label: "AI Advanced", description: "Adds the on-device assistant (about 600 MB; 1 GB on laptops) for plain-language questions, requests and suggestions. Experimental; needs a strong device.", models: ["handwriting", "assistant"] },
+  standard: { label: "Off", description: "No downloads. Scanning, templates and checks still work.", models: [] },
+  lite: { label: "Handwriting", description: "Reads handwritten values on forms. About 35 MB — suits most phones.", models: ["handwriting"] },
+  advanced: { label: "Handwriting and assistant", description: "Also answers questions and requests in plain words. About 600 MB (1 GB on laptops) — needs a strong device.", models: ["handwriting", "assistant"] },
 };
 
 export interface AiModeChoice {

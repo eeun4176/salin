@@ -378,7 +378,7 @@ function TermsAgreement({ policy, language, onLanguage, agreed, onAgreed }: {
   const checkbox = "mt-0.5 size-[18px] shrink-0 accent-[var(--color-salin-primary)]";
   return (
     <section aria-label="Paravet terms" className="space-y-3 rounded-xl p-3.5 ring-1 ring-salin-border">
-      <div role="radiogroup" aria-label="Terms language" className="flex gap-1 rounded-full bg-salin-tile p-1 text-[13px] font-medium">
+      <div role="radiogroup" aria-label="Terms language" className="seg-track flex gap-1 rounded-full bg-salin-tile p-1 text-[13px] font-medium">
         {(["en", "fil"] as const).map((value) => (
           <button key={value} type="button" role="radio" aria-checked={language === value} onClick={() => onLanguage(value)} className={cn("h-8 flex-1 rounded-full", language === value ? "bg-salin-surface text-salin-text shadow-sm" : "text-salin-muted hover:text-salin-text")}>
             {value === "en" ? "English" : "Filipino"}

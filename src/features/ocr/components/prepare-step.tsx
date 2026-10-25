@@ -191,7 +191,7 @@ function PageEditor({ page, index, count }: { page: OcrPage; index: number; coun
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem]">
       <div className="min-w-0">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div role="tablist" aria-label="Page view" className="inline-flex rounded-xl bg-salin-tile p-1">
+          <div role="tablist" aria-label="Page view" className="seg-track inline-flex rounded-xl bg-salin-tile p-1">
             {(["adjust", "preview"] as const).map((v) => (
               <button
                 key={v}

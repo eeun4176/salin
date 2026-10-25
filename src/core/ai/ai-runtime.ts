@@ -38,7 +38,7 @@ export class AiError extends Error {
 }
 
 const MESSAGES: Record<AiErrorCode, string> = {
-  "missing-files": "The AI model isn't on this device. Download it in Settings → On-device AI, then try again.",
+  "missing-files": "The AI model isn't on this device. Download it in Settings → AI helpers, then try again.",
   memory: "This device ran out of memory running the AI model. Close other apps or tabs and try again, or switch to a lighter AI mode in Settings.",
   failed: "The AI model stopped unexpectedly. Try again — your work is saved.",
   unavailable: "On-device AI isn't available in this browser.",

@@ -22,7 +22,7 @@ const LIST_MAX = 480;
 const clampList = (px: number) => Math.round(Math.min(LIST_MAX, Math.max(LIST_MIN, px)));
 
 /** The cursor-resizable line between the list and detail panes; a separator with arrow-key steps for keyboards. */
-function PaneDivider({ width, onResize }: { width: number; onResize: (px: number) => void }) {
+export function PaneDivider({ width, onResize }: { width: number; onResize: (px: number) => void }) {
   const [drag, setDrag] = useState<{ x: number; from: number } | null>(null);
 
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
@@ -69,7 +69,8 @@ function PaneDivider({ width, onResize }: { width: number; onResize: (px: number
  */
 export function HomeLayout() {
   const desktop = useDesktopLayout();
-  const onDatasets = useLocation().pathname === DATASETS_LINK.to;
+  const { pathname } = useLocation();
+  const onDatasets = pathname === DATASETS_LINK.to;
   const [listWidth, setListWidth] = useState(340);
 
   if (desktop) {
@@ -77,7 +78,9 @@ export function HomeLayout() {
       <div className="grid min-h-dvh" style={{ gridTemplateColumns: `${listWidth}px 6px minmax(0,1fr)` }}>
         <main id="main" className="@container sticky top-0 h-dvh overflow-y-auto bg-salin-surface px-4 pt-4 pb-8" data-lenis-prevent="">
           <WorkspaceToolbar />
-          <Outlet />
+          <div key={pathname} className="motion-safe:animate-page-in">
+            <Outlet />
+          </div>
         </main>
         <PaneDivider width={listWidth} onResize={setListWidth} />
         {onDatasets ? <DatasetDetail /> : <FileDetail />}
@@ -93,7 +96,9 @@ export function HomeLayout() {
         className="@container min-h-[24rem] rounded-[28px] bg-salin-surface p-4 shadow-[0_1px_2px_rgb(16_40_28/0.04),0_24px_48px_-28px_rgb(16_40_28/0.18)] ring-1 ring-salin-border/70 sm:p-6"
       >
         <WorkspaceToolbar />
-        <Outlet />
+        <div key={pathname} className="motion-safe:animate-page-in">
+          <Outlet />
+        </div>
       </main>
     </div>
   );

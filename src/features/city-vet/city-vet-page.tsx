@@ -11,8 +11,9 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router";
-import { Bot, CircleAlert, CloudOff, Inbox, LoaderCircle, Search, Send } from "lucide-react";
+import { Bot, CircleAlert, CloudOff, Inbox, Search, Send } from "lucide-react";
 
+import { LoadingSkeleton } from "@/components/common/loading-skeleton";
 import { ChoiceMenu } from "@/components/common/choice-menu";
 import { primaryButton, secondaryButton } from "@/components/common/step-footer";
 import { PageFrame } from "@/components/layout/page-frame";
@@ -62,7 +63,7 @@ export function CityVetPage() {
   const tab: Tab = TABS.find((t) => t.id === params.get("tab"))?.id ?? "inbox";
   return (
     <PageFrame title="City Vet" description="Notices, records and reports from the City Veterinary Office.">
-      <div role="tablist" aria-label="City Vet" className="mb-5 flex gap-1 overflow-x-auto rounded-xl bg-salin-tile p-1">
+      <div role="tablist" aria-label="City Vet" className="seg-track no-scrollbar mb-5 flex gap-1 overflow-x-auto rounded-xl bg-salin-tile p-1">
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -76,7 +77,7 @@ export function CityVetPage() {
           </button>
         ))}
       </div>
-      <div role="tabpanel" aria-label={TABS.find((t) => t.id === tab)!.label}>
+      <div key={tab} role="tabpanel" aria-label={TABS.find((t) => t.id === tab)!.label} className="motion-safe:animate-page-in">
         {tab === "inbox" ? <InboxTab /> : tab === "records" ? <RecordsTab /> : tab === "quality" ? <QualityTab /> : <ReportTab />}
       </div>
     </PageFrame>
@@ -85,9 +86,7 @@ export function CityVetPage() {
 
 function Loading({ label }: { label: string }) {
   return (
-    <p role="status" className="flex items-center justify-center gap-2 py-12 text-sm text-salin-muted">
-      <LoaderCircle aria-hidden="true" className="size-5 animate-spin motion-reduce:animate-none" /> {label}
-    </p>
+    <LoadingSkeleton label={label} />
   );
 }
 

@@ -101,12 +101,10 @@ test("handwriting is read on the device, offline, and offered as suggestions the
   await openWorkspace(page);
   await waitForOfflineReady(page);
 
-  // Settings: choose AI Lite and download the handwriting reader (size, license and source shown).
+  // Settings: turn on Handwriting and download the handwriting reader.
   await page.goto("/settings");
-  await page.getByRole("radio", { name: /^AI Lite/ }).check();
+  await page.getByRole("radio", { name: /^Handwriting Reads/ }).check();
   const reader = page.getByRole("listitem").filter({ hasText: "Handwriting reader" });
-  await expect(reader).toContainText("Apache-2.0");
-  await expect(reader).toContainText("huggingface.co · PaddlePaddle/en_PP-OCRv5_mobile_rec_onnx @ 3fafbc3 (pinned)");
   await reader.getByRole("button", { name: /^Download/ }).click();
   await expect(reader.getByText("Ready offline")).toBeVisible({ timeout: 180_000 });
   await reader.getByRole("button", { name: "Check files" }).click();
@@ -183,7 +181,7 @@ test("rule suggestions, Transform with preview, filter and undo work without any
   await expect(page.getByRole("textbox", { name: "Sex, record 1" })).toHaveValue("Male");
   await expect(page.getByRole("textbox", { name: "Sex, record 2" })).toHaveValue("Female");
   // Without AI downloaded, the tools say how to turn them on.
-  await expect(page.getByText(/Set it up in Settings|Download the handwriting reader|Turn on AI Lite/).first()).toBeVisible();
+  await expect(page.getByText(/Set it up in Settings|Download the handwriting reader|Turn on Handwriting/).first()).toBeVisible();
 
   await page.getByRole("button", { name: /^Save (dataset|\d+ datasets)$/ }).click();
   await page.getByRole("link", { name: /Animals/ }).first().click().catch(async () => {
@@ -246,7 +244,7 @@ test("the assistant turns a plain-language request into a previewed, validated c
   await context.addInitScript(() => Object.defineProperty(navigator, "deviceMemory", { get: () => 4 }));
 
   await page.goto("/settings");
-  await page.getByRole("radio", { name: /^AI Advanced/ }).check();
+  await page.getByRole("radio", { name: /^Handwriting and assistant/ }).check();
   const assistant = page.getByRole("listitem").filter({ hasText: "On-device assistant" });
   await assistant.getByRole("button", { name: /^Download/ }).click();
   await expect(assistant.getByText("Ready offline")).toBeVisible({ timeout: 900_000 });
