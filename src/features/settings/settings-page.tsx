@@ -28,6 +28,7 @@ import {
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { AiSettingsCard } from "@/features/settings/ai-settings-card";
 import { OcrSettingsCard } from "@/features/settings/ocr-settings-card";
+import { ResetEmailCard } from "@/features/settings/reset-email-card";
 import { SectionCard } from "@/features/settings/section-card";
 import { PageFrame } from "@/components/layout/page-frame";
 import { getStorageStatus, isStorageLow, requestPersistentStorage, type StorageStatus } from "@/core/storage/storage-health";
@@ -251,6 +252,7 @@ export function SettingsPage() {
         <OcrSettingsCard />
         <AiSettingsCard />
         <BackupCard />
+        <ResetEmailCard />
         <PrivacyCard />
         <AppearanceCard />
       </div>

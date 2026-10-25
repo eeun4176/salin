@@ -20,6 +20,7 @@ Salin PWA ──HTTPS + Bearer token──▶ e-Kapon /api/v1 (Vercel) ──▶
 | Area | Endpoint | Code |
 |---|---|---|
 | Sign-in | `POST /auth/login`, `/auth/first-signin`, `/auth/set-password`, `/auth/renew`, `GET /auth/me` | `src/core/auth/local-auth.ts` |
+| Forgotten password | `POST /auth/email` (`send`, `verify`: the paravet's confirmed email), `POST /auth/forgot-password` (`send`, `reset`) | `src/core/auth/local-auth.ts` |
 | Program requests | `GET /program-interest`, `POST /program-interest` (`create-demand`, `add-interest`, `update-interest`, `withdraw-interest`, `submit-request`) | `src/core/programs/program-requests.ts` |
 | Stubs and program day | `GET /stub-workflow` (`mode=print`, `day-pack`, `attendance`), `POST /stub-workflow` (`confirm-print`, `confirm-owner`, `redeem`, `walk-in`) | `src/core/programs/stubs.ts` |
 | Census | `POST /census/submissions` | `src/core/census/admin-submission.ts` |
@@ -49,6 +50,15 @@ Go to **Census → Send to City Vet**. Only a Paravet can send, and only for the
 | `027_salin_stubs.sql` | Batches sent to a barangay for printing in Salin, stubs that follow owner edits, owner names confirmed on blank stubs |
 | `028_superadmin_only.sql` | One staff role |
 | `029_census_request_id.sql` | `request_id` on census submissions, so a resent census isn't counted twice |
+| `030_password_reset_email.sql` | The paravet's confirmed email, the emailed 6-digit codes, and `sessions_valid_after` (a reset signs out other devices) |
+
+## Forgotten password
+
+- **Set the email first.** In Salin's **Settings → Email for password reset**, the paravet enters an email, gets a 6-digit code there and enters it. e-Kapon saves the address only then, so a typo never receives reset codes.
+- **Reset.** On the sign-in screen, **Forgot password?** → Account Key → **Email me a code**, then the code and a new password (8+ characters, with a letter and a number). Salin signs in with the new password and forgets this phone's offline copy sealed with the old one. e-Kapon ends the account's sessions on other devices.
+- **Limits.** Codes last 10 minutes and allow 5 tries, and at most 3 are sent per account in 30 minutes. They're stored hashed. The reply is the same whether or not the account or email exists.
+- **No confirmed email?** The office issues a new temporary password, as before.
+- **Mail is sent from the office Gmail account** through e-Kapon's `GMAIL_USER` and `GMAIL_APP_PASSWORD`. The app password comes from Google Account → Security → 2-Step Verification → App passwords. Gmail allows about 500 emails a day. Outside production with no Gmail set up, mail goes to an in-memory outbox (`devOutbox`) for tests and local work. In production, the endpoints answer "not set up yet" until it is configured.
 
 Each file is idempotent and has rollback notes. Back up the database before applying them, and check `ekapon.schema_migrations` first.
 

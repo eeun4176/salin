@@ -112,3 +112,52 @@ test("first sign-in turns the temporary password into the paravet's own, with th
   await expect(page.getByTestId("section-menu")).toBeVisible();
   expect(saved).toMatchObject({ newPassword: "Strong-Pass-1", acceptedTerms: true, acknowledgedPrivacy: true, policyVersion: policy.version, policyLanguage: "fil" });
 });
+
+test("a forgotten password is reset with a code sent to the email confirmed in Settings", async ({ page }) => {
+  let email: string | null = null;
+  const account = { id: 7, type: "Paravet", name: ACCOUNT.name, username: null, accountKey: ACCOUNT.key, barangayId: 4, barangay: ACCOUNT.barangay };
+  const signedIn = { json: { account, token: "e2e-token", expiresAt: new Date(Date.now() + 14 * 86_400_000).toISOString() } };
+  const wrongCode = { status: 401, json: { error: { code: "INVALID_CODE", message: "That code is not right or has expired." } } };
+  await mockCityVet(page, {
+    "/auth/login": (b) => (b.password === "NewPass123" ? signedIn : { status: 401, json: { error: { code: "INVALID_CREDENTIALS", message: "Wrong password." } } }),
+    "/auth/forgot-password": (b) => (b.action === "send" ? { json: { sent: true, message: "If this account has a confirmed email, a 6-digit code is on its way." } } : b.code === "123456" ? { json: { reset: true } } : wrongCode),
+    "/auth/me": () => ({ json: { account: { ...account, email } } }),
+    "/auth/email": (b) => {
+      if (b.action === "send") return { json: { sent: true, email: b.email } };
+      if (b.code !== "654321") return wrongCode;
+      email = "juana@example.com";
+      return { json: { email } };
+    },
+  });
+
+  await page.goto("/login");
+  await page.getByRole("button", { name: "Forgot password?" }).click();
+  await expect(page.getByRole("heading", { name: "Reset your password" })).toBeVisible();
+  await page.getByLabel("Account Key").fill(ACCOUNT.key);
+  await page.getByRole("button", { name: "Email me a code" }).click();
+  await expect(page.getByRole("heading", { name: "Enter the code" })).toBeVisible();
+  await expect(page.getByText("a 6-digit code is on its way")).toBeVisible();
+
+  const code = page.getByLabel("6-digit code from the email");
+  await expect(code).toBeFocused();
+  await code.fill("000000");
+  await page.getByLabel("New password", { exact: true }).fill("NewPass123");
+  await page.getByLabel("Confirm new password").fill("NewPass123");
+  await page.getByRole("button", { name: "Save password and sign in" }).click();
+  await expect(page.getByRole("alert")).toHaveText("That code is not right or has expired.");
+  await code.fill("123456");
+  await page.getByRole("button", { name: "Save password and sign in" }).click();
+  await expect(page.getByText(`Welcome back, ${ACCOUNT.name}`)).toBeVisible();
+  await expect(page.getByTestId("section-menu")).toBeVisible();
+
+  // Settings: the email is saved only after the code sent to it is confirmed.
+  await page.goto("/settings");
+  const card = page.getByRole("region", { name: "Email for password reset" });
+  await expect(card.getByText("No email yet.")).toBeVisible();
+  await card.getByRole("button", { name: "Add email" }).click();
+  await card.getByLabel("Email address").fill("juana@example.com");
+  await card.getByRole("button", { name: "Send code" }).click();
+  await card.getByLabel("Code from the email").fill("654321");
+  await card.getByRole("button", { name: "Confirm email" }).click();
+  await expect(card.getByText("Codes go to juana@example.com.")).toBeVisible();
+});

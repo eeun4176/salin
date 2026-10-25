@@ -4,14 +4,29 @@
  * (the saved session, wrong passwords, accounts that still need their first
  * sign-in); first sign-in from temporary password to a signed-in session;
  * the background re-check that keeps, updates or ends the session; offline
- * sign-in for accounts that signed in here before; and token renewal.
+ * sign-in for accounts that signed in here before; the forgotten-password
+ * reset and its confirmed email; and token renewal.
  */
 
 import { describe, expect, it, vi } from "vitest";
 
 import { db } from "@/core/storage/database";
 
-import { finishFirstSignIn, getSession, refreshSession, shouldRenew, signIn, signOut, startFirstSignIn, validateLogin, validateNewPassword } from "./local-auth";
+import {
+  confirmEmail,
+  finishFirstSignIn,
+  getSession,
+  refreshSession,
+  requestPasswordReset,
+  resetPassword,
+  sendEmailCode,
+  shouldRenew,
+  signIn,
+  signOut,
+  startFirstSignIn,
+  validateLogin,
+  validateNewPassword,
+} from "./local-auth";
 
 const KEY = "PV2026-TMP001-3023";
 const PASSWORD = "Strong-Pass-1";
@@ -136,6 +151,35 @@ describe("offline sign-in", () => {
     await signIn({ key: KEY, password: PASSWORD });
     offline();
     expect(await signIn({ key: KEY, password: PASSWORD })).toMatchObject({ ok: false, message: expect.stringContaining("first sign-in") });
+  });
+});
+
+describe("forgotten password", () => {
+  it("asks for an emailed code, resets with it, and stops the old password opening this phone offline", async () => {
+    serve(reply(200, { account: ACCOUNT, token: "tok", expiresAt: "2026-11-07T00:00:00.000Z" }));
+    await signIn({ key: KEY, password: PASSWORD });
+    await signOut();
+
+    const sent = serve(reply(200, { sent: true, message: "If this account has a confirmed email, a 6-digit code is on its way." }));
+    expect(await requestPasswordReset(` ${KEY} `)).toEqual({ ok: true, message: expect.stringContaining("6-digit code") });
+    expect(sent(0)).toMatchObject({ url: expect.stringMatching(/\/api\/v1\/auth\/forgot-password$/), body: { action: "send", identifier: KEY } });
+
+    serve(error(401, "INVALID_CODE", "That code is not right or has expired."));
+    expect(await resetPassword(KEY, "000000", "New-Pass-22")).toEqual({ ok: false, message: expect.stringContaining("not right") });
+
+    const reset = serve(reply(200, { reset: true }));
+    expect(await resetPassword(KEY, " 123456 ", "New-Pass-22")).toEqual({ ok: true });
+    expect(reset(0).body).toEqual({ action: "reset", identifier: KEY, code: "123456", newPassword: "New-Pass-22" });
+    vi.stubGlobal("fetch", vi.fn(async () => Promise.reject(new TypeError("Failed to fetch"))));
+    expect(await signIn({ key: KEY, password: PASSWORD })).toMatchObject({ ok: false, message: expect.stringContaining("first sign-in") });
+  });
+
+  it("confirms the reset email with the code before City Vet saves it", async () => {
+    const calls = serve(reply(200, { sent: true, email: "juana@example.com" }), reply(200, { email: "juana@example.com" }));
+    await sendEmailCode("tok", " juana@example.com ");
+    expect(await confirmEmail("tok", "123456")).toBe("juana@example.com");
+    expect(calls(0)).toMatchObject({ headers: { Authorization: "Bearer tok" }, body: { action: "send", email: "juana@example.com" } });
+    expect(calls(1).body).toEqual({ action: "verify", code: "123456" });
   });
 });
 

@@ -168,6 +168,48 @@ export async function finishFirstSignIn(resetToken: string, input: NewPassword):
   }
 }
 
+/** Forgotten password, step 1: asks City Vet to email a 6-digit code to the account's confirmed email. The reply is the same whether or not the account has one. */
+export async function requestPasswordReset(key: string): Promise<{ ok: true; message: string } | { ok: false; message: string }> {
+  try {
+    const reply = await adminRequest("/auth/forgot-password", { method: "POST", body: { action: "send", identifier: key.trim() }, schema: z.object({ message: z.string() }) });
+    return { ok: true, message: reply.message };
+  } catch (error) {
+    if (!(error instanceof AdminApiError)) throw error;
+    return { ok: false, message: error.message };
+  }
+}
+
+/**
+ * Forgotten password, step 2: the emailed code and the new password; sign in with it afterwards.
+ * City Vet ends the account's older sessions; this phone also forgets its offline copy sealed with the old password.
+ */
+export async function resetPassword(key: string, code: string, newPassword: string): Promise<{ ok: true } | { ok: false; message: string }> {
+  try {
+    await adminRequest("/auth/forgot-password", { method: "POST", body: { action: "reset", identifier: key.trim(), code: code.trim(), newPassword }, schema: z.object({ reset: z.literal(true) }) });
+  } catch (error) {
+    if (!(error instanceof AdminApiError)) throw error;
+    return { ok: false, message: error.message };
+  }
+  await forgetSealedSession(key);
+  return { ok: true };
+}
+
+/** The confirmed email City Vet sends password reset codes to (null if none yet). */
+export async function getAccountEmail(token: string): Promise<string | null> {
+  const reply = await adminRequest("/auth/me", { token, schema: z.object({ account: z.object({ email: z.string().nullish() }) }) });
+  return reply.account.email ?? null;
+}
+
+/** Setting the reset email, step 1: City Vet emails a code to the address (it isn't saved yet). */
+export async function sendEmailCode(token: string, email: string) {
+  await adminRequest("/auth/email", { method: "POST", token, body: { action: "send", email: email.trim() }, schema: z.object({ email: z.string() }) });
+}
+
+/** Step 2: the code from that email; City Vet saves the address only now. */
+export async function confirmEmail(token: string, code: string): Promise<string> {
+  return (await adminRequest("/auth/email", { method: "POST", token, body: { action: "verify", code: code.trim() }, schema: z.object({ email: z.string() }) })).email;
+}
+
 /** True once half of the token's life has passed. */
 export function shouldRenew(session: Session, now = Date.now()) {
   const issued = session.tokenIssuedAt ?? session.signedInAt;
