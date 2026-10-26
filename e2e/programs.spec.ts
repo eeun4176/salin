@@ -55,6 +55,8 @@ test("owners added offline wait on the phone, then go to City Vet once; the list
   await expect(dialog.getByRole("alert")).toContainText("already on this list");
   await dialog.getByLabel("Owner name").fill("Pedro Reyes");
   await expect(dialog.getByRole("alert")).toHaveCount(0);
+  await dialog.getByRole("button", { name: "Add owner" }).click();
+  await expect(dialog.getByRole("alert")).toContainText("Add at least one pet");
 
   await context.setOffline(true);
   await dialog.getByLabel("Pet 1 name").fill("Muning");

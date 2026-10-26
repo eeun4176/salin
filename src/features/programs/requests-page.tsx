@@ -381,7 +381,7 @@ function OwnerDialog({ request, owner, listed, onClose, onSave }: { request: Pro
     event.preventDefault();
     if (busy) return;
     const named = pets.filter((pet) => pet.name.trim());
-    const problem = !ownerName.trim() ? "Enter the owner's name." : mobile.trim() && !MOBILE.test(mobile.trim()) ? "Enter the mobile number as 09XX-XXX-XXXX, or leave it blank." : named.some((pet) => !pet.processes.length) ? "Choose at least one service for each pet." : null;
+    const problem = !ownerName.trim() ? "Enter the owner's name." : mobile.trim() && !MOBILE.test(mobile.trim()) ? "Enter the mobile number as 09XX-XXX-XXXX, or leave it blank." : !named.length ? "Add at least one pet: an owner joins the request with their pets." : named.some((pet) => !pet.processes.length) ? "Choose at least one service for each pet." : null;
     if (problem) return setError(problem);
     if (duplicates.length && !confirmed) return setError(null);
     setBusy(true);
@@ -424,6 +424,7 @@ function OwnerDialog({ request, owner, listed, onClose, onSave }: { request: Pro
           </label>
 
           <div className="space-y-3">
+            <p className="text-sm font-medium text-salin-text">Pets <span className="font-normal text-salin-muted">(at least one)</span></p>
             {pets.map((pet, index) => (
               <fieldset key={index} className="space-y-2 rounded-xl p-3 ring-1 ring-salin-border">
                 <legend className="sr-only">Pet {index + 1}</legend>
@@ -436,7 +437,7 @@ function OwnerDialog({ request, owner, listed, onClose, onSave }: { request: Pro
                       </button>
                     ))}
                   </div>
-                  <button type="button" aria-label={`Remove pet ${index + 1}`} onClick={() => setPets((all) => all.filter((_, i) => i !== index))} className="grid size-10 shrink-0 place-items-center rounded-lg text-salin-muted hover:bg-salin-tile">
+                  <button type="button" aria-label={`Remove pet ${index + 1}`} disabled={pets.length === 1} onClick={() => setPets((all) => all.filter((_, i) => i !== index))} className="grid size-10 shrink-0 place-items-center rounded-lg text-salin-muted hover:bg-salin-tile disabled:opacity-30">
                     <Trash2 className="size-4" />
                   </button>
                 </div>

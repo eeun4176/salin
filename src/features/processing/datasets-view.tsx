@@ -17,6 +17,7 @@ import { ChevronRight, CircleCheck, House, Plus, ScanText, Table2, TriangleAlert
 
 import { LoadingSkeleton } from "@/components/common/loading-skeleton";
 import { ChoiceMenu } from "@/components/common/choice-menu";
+import { MoreDetails } from "@/components/common/more-details";
 import { DatasetActions } from "@/features/processing/components/dataset-actions";
 import { DATASET_PARAM } from "@/features/processing/components/dataset-detail";
 import { DocumentPickerDialog } from "@/features/processing/components/document-picker-dialog";
@@ -166,9 +167,11 @@ export function DatasetsView() {
       </nav>
 
       <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="text-[22px] font-semibold tracking-[-0.02em] text-salin-text @2xl:text-2xl">Datasets</h2>
-          <p className="mt-0.5 text-xs text-salin-muted">Tables extracted from your documents and scans. They stay on this device.</p>
+        <div className="relative min-w-0">
+          <h2 className="text-[22px] font-semibold tracking-[-0.02em] text-salin-text @2xl:text-2xl">
+            Datasets
+            <MoreDetails>Tables extracted from your documents and scans. They stay on this device.</MoreDetails>
+          </h2>
         </div>
         <button
           type="button"

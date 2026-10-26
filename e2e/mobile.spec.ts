@@ -19,6 +19,18 @@ for (const path of ["/", "/recents", "/trash", "/datasets", "/import", "/scan", 
   });
 }
 
+test("a page's explanation opens from More details beside the title and fits the phone", async ({ page }) => {
+  await page.goto("/settings");
+  const tip = page.getByRole("tooltip");
+  await expect(tip).toHaveCount(0);
+  await page.getByRole("button", { name: "More details" }).tap();
+  await expect(tip).toContainText("Storage, reading scanned pages");
+  await page.screenshot({ path: test.info().outputPath("more-details.png") });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+  await page.getByRole("button", { name: "More details" }).tap();
+  await expect(tip).toHaveCount(0);
+});
+
 test("quick actions open Import from the + button", async ({ page }) => {
   await openWorkspace(page);
   const toggle = page.getByRole("button", { name: "Open quick actions" });

@@ -17,6 +17,7 @@ import { Camera, CircleAlert, CircleCheck, CircleHelp, ClipboardList, FileSpread
 
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { LoadingSkeleton } from "@/components/common/loading-skeleton";
+import { MoreDetails } from "@/components/common/more-details";
 import { primaryButton, secondaryButton } from "@/components/common/step-footer";
 import { PageFrame } from "@/components/layout/page-frame";
 import type { CensusSendPlan } from "@/core/census/admin-submission";
@@ -278,8 +279,12 @@ export function CensusPage() {
   return (
     <div className="grid min-h-dvh" style={{ gridTemplateColumns: `${listWidth}px 6px minmax(0,1fr)` }}>
       <main id="main" className="sticky top-0 h-dvh overflow-y-auto bg-salin-surface px-4 pt-6 pb-8" data-lenis-prevent="">
-        <h1 className="text-2xl leading-tight font-bold tracking-[-0.03em] text-salin-text">Census</h1>
-        <p className="mt-1 mb-4 text-sm text-salin-muted">{DESCRIPTION}</p>
+        <div className="relative mb-4">
+          <h1 className="text-2xl leading-tight font-bold tracking-[-0.03em] text-salin-text">
+            Census
+            <MoreDetails>{DESCRIPTION}</MoreDetails>
+          </h1>
+        </div>
         <CensusActions />
         <section aria-labelledby="records-heading" className="mt-6">
           {heading}

@@ -10,6 +10,7 @@ import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { ArrowLeft } from "lucide-react";
 
+import { MoreDetails } from "@/components/common/more-details";
 import { AppHeader } from "@/components/layout/app-header";
 import { cn } from "@/lib/utils";
 
@@ -36,13 +37,15 @@ export function PageFrame({ title, description, aside, back = { to: "/", label: 
         )}
       >
         <header className="mb-6 flex flex-wrap items-end justify-between gap-4 border-b border-salin-border pb-5">
-          <div className="min-w-0">
+          <div className="relative min-w-0">
             <Link to={back.to} className="mb-1 -ml-2 inline-flex h-9 items-center gap-1.5 rounded-lg px-2 text-[13px] font-medium text-salin-muted hover:text-salin-text">
               <ArrowLeft className="size-4" />
               {back.label}
             </Link>
-            <h1 className="text-[clamp(1.5rem,4vw,2rem)] leading-tight font-bold tracking-[-0.03em] text-salin-text">{title}</h1>
-            {description && <p className="mt-1 max-w-2xl text-[15px] text-salin-muted">{description}</p>}
+            <h1 className="text-[clamp(1.5rem,4vw,2rem)] leading-tight font-bold tracking-[-0.03em] text-salin-text">
+              {title}
+              {description && <MoreDetails>{description}</MoreDetails>}
+            </h1>
           </div>
           {aside}
         </header>
