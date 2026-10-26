@@ -68,6 +68,8 @@ const campaign = z.object({
   reviewNote: z.string().nullish(),
   programTitle: z.string().nullish(),
   programDate: z.string().nullish(),
+  /** The linked program's own status (Planned, Open, In progress, Completed…). */
+  programStatus: z.string().nullish(),
   allowedBarangays: z.array(z.object({ id: z.number(), name: z.string() })),
   createdByName: z.string().nullish(),
   submittedByName: z.string().nullish(),
@@ -106,11 +108,20 @@ export const requestCacheKey = (account: string) => `programs:${account}`;
 export const loadRequests = (token: string) => adminRequest("/program-interest", { token, schema: listReply });
 export const loadRequest = (token: string, id: number) => adminRequest(`/program-interest?id=${id}`, { token, schema: detailReply });
 
-/** The request the paravet works on now: their barangay's active one, or — once merged — the one it joined. */
+/** A scheduled request whose program is Completed is done: the barangay may start its next request (e-Kapon allows it too). */
+export const programCompleted = (request: Pick<ProgramRequest, "status" | "programStatus">) => request.status === "scheduled" && request.programStatus?.toLowerCase() === "completed";
+
+/** The request the paravet works on now: their barangay's active one, or — once merged — the one it joined. None once its program is Completed. */
 export function currentRequest(requests: ProgramRequest[], barangayId: number | null): ProgramRequest | null {
   const own = requests.find((request) => request.kind === "program_request" && request.hostBarangayId === barangayId && ACTIVE.includes(request.status));
-  if (own?.status === "merged") return requests.find((request) => request.id === own.mergedIntoId) ?? own;
-  return own ?? null;
+  const current = own?.status === "merged" ? (requests.find((request) => request.id === own.mergedIntoId) ?? own) : own;
+  return current && !programCompleted(current) ? current : null;
+}
+
+/** The barangay's last request whose program was Completed (to say so above "Start a request"). */
+export function lastCompleted(requests: ProgramRequest[], barangayId: number | null): ProgramRequest | null {
+  const own = requests.filter((request) => request.kind === "program_request" && request.hostBarangayId === barangayId && ["scheduled", "merged"].includes(request.status));
+  return own.map((request) => (request.status === "merged" ? requests.find((r) => r.id === request.mergedIntoId) : request)).find((request): request is ProgramRequest => Boolean(request && programCompleted(request))) ?? null;
 }
 
 /** The barangay's own request that was merged into `current`, if any (to say "merged into …"). */

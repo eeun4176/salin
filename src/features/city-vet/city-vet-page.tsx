@@ -15,6 +15,7 @@ import { Bot, CircleAlert, CloudOff, Inbox, Search, Send } from "lucide-react";
 
 import { LoadingSkeleton } from "@/components/common/loading-skeleton";
 import { ChoiceMenu } from "@/components/common/choice-menu";
+import { RefreshButton } from "@/components/common/refresh-button";
 import { primaryButton, secondaryButton } from "@/components/common/step-footer";
 import { PageFrame } from "@/components/layout/page-frame";
 import { AdminApiError } from "@/core/admin/admin-api";
@@ -45,6 +46,7 @@ import { formatDate } from "@/features/workspace/query";
 import { useOnline } from "@/hooks/use-online";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
+import { useSyncStore } from "@/stores/sync-store";
 import { toast } from "@/stores/toast-store";
 import type { DatasetContent } from "@/types/processing";
 
@@ -62,7 +64,7 @@ export function CityVetPage() {
   const [params, setParams] = useSearchParams();
   const tab: Tab = TABS.find((t) => t.id === params.get("tab"))?.id ?? "inbox";
   return (
-    <PageFrame title="City Vet" description="Notices, records and reports from the City Veterinary Office.">
+    <PageFrame title="City Vet" description="Notices, records and reports from the City Veterinary Office." aside={<RefreshButton />}>
       <div role="tablist" aria-label="City Vet" className="seg-track no-scrollbar mb-5 flex gap-1 overflow-x-auto rounded-xl bg-salin-tile p-1">
         {TABS.map((t) => (
           <button
@@ -104,6 +106,7 @@ function InboxTab() {
   const [notices, setNotices] = useState<Notice[] | null>(null);
   const [fromDevice, setFromDevice] = useState(false);
   const cacheKey = `inbox:${session?.key}`;
+  const lastSyncedAt = useSyncStore((state) => state.lastSyncedAt);
 
   useEffect(() => {
     if (!session) return;
@@ -125,7 +128,7 @@ function InboxTab() {
     return () => {
       live = false;
     };
-  }, [session, cacheKey]);
+  }, [session, cacheKey, lastSyncedAt]);
 
   function open(notice: Notice) {
     if (session && !notice.read_at) {

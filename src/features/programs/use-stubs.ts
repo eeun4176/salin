@@ -79,6 +79,8 @@ export interface StubsData {
   programs: StubProgram[];
   /** Sheets sent to the barangay; a sheet that can't load now (e.g. after the program) keeps its saved copy. */
   sheets: StubSheet[];
+  /** Each sheet's program day pack: the owners and pets encoded on its stubs, and which stubs were used. */
+  packs: DayPack[];
 }
 
 const loadStubs = (session: Session) =>
@@ -87,7 +89,10 @@ const loadStubs = (session: Session) =>
     const sent = batches.filter((batch) => batch.sentAt);
     const results = await Promise.allSettled(sent.map((batch) => loadStubSheet(session.token, batch.id)));
     const sheets = results.flatMap((result, i) => (result.status === "fulfilled" ? [result.value] : (previous?.sheets.filter((sheet) => sheet.batch.id === sent[i].id) ?? [])));
-    return { programs, sheets };
+    const ids = [...new Set(sheets.map((sheet) => sheet.program.id))];
+    const loaded = await Promise.allSettled(ids.map((id) => loadDayPack(session.token, id)));
+    const packs = loaded.flatMap((result, i) => (result.status === "fulfilled" ? [result.value] : (previous?.packs?.filter((pack) => pack.program.id === ids[i]) ?? [])));
+    return { programs, sheets, packs };
   });
 
 export const useStubs = () => useSaved(loadStubs);

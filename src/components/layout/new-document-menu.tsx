@@ -2,7 +2,7 @@
  * New Document Menu
  * The sidebar's create button. Opening it morphs the green "+ New Document"
  * button into a white panel headed "Create New" (the + turns into ×), and
- * Scan Document, Import Files and New Dataset fan out beneath it. A
+ * Scan (documents and stub QR codes), Import Files and New Dataset fan out beneath it. A
  * drop-shadow filter on the wrapper follows the clip-path as it grows. In the
  * folded rail the panel also widens out of the 40px button. Escape, a click
  * outside or picking an option closes it and focus returns to the button;
@@ -35,7 +35,7 @@ interface Option {
 }
 
 const OPTIONS: Option[] = [
-  { label: "Scan Document", icon: Camera, key: "s", to: "/scan" },
+  { label: "Scan", icon: Camera, key: "s", to: "/scan" },
   { label: "Import Files", icon: FileUp, key: "i", to: "/import" },
   { label: "New Dataset", icon: Table2, key: "d", to: "/datasets", state: { newDataset: true } },
 ];

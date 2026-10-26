@@ -1,25 +1,28 @@
 /**
  * Attendance (the Attendance tab of /programs)
  * Program day. Salin downloads the program's stubs beforehand, so scanning
- * works with no signal: scan a stub's QR (or type its code), check the pets
- * that came, and the attendance waits in the outbox until there's signal.
+ * works with no signal: scan a stub's QR with the one scanner (/scan, which
+ * comes back here with ?stub=<code>) or type its code, check the pets that
+ * came, and the attendance waits in the outbox until there's signal. Every
+ * encoded stub is listed as present once scanned, and absent if it never was
+ * by the end of the program day.
  * Owners without a stub are typed in as walk-ins on a sheet, one row per
  * pet, so a queue of owners goes in at once. Scanning counts only on
  * the program date — before it is too early, after it the day is over —
  * and a stub already used (on the server, or on this phone) is refused.
  */
 
-import { useMemo, useState, type FormEvent } from "react";
-import { CalendarClock, CircleCheck, Clock, ScanLine, Trash2, UserPlus } from "lucide-react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useNavigate, useSearchParams } from "react-router";
+import { CalendarClock, CircleCheck, Clock, Hourglass, ScanLine, Trash2, UserPlus, UserX } from "lucide-react";
 
 import { LoadingSkeleton } from "@/components/common/loading-skeleton";
 import { ChoiceMenu } from "@/components/common/choice-menu";
 import { primaryButton, secondaryButton } from "@/components/common/step-footer";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
-import { findStub, pickProgram, programDay, redeemStub, walkIn, type AttendedPet, type DayPack, type PackStub, type StubOwner, type StubProgram } from "@/core/programs/stubs";
+import { attendanceRoster, findStub, pickProgram, programDay, redeemStub, walkIn, type AttendedPet, type DayPack, type PackStub, type StubOwner, type StubProgram } from "@/core/programs/stubs";
 import { OwnerNameInput } from "@/features/programs/owner-name-input";
 import { programWhen, services } from "@/features/programs/program-format";
-import { QrScanner } from "@/features/programs/qr-scanner";
 import { field, SavedCopy, ServiceToggles } from "@/features/programs/requests-page";
 import { useOwnerSuggestions } from "@/features/programs/use-owner-suggestions";
 import { useProgramDay, useStubs } from "@/features/programs/use-stubs";
@@ -69,7 +72,8 @@ function ProgramDayPanel({ program }: { program: StubProgram }) {
   const day = useProgramDay(program.id);
   const online = useOnline();
   const known = useOwnerSuggestions();
-  const [scanning, setScanning] = useState(false);
+  const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
   const [typed, setTyped] = useState("");
   const [attending, setAttending] = useState<Attending | null>(null);
   const [walkIns, setWalkIns] = useState(false);
@@ -83,18 +87,38 @@ function ProgramDayPanel({ program }: { program: StubProgram }) {
   const recorded = (day.data?.attendance ?? []).filter((a) => a.status !== "Voided");
   const used = new Set<number>([...recorded.flatMap((a) => (a.stubId ? [a.stubId] : [])), ...pending.flatMap((item) => (item.body.action === "redeem" ? [item.body.stubId as number] : []))]);
 
+  const refusal = (result: ReturnType<typeof findStub>) =>
+    result.kind === "invalid" ? "That isn't a City Vet stub code." : result.kind === "unknown" ? "This stub isn't for this program or your barangay." : result.kind === "used" ? `Stub ${result.stub.id} was already used.` : null;
+
   function open(code: string) {
-    setScanning(false);
     if (!pack) return;
     const result = findStub(pack, code, used);
-    if (result.kind === "invalid") toast("That isn't a City Vet stub code.");
-    else if (result.kind === "unknown") toast("This stub isn't for this program or your barangay.");
-    else if (result.kind === "used") toast(`Stub ${result.stub.id} was already used.`);
-    else {
-      setTyped("");
-      setAttending({ kind: "stub", stub: result.stub });
-    }
+    if (result.kind !== "ok") return toast(refusal(result)!);
+    setTyped("");
+    setAttending({ kind: "stub", stub: result.stub });
   }
+
+  // A stub QR read on /scan comes back as ?stub=<code>: once the day pack is on the phone, it opens like a typed code.
+  const scanned = params.get("stub");
+  const fromScan = scanned && pack ? findStub(pack, scanned, used) : null;
+  const clearScan = () =>
+    setParams((p) => {
+      p.delete("stub");
+      return p;
+    }, { replace: true });
+  const scanRefusal = fromScan ? refusal(fromScan) : null;
+  useEffect(() => {
+    if (!scanRefusal) return;
+    toast(scanRefusal);
+    setParams((p) => {
+      p.delete("stub");
+      return p;
+    }, { replace: true });
+  }, [scanRefusal, setParams]);
+  const shown: Attending | null = attending ?? (fromScan?.kind === "ok" ? { kind: "stub", stub: fromScan.stub } : null);
+  const roster = pack ? attendanceRoster(pack, used) : [];
+  const present = roster.filter((entry) => entry.state === "present").length;
+  const missing = roster.filter((entry) => entry.state !== "present").length;
 
   async function save(change: Parameters<typeof queueChange>[0], message: string) {
     await queueChange(change);
@@ -123,7 +147,7 @@ function ProgramDayPanel({ program }: { program: StubProgram }) {
       {when === "today" && pack && (
         <div className="space-y-3">
           <div className="grid gap-2 sm:flex">
-            <button type="button" onClick={() => setScanning(true)} className={primaryButton}>
+            <button type="button" onClick={() => navigate("/scan")} className={primaryButton}>
               <ScanLine aria-hidden="true" className="size-4" /> Scan stub
             </button>
             <button type="button" onClick={() => setWalkIns(true)} className={secondaryButton}>
@@ -146,6 +170,28 @@ function ProgramDayPanel({ program }: { program: StubProgram }) {
             </button>
           </form>
         </div>
+      )}
+
+      {roster.length > 0 && (
+        <section aria-labelledby="holders-heading" className="space-y-2">
+          <h2 id="holders-heading" className="text-sm font-semibold text-salin-text">
+            Stub holders <span className="text-salin-muted">· {present} present · {missing} {when === "over" ? "absent" : "not yet scanned"}</span>
+          </h2>
+          <ul className="divide-y divide-salin-border rounded-2xl ring-1 ring-salin-border">
+            {roster.map(({ stub, state }) => {
+              const [Icon, label] = state === "present" ? [CircleCheck, "Present"] : state === "absent" ? [UserX, "Absent"] : [Hourglass, "Not yet scanned"];
+              return (
+                <li key={stub.id} className="flex items-center gap-3 px-3 py-2.5 text-sm">
+                  <span className="w-12 shrink-0 font-mono text-xs font-semibold text-salin-text">{stub.id}</span>
+                  <span className="min-w-0 flex-1 truncate text-salin-text">{stub.owner?.name ?? "—"}</span>
+                  <span className={cn("flex shrink-0 items-center gap-1 text-xs", state === "present" ? "text-salin-primary-ink" : "text-salin-muted")}>
+                    <Icon aria-hidden="true" className="size-3.5" /> {label}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
       )}
 
       <section aria-labelledby="attendance-heading" className="space-y-2">
@@ -174,14 +220,19 @@ function ProgramDayPanel({ program }: { program: StubProgram }) {
         </ul>
       </section>
 
-      {scanning && <QrScanner onCode={open} onClose={() => setScanning(false)} />}
-      {attending && pack && (
+      {shown && pack && (
         <AttendDialog
-          attending={attending}
+          attending={shown}
           pack={pack}
           known={known}
-          onClose={() => setAttending(null)}
-          onSave={(owner, pets) => save(redeemStub(attending.stub, owner, pets), `Stub ${attending.stub.id} recorded.`)}
+          onClose={() => {
+            setAttending(null);
+            clearScan();
+          }}
+          onSave={async (owner, pets) => {
+            clearScan();
+            await save(redeemStub(shown.stub, owner, pets), `Stub ${shown.stub.id} recorded.`);
+          }}
         />
       )}
       {walkIns && (

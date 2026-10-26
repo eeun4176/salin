@@ -9,7 +9,7 @@ import { liveQuery } from "dexie";
 import { useCallback, useEffect, useState } from "react";
 
 import { AdminApiError } from "@/core/admin/admin-api";
-import { currentRequest, loadRequest, loadRequests, mergedFrom, requestCacheKey as cacheKey, type ProgramRequest, type RequestDetail } from "@/core/programs/program-requests";
+import { currentRequest, lastCompleted, loadRequest, loadRequests, mergedFrom, requestCacheKey as cacheKey, type ProgramRequest, type RequestDetail } from "@/core/programs/program-requests";
 import { db } from "@/core/storage/database";
 import type { Session } from "@/core/auth/local-auth";
 import { listOutbox } from "@/core/sync/outbox";
@@ -28,6 +28,8 @@ export interface ProgramRequestsState {
   current: ProgramRequest | null;
   /** The barangay's own request, when it was merged into `current`. */
   merged: ProgramRequest | null;
+  /** The barangay's last request whose program is Completed: a new request can start. */
+  completed: ProgramRequest | null;
   detail: RequestDetail | null;
   /** When the shown data was last loaded from the server (it may be older when offline). */
   savedAt: number | null;
@@ -93,6 +95,7 @@ export function useProgramRequests(): ProgramRequestsState {
     status,
     current: data ? currentRequest(data.requests, barangayId) : null,
     merged: data ? mergedFrom(data.requests, barangayId) : null,
+    completed: data ? lastCompleted(data.requests, barangayId) : null,
     detail: data?.detail ?? null,
     savedAt: data?.savedAt ?? null,
     fromDevice,

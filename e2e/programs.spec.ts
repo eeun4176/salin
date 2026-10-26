@@ -108,9 +108,9 @@ function cityVetStubs() {
       }
       const mode = query.get("mode");
       if (mode === "print")
-        return { json: { batch, program, stubs: [{ id: 101, code: code(1), ownerName: "Maria Santos", status: "Issued", services: ["Neuter/Spay"], ownerConfirmedAt: null }, { id: 102, code: code(2), ownerName: null, status: "Available", services: [], ownerConfirmedAt: null }] } };
+        return { json: { batch, program, requestedOwners: 1, stubs: [{ id: 101, code: code(1), ownerName: "Maria Santos", status: "Issued", services: ["Neuter/Spay"], ownerConfirmedAt: null }, { id: 102, code: code(2), ownerName: null, status: "Available", services: [], ownerConfirmedAt: null }] } };
       if (mode === "day-pack")
-        return { json: { program, generatedAt: new Date().toISOString(), stubs: [{ id: 101, code: code(1), status: "Issued", owner, pets: [{ name: "Bantay", species: "Dog", processes: ["Neuter/Spay"] }], redeemedAt: null, barangayId: 4 }] } };
+        return { json: { program, generatedAt: new Date().toISOString(), stubs: [{ id: 101, batchId: 31, code: code(1), status: "Issued", owner, pets: [{ name: "Bantay", species: "Dog", processes: ["Neuter/Spay"] }], redeemedAt: null, barangayId: 4 }] } };
       if (mode === "attendance") return { json: { data: [] } };
       return { json: { programs: [program], batches: [batch] } };
     },
@@ -118,19 +118,31 @@ function cityVetStubs() {
   return { routes, posts, code };
 }
 
-test("stubs: the written name is confirmed; program day: a stub is scanned offline once, and a walk-in recorded", async ({ page, context }) => {
+test("stubs: a blank stub is encoded on a sheet; program day: a scanned QR opens its stub, it counts once, and a walk-in is recorded", async ({ page, context }) => {
   const server = cityVetStubs();
   await mockCityVet(page, server.routes);
   await page.goto("/programs?tab=stubs");
   await expect(page.getByText("Kapon Day")).toBeVisible();
-  await expect(page.getByText("Blank stub · filled in on program day")).toBeVisible();
-  const name = page.getByRole("combobox", { name: "Name written on stub 101" });
-  await expect(name).toHaveValue("Maria Santos");
-  await name.fill("Maria D. Santos");
-  await page.getByRole("button", { name: "Confirm" }).click();
-  await expect.poll(() => server.posts).toEqual([{ action: "confirm-owner", stubId: 101, ownerName: "Maria D. Santos" }]);
+  // Encoded and not-yet-encoded stubs are listed apart; the search finds a stub by number, owner or pet.
+  await expect(page.getByRole("heading", { name: "Encoded (1)", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Not encoded (1)" })).toBeVisible();
+  await page.getByPlaceholder("Search stub no., owner, pet or mobile").fill("bantay");
+  await expect(page.getByRole("cell", { name: "Maria Santos" })).toBeVisible();
+  await expect(page.getByLabel("Stub 102 owner")).toHaveCount(0);
+  await page.getByPlaceholder("Search stub no., owner, pet or mobile").fill("");
+  // Stub 102 was handed to Pedro: his row goes in like a spreadsheet, the stub's pets one row each.
+  await page.getByLabel("Stub 102 owner").fill("Pedro Reyes");
+  await page.getByLabel("Stub 102 pet 1 name").fill("Tagpi");
+  await page.getByRole("button", { name: "Save 1 stub" }).click();
+  await expect.poll(() => server.posts).toEqual([{ action: "issue", stubId: 102, owner: { name: "Pedro Reyes", mobile: "", address: "", barangayId: 4 }, pets: [{ name: "Tagpi", species: "Dog", processes: ["Neuter/Spay", "Anti-Rabies Vaccine"] }] }]);
 
-  await page.getByRole("tab", { name: "Attendance" }).click();
+  // The QR read on /scan: on its program day it opens the stub's attendance.
+  await page.goto(`/programs?tab=stubs&stub=${encodeURIComponent(server.code(1))}`);
+  await expect(page.getByRole("tab", { name: "Attendance" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("dialog").getByText("Maria Santos")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByText("0 present · 1 not yet scanned")).toBeVisible();
+
   await expect(page.getByText("1 stub saved on this phone for scanning offline.")).toBeVisible();
   await context.setOffline(true);
   await page.getByLabel("Stub code").fill(server.code(1));
@@ -139,6 +151,7 @@ test("stubs: the written name is confirmed; program day: a stub is scanned offli
   await expect(dialog.getByText("Maria Santos")).toBeVisible();
   await dialog.getByRole("button", { name: "Record attendance" }).click();
   await expect(page.getByText(/Stub 101 · Waiting to send/)).toBeVisible();
+  await expect(page.getByText("1 present · 0 not yet scanned")).toBeVisible();
 
   await page.getByLabel("Stub code").fill(server.code(1));
   await page.getByRole("button", { name: "Find" }).click();
@@ -161,7 +174,7 @@ test("stubs: the written name is confirmed; program day: a stub is scanned offli
   await expect(page.getByRole("tab", { name: "Attendance" })).toHaveAttribute("aria-selected", "true");
 
   await context.setOffline(false);
-  await expect.poll(() => server.posts.map((p) => p.action)).toEqual(["confirm-owner", "redeem", "walk-in"]);
+  await expect.poll(() => server.posts.map((p) => p.action)).toEqual(["issue", "redeem", "walk-in"]);
   expect(server.posts[1]).toMatchObject({ stubId: 101, owner: { name: "Maria Santos", barangayId: 4 }, pets: [{ name: "Bantay", outcome: "Completed" }], requestId: expect.stringMatching(/^[0-9a-f-]{36}$/) });
   expect(server.posts[2]).toMatchObject({ campaignId: 21, owner: { name: "Pedro Reyes", barangayId: 4 }, pets: [{ name: "Tagpi", species: "Dog", processes: ["Neuter/Spay", "Anti-Rabies Vaccine"], outcome: "Completed" }, { name: "Mingming", species: "Cat" }] });
 });

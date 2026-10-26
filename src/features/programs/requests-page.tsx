@@ -110,7 +110,7 @@ export function RequestsTab() {
         startPending ? (
           <p className="py-14 text-center text-sm text-salin-muted">Your new request is waiting to send. It appears here once City Vet receives it.</p>
         ) : (
-          <StartRequest onStart={(input) => queue(startRequest(input), "Request started.")} />
+          <StartRequest completed={state.completed} onStart={(input) => queue(startRequest(input), "Request started.")} />
         )
       ) : (
         <div className="space-y-5">
@@ -299,7 +299,7 @@ function PendingOwner({ item }: { item: OutboxItem }) {
   );
 }
 
-function StartRequest({ onStart }: { onStart: (input: { targetPeople: number; processes: Process[]; note: string }) => Promise<void> }) {
+function StartRequest({ completed, onStart }: { completed: ProgramRequest | null; onStart: (input: { targetPeople: number; processes: Process[]; note: string }) => Promise<void> }) {
   const [target, setTarget] = useState("100");
   const [chosen, setChosen] = useState<Process[]>([...PROCESSES]);
   const [note, setNote] = useState("");
@@ -321,8 +321,10 @@ function StartRequest({ onStart }: { onStart: (input: { targetPeople: number; pr
   return (
     <form onSubmit={submit} className="mx-auto max-w-md space-y-4 py-4">
       <div className="text-center">
-        <p className="font-semibold text-salin-text">No active request</p>
-        <p className="mt-1 text-sm text-salin-muted">Start one for your barangay. The other paravets assigned here can add owners to it too.</p>
+        <p className="font-semibold text-salin-text">{completed ? "Your last program is completed" : "No active request"}</p>
+        <p className="mt-1 text-sm text-salin-muted">
+          {completed ? `${completed.programTitle ?? completed.reference} is done. Start the next request for your barangay.` : "Start one for your barangay. The other paravets assigned here can add owners to it too."}
+        </p>
       </div>
       <label className="block text-sm font-medium text-salin-text">
         Owner target

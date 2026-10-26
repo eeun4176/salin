@@ -92,9 +92,11 @@ Reviewed tables become datasets that can be edited, cleaned and exported.
 
 ### 3.6 Programs (Kapon, anti-rabies, microchipping days)
 Three tabs, all for the Paravet's barangay:
-- **Requests**: the barangay's shared program request. Add interested owners and their pets, then submit the request to the City Vet. Other Paravets of the same barangay see the same request.
-- **Stubs**: stub sheets the office sent for printing. Print them; owners write their names on blank stubs, and the Paravet confirms the names.
-- **Attendance** (program day): download the **day pack** before the event, then record attendance by scanning stub QR codes or adding **walk-ins**, even without signal. Everything is sent when the phone is back online.
+- **Requests**: the barangay's shared program request. Add interested owners, each with at least one pet, then submit the request to the City Vet. Other Paravets of the same barangay see the same request. Only one request runs at a time; once its program is **Completed**, the barangay can start the next.
+- **Stubs**: the numbered blank stubs the office sent. They can be printed only when the barangay has requested (or already encoded) owners. After handing a stub to an owner, the Paravet encodes it on a sheet: the stub number, the owner, and one row per pet (up to three) with the services as columns. Stubs are listed as **Not encoded** and **Encoded**, and a search finds any stub by number, owner, pet or mobile.
+- **Attendance** (program day): download the **day pack** before the event, then record attendance by scanning stub QR codes or adding **walk-ins**, even without signal. Every encoded stub shows as **present** once scanned and **absent** if it was never scanned by the end of the day. Everything is sent when the phone is back online.
+- **Scan**: there is one scanner (**Scan**). Point it at a document to capture pages, or at a stub: its QR opens that stub's row (on program day, its attendance). Each QR holds a random code that belongs to exactly one stub number.
+- **Refresh** (Programs and City Vet): loads the newest records; the page also refreshes by itself every minute while it is open and online.
 
 ### 3.7 City Vet page
 Messages from the office (inbox), a search of City Vet records the Paravet may see, data-quality flags, and **Report an issue**.

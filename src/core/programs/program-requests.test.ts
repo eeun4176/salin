@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { addOwner, currentRequest, editOwner, mergedFrom, possibleDuplicates, removeOwner, sendRequest, type ProgramRequest, type RequestOwner } from "./program-requests";
+import { addOwner, currentRequest, editOwner, lastCompleted, mergedFrom, possibleDuplicates, removeOwner, sendRequest, type ProgramRequest, type RequestOwner } from "./program-requests";
 
 const request = (extra: Partial<ProgramRequest>): ProgramRequest => ({
   id: 1, revision: 1, reference: "PI-2026-A", kind: "program_request", hostBarangayId: 4, hostBarangay: "Assumption", status: "gathering", requestedTargetPeople: 10, targetPeople: 10,
@@ -21,6 +21,16 @@ describe("currentRequest", () => {
     const list = [request({ id: 1, status: "closed" }), request({ id: 2, hostBarangayId: 9 }), request({ id: 3, status: "requested" })];
     expect(currentRequest(list, 4)?.id).toBe(3);
     expect(currentRequest(list, 5)).toBeNull();
+  });
+
+  it("ends once the program is Completed, so a new request can start; an ongoing program still blocks it", () => {
+    expect(currentRequest([request({ id: 3, status: "scheduled", programStatus: "In progress" })], 4)?.id).toBe(3);
+    const done = [request({ id: 3, status: "scheduled", programStatus: "Completed", programTitle: "Kapon Day" })];
+    expect(currentRequest(done, 4)).toBeNull();
+    expect(lastCompleted(done, 4)?.programTitle).toBe("Kapon Day");
+    const merged = [request({ id: 3, status: "merged", mergedIntoId: 8 }), request({ id: 8, hostBarangayId: 9, status: "scheduled", programStatus: "Completed" })];
+    expect(currentRequest(merged, 4)).toBeNull();
+    expect(lastCompleted(merged, 4)?.id).toBe(8);
   });
 
   it("follows a merged request to the one it joined", () => {

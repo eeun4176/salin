@@ -1,6 +1,8 @@
 /**
  * Scan Page (/scan)
- * Camera capture for paper documents: live viewfinder with a page frame;
+ * The one scanner: camera capture for paper documents, and stub QR codes —
+ * a City Vet stub held up to the live camera opens its stub number under
+ * Programs (on program day, its attendance). Live viewfinder with a page frame;
  * each shot is shown for Retake or Use photo; pages can also come from the
  * phone's own camera app (when the browser camera is blocked or missing) or
  * be uploaded (JPG, PNG, WebP, PDF — wrong types and files over 50 MB are
@@ -14,7 +16,9 @@ import { useNavigate } from "react-router";
 import { Camera, CameraOff, Check, FolderInput, Images, LoaderCircle, RotateCcw, ScanText, Sparkles, SwitchCamera, X } from "lucide-react";
 
 import { PageFrame } from "@/components/layout/page-frame";
+import { useQrWatch } from "@/features/capture/qr-reader";
 import { CAMERA_ERROR_COPY, useCamera } from "@/features/capture/use-camera";
+import { STUB_CODE } from "@/core/programs/stubs";
 import { scanUrl, startScanFromIntake } from "@/features/ocr/ocr-actions";
 import { FolderPickerDialog } from "@/features/workspace/components/folder-picker-dialog";
 import { folderUrl } from "@/features/workspace/use-open-item";
@@ -71,6 +75,7 @@ export function ScanPage() {
   const [choosingFolder, setChoosingFolder] = useState(false);
   const pagesRef = useRef<IntakeFile[]>([]);
   const handedOff = useRef(false);
+  const qrNoticed = useRef(false);
 
   useEffect(() => {
     pagesRef.current = pages;
@@ -85,6 +90,17 @@ export function ScanPage() {
   );
 
   const live = status.state === "live";
+  // Stub QR codes open their stub; any other QR (or none) leaves the page capture as it is.
+  useQrWatch(videoRef, live && !shot, (text) => {
+    if (!STUB_CODE.test(text.trim())) return;
+    // Never leave captured pages behind for a QR seen in passing.
+    if (pagesRef.current.length) {
+      if (!qrNoticed.current) toast("A stub QR is in view. Save or cancel these pages first, then scan the stub.");
+      qrNoticed.current = true;
+      return;
+    }
+    navigate(`/programs?tab=stubs&stub=${encodeURIComponent(text.trim())}`);
+  });
 
   function capture() {
     const video = videoRef.current;
@@ -179,7 +195,7 @@ export function ScanPage() {
   const canRetry = status.state === "error" && status.error !== "insecure" && status.error !== "unsupported";
 
   return (
-    <PageFrame title="Scan Document" description="Capture paper forms with your camera. Pages stay on this device.">
+    <PageFrame title="Scan" description="Capture paper forms with your camera, or hold up a City Vet stub: its QR code opens the stub. Pages stay on this device.">
       <input ref={uploadRef} type="file" accept={SCAN_ACCEPT_ATTR} multiple className="sr-only" tabIndex={-1} aria-hidden="true" data-testid="scan-file-input" onChange={onUpload} />
       <input ref={nativeRef} type="file" accept="image/*" capture="environment" className="sr-only" tabIndex={-1} aria-hidden="true" onChange={onNativeCapture} />
 
@@ -193,7 +209,7 @@ export function ScanPage() {
               <>
                 <DocumentFrame animate={!reduced} />
                 <p className="absolute top-3 left-1/2 -translate-x-1/2 rounded-full bg-salin-surface/85 px-3 py-1.5 text-xs font-medium whitespace-nowrap text-salin-text shadow-sm backdrop-blur">
-                  Fit the whole page inside the frame
+                  Fit the page in the frame, or show a stub QR
                 </p>
               </>
             )}
