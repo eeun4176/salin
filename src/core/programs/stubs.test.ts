@@ -78,7 +78,7 @@ describe("encoding blank stubs", () => {
     expect(draftIsBlank(draft)).toBe(true);
     expect(draftProblem({ ...draft, owner: "Juana" })).toBe("add at least one pet");
     expect(draftProblem({ ...draft, pets: [{ ...draft.pets[0], name: "Bantay" }] })).toBe("type the owner's name");
-    expect(draftProblem({ ...draft, owner: "Juana", mobile: "12345", pets: [{ ...draft.pets[0], name: "Bantay" }] })).toMatch(/09XX/);
+    expect(draftProblem({ ...draft, owner: "Juana", mobile: "12345", pets: [{ ...draft.pets[0], name: "Bantay" }] })).toMatch(/11 digits starting with 09/);
     expect(draftProblem({ ...draft, owner: "Juana", pets: [{ ...draft.pets[0], name: "Bantay", processes: [] }] })).toMatch(/service/);
     expect(draftProblem({ ...draft, owner: "Juana", pets: [{ ...draft.pets[0], name: "Bantay" }] })).toBeNull();
   });

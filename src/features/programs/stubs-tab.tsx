@@ -30,6 +30,7 @@ import { useAuthStore } from "@/stores/auth-store";
 import { queueChange } from "@/stores/sync-store";
 import { toast } from "@/stores/toast-store";
 import type { OutboxItem } from "@/types/sync";
+import { mobileDigits, mobileInput } from "@/core/programs/mobile";
 
 export function StubsTab() {
   const state = useStubs();
@@ -337,7 +338,7 @@ function EncodeSheet({ stubs, sheet, drafts, problems, known, focus, onChange }:
                       />
                     </td>
                     <td className="p-0">
-                      <input aria-label={`Stub ${stub.id} mobile`} value={draft.mobile} inputMode="tel" maxLength={20} placeholder="09XX-XXX-XXXX" onChange={(event) => set({ mobile: event.target.value })} className={cell} />
+                      <input aria-label={`Stub ${stub.id} mobile`} {...mobileInput} value={draft.mobile} onChange={(event) => set({ mobile: mobileDigits(event.target.value) })} className={cell} />
                     </td>
                     <td className="p-0">
                       <input aria-label={`Stub ${stub.id} address`} value={draft.address} maxLength={300} placeholder="Street, purok" onChange={(event) => set({ address: event.target.value })} className={cell} />

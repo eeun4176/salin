@@ -8,6 +8,7 @@
 
 import type { Process } from "@/core/programs/program-requests";
 import type { AttendedPet } from "@/core/programs/stubs";
+import { isMobile, MOBILE_HINT } from "@/core/programs/mobile";
 
 export interface WalkInRow {
   owner: string;
@@ -25,7 +26,7 @@ export interface WalkInOwner {
 }
 
 export const MAX_WALK_IN_PETS = 10;
-const MOBILE = /^09\d{2}[- ]?\d{3}[- ]?\d{4}$/;
+
 
 export const blankWalkInRow = (processes: Process[]): WalkInRow => ({ owner: "", mobile: "", pet: "", species: "Dog", processes: [...processes], served: true });
 
@@ -39,7 +40,7 @@ export function groupWalkIns(rows: WalkInRow[]): { owners: WalkInOwner[]; error:
     if (!owner && !pet && !mobile) continue;
     if (!pet) return { owners: [], error: `${at}: enter the pet's name.` };
     if (!row.processes.length) return { owners: [], error: `${at}: choose at least one service.` };
-    if (mobile && !MOBILE.test(mobile)) return { owners: [], error: `${at}: enter the mobile number as 09XX-XXX-XXXX, or leave it blank.` };
+    if (mobile && !isMobile(mobile)) return { owners: [], error: `${at}: enter the mobile number as ${MOBILE_HINT}, or leave it blank.` };
     let current = owners.at(-1);
     if (owner) {
       current = { name: owner, mobile: "", pets: [] };

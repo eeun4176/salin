@@ -16,6 +16,7 @@ import { z } from "zod";
 import { adminRequest } from "@/core/admin/admin-api";
 import { PROCESSES, type Process } from "@/core/programs/program-requests";
 import { newRequestId, type NewOutboxItem } from "@/core/sync/outbox";
+import { isMobile, MOBILE_HINT } from "@/core/programs/mobile";
 
 /** Where stub sheets and each program's day pack are kept on the device (settings table). */
 export const stubsCacheKey = (account: string) => `stubs:${account}`;
@@ -131,7 +132,6 @@ export interface StubDraft {
   pets: { name: string; species: "Dog" | "Cat"; sex: "" | "Male" | "Female"; processes: Process[] }[];
 }
 export const MAX_STUB_PETS = 3;
-const MOBILE = /^09\d{2}[- ]?\d{3}[- ]?\d{4}$/;
 
 export const emptyDraft = (processes: Process[]): StubDraft => ({ owner: "", mobile: "", address: "", pets: [{ name: "", species: "Dog", sex: "", processes: [...processes] }] });
 
@@ -142,7 +142,7 @@ export const draftIsBlank = (draft: StubDraft) => !draft.owner.trim() && !draft.
 export function draftProblem(draft: StubDraft): string | null {
   const pets = draft.pets.filter((p) => p.name.trim());
   if (!draft.owner.trim()) return "type the owner's name";
-  if (draft.mobile.trim() && !MOBILE.test(draft.mobile.trim())) return "write the mobile as 09XX-XXX-XXXX, or leave it blank";
+  if (draft.mobile.trim() && !isMobile(draft.mobile)) return `write the mobile as ${MOBILE_HINT}, or leave it blank`;
   if (!pets.length) return "add at least one pet";
   if (pets.length > MAX_STUB_PETS) return `one stub holds up to ${MAX_STUB_PETS} pets`;
   if (pets.some((p) => !p.processes.length)) return "choose at least one service for each pet";

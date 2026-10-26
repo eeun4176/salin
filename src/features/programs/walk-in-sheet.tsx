@@ -18,6 +18,7 @@ import { blankWalkInRow, groupWalkIns, type WalkInRow } from "@/core/programs/wa
 import { OwnerNameInput } from "@/features/programs/owner-name-input";
 import type { useOwnerSuggestions } from "@/features/programs/use-owner-suggestions";
 import { cn } from "@/lib/utils";
+import { mobileDigits, mobileInput } from "@/core/programs/mobile";
 
 const cell = "h-10 w-full min-w-0 bg-transparent px-2.5 text-sm text-salin-text outline-none placeholder:text-salin-subtle focus:bg-salin-primary-soft/40 focus:ring-2 focus:ring-salin-primary focus:ring-inset";
 const head = "h-9 border-b border-salin-border px-2.5 text-left text-[11px] font-semibold tracking-[0.06em] text-salin-muted uppercase";
@@ -110,7 +111,7 @@ export function WalkInSheet({
                       />
                     </td>
                     <td>
-                      <input aria-label={`Row ${n} mobile`} value={row.mobile} onChange={(event) => setRow(index, { mobile: event.target.value })} inputMode="tel" placeholder="09XX-XXX-XXXX" className={cell} />
+                      <input aria-label={`Row ${n} mobile`} {...mobileInput} value={row.mobile} onChange={(event) => setRow(index, { mobile: mobileDigits(event.target.value) })} className={cell} />
                     </td>
                     <td>
                       <input aria-label={`Row ${n} pet`} value={row.pet} onChange={(event) => setRow(index, { pet: event.target.value })} maxLength={80} placeholder="Pet name" className={cell} />

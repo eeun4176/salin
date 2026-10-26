@@ -2,8 +2,9 @@
  * Attendance (the Attendance tab of /programs)
  * Program day. Salin downloads the program's stubs beforehand, so scanning
  * works with no signal: scan a stub's QR with the one scanner (/scan, which
- * comes back here with ?stub=<code>) or type its code, check the pets that
- * came, and the attendance waits in the outbox until there's signal. Every
+ * comes back here with ?stub=<code>) or type its code: an encoded stub is
+ * recorded present at once (every pet served); a blank stub asks who came.
+ * The attendance waits in the outbox until there's signal. Every
  * encoded stub is listed as present once scanned, and absent if it never was
  * by the end of the program day.
  * Owners without a stub are typed in as walk-ins on a sheet, one row per
@@ -12,7 +13,7 @@
  * and a stub already used (on the server, or on this phone) is refused.
  */
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { CalendarClock, CircleCheck, Clock, Hourglass, ScanLine, Trash2, UserPlus, UserX } from "lucide-react";
 
@@ -32,8 +33,9 @@ import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
 import { queueChange } from "@/stores/sync-store";
 import { toast } from "@/stores/toast-store";
+import { isMobile, mobileDigits, mobileInput, MOBILE_HINT } from "@/core/programs/mobile";
 
-const MOBILE = /^09\d{2}[- ]?\d{3}[- ]?\d{4}$/;
+
 
 type Attending = { kind: "stub"; stub: PackStub };
 
@@ -95,10 +97,12 @@ function ProgramDayPanel({ program }: { program: StubProgram }) {
     const result = findStub(pack, code, used);
     if (result.kind !== "ok") return toast(refusal(result)!);
     setTyped("");
-    setAttending({ kind: "stub", stub: result.stub });
+    const encoded = encodedStub(result.stub);
+    if (encoded) void recordPresent(encoded, online);
+    else setAttending({ kind: "stub", stub: result.stub });
   }
 
-  // A stub QR read on /scan comes back as ?stub=<code>: once the day pack is on the phone, it opens like a typed code.
+  // A stub QR read on /scan comes back as ?stub=<code>: once the day pack is on the phone, it counts like a typed code.
   const scanned = params.get("stub");
   const fromScan = scanned && pack ? findStub(pack, scanned, used) : null;
   const clearScan = () =>
@@ -106,16 +110,28 @@ function ProgramDayPanel({ program }: { program: StubProgram }) {
       p.delete("stub");
       return p;
     }, { replace: true });
+  // The scanned code already recorded here; once saved it reads as "used", which is not news.
+  const handled = useRef<string | null>(null);
+  const direct = fromScan?.kind === "ok" ? encodedStub(fromScan.stub) : null;
+  useEffect(() => {
+    if (!scanned || !direct || handled.current === scanned) return;
+    handled.current = scanned;
+    setParams((p) => {
+      p.delete("stub");
+      return p;
+    }, { replace: true });
+    void recordPresent(direct, online);
+  }, [scanned, direct, online, setParams]);
   const scanRefusal = fromScan ? refusal(fromScan) : null;
   useEffect(() => {
-    if (!scanRefusal) return;
+    if (!scanRefusal || handled.current === scanned) return;
     toast(scanRefusal);
     setParams((p) => {
       p.delete("stub");
       return p;
     }, { replace: true });
-  }, [scanRefusal, setParams]);
-  const shown: Attending | null = attending ?? (fromScan?.kind === "ok" ? { kind: "stub", stub: fromScan.stub } : null);
+  }, [scanRefusal, scanned, setParams]);
+  const shown: Attending | null = attending ?? (fromScan?.kind === "ok" && !direct ? { kind: "stub", stub: fromScan.stub } : null);
   const roster = pack ? attendanceRoster(pack, used) : [];
   const present = roster.filter((entry) => entry.state === "present").length;
   const missing = roster.filter((entry) => entry.state !== "present").length;
@@ -253,6 +269,16 @@ function ProgramDayPanel({ program }: { program: StubProgram }) {
   );
 }
 
+/** An encoded stub: its owner and pets are known, so a scan alone records attendance. A blank stub still asks who came. */
+const encodedStub = (stub: PackStub) => (stub.status === "Issued" && stub.owner && stub.pets.length ? (stub as PackStub & { owner: StubOwner }) : null);
+
+/** Records the stub's owner as present, every pet served, the moment it is scanned. */
+async function recordPresent(stub: PackStub & { owner: StubOwner }, online: boolean) {
+  await queueChange(redeemStub(stub, stub.owner, stub.pets.map((pet) => ({ ...pet, served: true }))));
+  const message = `Stub ${stub.id} · ${stub.owner.name}: present.`;
+  toast(online ? message : `${message} It will be sent when you're back online.`);
+}
+
 const newPet = (program: StubProgram): AttendedPet => ({ name: "", species: "Dog", processes: [...program.processes], served: true });
 
 function AttendDialog({ attending, pack, known, onClose, onSave }: { attending: Attending; pack: DayPack; known: ReturnType<typeof useOwnerSuggestions>; onClose: () => void; onSave: (owner: StubOwner, pets: AttendedPet[]) => Promise<void> }) {
@@ -272,7 +298,7 @@ function AttendDialog({ attending, pack, known, onClose, onSave }: { attending: 
     event.preventDefault();
     if (busy) return;
     const named = pets.filter((p) => p.name.trim());
-    const problem = !name.trim() ? "Enter the owner's name." : mobile.trim() && !MOBILE.test(mobile.trim()) ? "Enter the mobile number as 09XX-XXX-XXXX, or leave it blank." : !named.length ? "Add at least one pet." : named.some((p) => !p.processes.length) ? "Choose at least one service for each pet." : null;
+    const problem = !name.trim() ? "Enter the owner's name." : mobile.trim() && !isMobile(mobile) ? `Enter the mobile number as ${MOBILE_HINT}, or leave it blank.` : !named.length ? "Add at least one pet." : named.some((p) => !p.processes.length) ? "Choose at least one service for each pet." : null;
     if (problem) return setError(problem);
     setBusy(true);
     try {
@@ -314,7 +340,7 @@ function AttendDialog({ attending, pack, known, onClose, onSave }: { attending: 
               </label>
               <label className="block text-sm font-medium text-salin-text">
                 Mobile <span className="font-normal text-salin-muted">(optional)</span>
-                <input value={mobile} onChange={(event) => setMobile(event.target.value)} inputMode="tel" placeholder="09XX-XXX-XXXX" className={cn(field, "mt-1.5")} />
+                <input {...mobileInput} value={mobile} onChange={(event) => setMobile(mobileDigits(event.target.value))} className={cn(field, "mt-1.5")} />
               </label>
             </>
           )}

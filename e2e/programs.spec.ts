@@ -100,17 +100,19 @@ function cityVetStubs() {
   const batch = { id: 31, reference: "SB-2026-1", campaignId: 21, barangay: "Assumption", status: "Approved", approvedQuantity: 2, sentAt: new Date().toISOString() };
   const owner = { name: "Maria Santos", mobile: "09171234567", address: "", barangayId: 4 };
   const posts: Record<string, unknown>[] = [];
+  const redeemed = new Set<number>();
   const routes = {
     "/stub-workflow": (body: Record<string, unknown>, { method, query }: { method: string; query: URLSearchParams }) => {
       if (method === "POST") {
         posts.push(body);
+        if (body.action === "redeem") redeemed.add(body.stubId as number);
         return { json: { saved: true } };
       }
       const mode = query.get("mode");
       if (mode === "print")
         return { json: { batch, program, requestedOwners: 1, stubs: [{ id: 101, code: code(1), ownerName: "Maria Santos", status: "Issued", services: ["Neuter/Spay"], ownerConfirmedAt: null }, { id: 102, code: code(2), ownerName: null, status: "Available", services: [], ownerConfirmedAt: null }] } };
       if (mode === "day-pack")
-        return { json: { program, generatedAt: new Date().toISOString(), stubs: [{ id: 101, batchId: 31, code: code(1), status: "Issued", owner, pets: [{ name: "Bantay", species: "Dog", processes: ["Neuter/Spay"] }], redeemedAt: null, barangayId: 4 }] } };
+        return { json: { program, generatedAt: new Date().toISOString(), stubs: [{ id: 101, batchId: 31, code: code(1), status: redeemed.has(101) ? "Redeemed" : "Issued", owner, pets: [{ name: "Bantay", species: "Dog", processes: ["Neuter/Spay"] }], redeemedAt: null, barangayId: 4 }] } };
       if (mode === "attendance") return { json: { data: [] } };
       return { json: { programs: [program], batches: [batch] } };
     },
@@ -136,23 +138,16 @@ test("stubs: a blank stub is encoded on a sheet; program day: a scanned QR opens
   await page.getByRole("button", { name: "Save 1 stub" }).click();
   await expect.poll(() => server.posts).toEqual([{ action: "issue", stubId: 102, owner: { name: "Pedro Reyes", mobile: "", address: "", barangayId: 4 }, pets: [{ name: "Tagpi", species: "Dog", processes: ["Neuter/Spay", "Anti-Rabies Vaccine"] }] }]);
 
-  // The QR read on /scan: on its program day it opens the stub's attendance.
+  // The QR read on /scan: on its program day the encoded stub is recorded present at once.
   await page.goto(`/programs?tab=stubs&stub=${encodeURIComponent(server.code(1))}`);
   await expect(page.getByRole("tab", { name: "Attendance" })).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByRole("dialog").getByText("Maria Santos")).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(page.getByText("0 present · 1 not yet scanned")).toBeVisible();
+  await expect(page.getByText("Stub 101 · Maria Santos: present.")).toBeVisible();
+  await expect(page.getByText("1 present · 0 not yet scanned")).toBeVisible();
+  await expect.poll(() => server.posts.map((p) => p.action)).toEqual(["issue", "redeem"]);
 
   await expect(page.getByText("1 stub saved on this phone for scanning offline.")).toBeVisible();
   await context.setOffline(true);
-  await page.getByLabel("Stub code").fill(server.code(1));
-  await page.getByRole("button", { name: "Find" }).click();
   const dialog = page.getByRole("dialog");
-  await expect(dialog.getByText("Maria Santos")).toBeVisible();
-  await dialog.getByRole("button", { name: "Record attendance" }).click();
-  await expect(page.getByText(/Stub 101 · Waiting to send/)).toBeVisible();
-  await expect(page.getByText("1 present · 0 not yet scanned")).toBeVisible();
-
   await page.getByLabel("Stub code").fill(server.code(1));
   await page.getByRole("button", { name: "Find" }).click();
   await expect(page.getByText("Stub 101 was already used.")).toBeVisible();
@@ -166,7 +161,7 @@ test("stubs: a blank stub is encoded on a sheet; program day: a scanned QR opens
   await expect(dialog.getByText("1 owner · 2 pets")).toBeVisible();
   await dialog.getByRole("button", { name: "Record walk-ins" }).click();
   await expect(page.getByText("1 walk-in recorded. They will be sent when you're back online.")).toBeVisible();
-  expect(server.posts).toHaveLength(1);
+  expect(server.posts).toHaveLength(2);
 
   // The calendar lists today's program and links back to its attendance.
   await page.getByRole("tab", { name: "Calendar" }).click();

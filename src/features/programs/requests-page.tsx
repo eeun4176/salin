@@ -45,9 +45,10 @@ import { useAuthStore } from "@/stores/auth-store";
 import { queueChange } from "@/stores/sync-store";
 import { toast } from "@/stores/toast-store";
 import type { OutboxItem } from "@/types/sync";
+import { isMobile, mobileDigits, mobileInput, MOBILE_HINT } from "@/core/programs/mobile";
 
 export const field = "h-11 w-full rounded-xl border border-salin-border bg-salin-surface px-3 text-[15px] text-salin-text outline-none focus:border-salin-primary focus:ring-3 focus:ring-salin-primary/20";
-const MOBILE = /^09\d{2}[- ]?\d{3}[- ]?\d{4}$/;
+
 
 // Icon + word for each status, never colour alone.
 const STATUS_ICON: Record<RequestStatus, LucideIcon> = {
@@ -383,7 +384,7 @@ function OwnerDialog({ request, owner, listed, onClose, onSave }: { request: Pro
     event.preventDefault();
     if (busy) return;
     const named = pets.filter((pet) => pet.name.trim());
-    const problem = !ownerName.trim() ? "Enter the owner's name." : mobile.trim() && !MOBILE.test(mobile.trim()) ? "Enter the mobile number as 09XX-XXX-XXXX, or leave it blank." : !named.length ? "Add at least one pet: an owner joins the request with their pets." : named.some((pet) => !pet.processes.length) ? "Choose at least one service for each pet." : null;
+    const problem = !ownerName.trim() ? "Enter the owner's name." : mobile.trim() && !isMobile(mobile) ? `Enter the mobile number as ${MOBILE_HINT}, or leave it blank.` : !named.length ? "Add at least one pet: an owner joins the request with their pets." : named.some((pet) => !pet.processes.length) ? "Choose at least one service for each pet." : null;
     if (problem) return setError(problem);
     if (duplicates.length && !confirmed) return setError(null);
     setBusy(true);
@@ -422,7 +423,7 @@ function OwnerDialog({ request, owner, listed, onClose, onSave }: { request: Pro
           </label>
           <label className="block text-sm font-medium text-salin-text">
             Mobile <span className="font-normal text-salin-muted">(optional)</span>
-            <input value={mobile} onChange={(event) => { setMobile(event.target.value); setConfirmed(false); }} inputMode="tel" placeholder="09XX-XXX-XXXX" className={cn(field, "mt-1.5")} />
+            <input {...mobileInput} value={mobile} onChange={(event) => { setMobile(mobileDigits(event.target.value)); setConfirmed(false); }} className={cn(field, "mt-1.5")} />
           </label>
 
           <div className="space-y-3">
