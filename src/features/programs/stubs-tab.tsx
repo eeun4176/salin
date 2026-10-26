@@ -43,7 +43,8 @@ export function StubsTab() {
   const sheets = useMemo(() => state.data?.sheets ?? [], [state.data]);
   const packs = useMemo(() => state.data?.packs ?? [], [state.data]);
 
-  // A QR scanned on /scan arrives as ?stub=<code>: on its program day it opens attendance, else its row here (until a search is typed).
+  // A QR scanned on /scan arrives as ?stub=<code>: on its program day it goes to attendance, else to its row here (until a search is typed).
+  // A stub not on a sheet sent here (e.g. printed by the office and handed over) is left for attendance to check against the day's stubs.
   const code = params.get("stub");
   const found = useMemo(() => {
     const sheet = code ? sheets.find((s) => s.stubs.some((stub) => stub.code === code)) : undefined;
@@ -53,11 +54,8 @@ export function StubsTab() {
   const query = code ? "" : typed;
   useEffect(() => {
     if (!code || state.status === "loading") return;
-    if (found && found.stub.status !== "Available" && programDay(found.sheet.program) === "today") navigate(`/programs?tab=attendance&program=${found.sheet.program.id}&stub=${encodeURIComponent(code)}`, { replace: true });
-    else if (!found) {
-      toast("That QR isn't one of your barangay's stubs.");
-      setParams({ tab: "stubs" }, { replace: true });
-    }
+    if (found && programDay(found.sheet.program) === "today") navigate(`/programs?tab=attendance&program=${found.sheet.program.id}&stub=${encodeURIComponent(code)}`, { replace: true });
+    else if (!found) navigate(`/programs?tab=attendance&stub=${encodeURIComponent(code)}`, { replace: true });
   }, [code, found, state.status, navigate, setParams]);
 
   if (state.status === "loading") return <LoadingSkeleton label="Loading your stubs" />;

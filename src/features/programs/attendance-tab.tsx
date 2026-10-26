@@ -87,7 +87,7 @@ function ProgramDayPanel({ program }: { program: StubProgram }) {
   const packIds = useMemo(() => new Set(pack?.stubs.map((s) => s.id)), [pack]);
   const pending = day.pending.filter((item) => item.body.campaignId === program.id || packIds.has(item.body.stubId as number));
   const recorded = (day.data?.attendance ?? []).filter((a) => a.status !== "Voided");
-  const used = new Set<number>([...recorded.flatMap((a) => (a.stubId ? [a.stubId] : [])), ...pending.flatMap((item) => (item.body.action === "redeem" ? [item.body.stubId as number] : []))]);
+  const used = new Set<number>([...recorded.flatMap((a) => (a.stubId ? [a.stubId] : [])), ...pending.flatMap((item) => (item.body.action === "redeem" ? [item.body.stubId as number] : [])), ...recordedOnThisPhone]);
 
   const refusal = (result: ReturnType<typeof findStub>) =>
     result.kind === "invalid" ? "That isn't a City Vet stub code." : result.kind === "unknown" ? "This stub isn't for this program or your barangay." : result.kind === "used" ? `Stub ${result.stub.id} was already used.` : null;
@@ -104,7 +104,8 @@ function ProgramDayPanel({ program }: { program: StubProgram }) {
 
   // A stub QR read on /scan comes back as ?stub=<code>: once the day pack is on the phone, it counts like a typed code.
   const scanned = params.get("stub");
-  const fromScan = scanned && pack ? findStub(pack, scanned, used) : null;
+  // Scans count only on the program date; before or after it the code is refused with the reason, never queued.
+  const fromScan = scanned && pack && when === "today" ? findStub(pack, scanned, used) : null;
   const clearScan = () =>
     setParams((p) => {
       p.delete("stub");
@@ -122,7 +123,7 @@ function ProgramDayPanel({ program }: { program: StubProgram }) {
     }, { replace: true });
     void recordPresent(direct, online);
   }, [scanned, direct, online, setParams]);
-  const scanRefusal = fromScan ? refusal(fromScan) : null;
+  const scanRefusal = fromScan ? refusal(fromScan) : scanned && pack && when !== "today" ? `Stubs are scanned on the program day (${programWhen(program)}). ${program.title} is not today.` : null;
   useEffect(() => {
     if (!scanRefusal || handled.current === scanned) return;
     toast(scanRefusal);
@@ -247,6 +248,7 @@ function ProgramDayPanel({ program }: { program: StubProgram }) {
           }}
           onSave={async (owner, pets) => {
             clearScan();
+            recordedOnThisPhone.add(shown.stub.id);
             await save(redeemStub(shown.stub, owner, pets), `Stub ${shown.stub.id} recorded.`);
           }}
         />
@@ -273,7 +275,11 @@ function ProgramDayPanel({ program }: { program: StubProgram }) {
 const encodedStub = (stub: PackStub) => (stub.status === "Issued" && stub.owner && stub.pets.length ? (stub as PackStub & { owner: StubOwner }) : null);
 
 /** Records the stub's owner as present, every pet served, the moment it is scanned. */
+// Stubs recorded on this phone since it opened: a sent record leaves the outbox before the stub list reloads as used.
+const recordedOnThisPhone = new Set<number>();
+
 async function recordPresent(stub: PackStub & { owner: StubOwner }, online: boolean) {
+  recordedOnThisPhone.add(stub.id);
   await queueChange(redeemStub(stub, stub.owner, stub.pets.map((pet) => ({ ...pet, served: true }))));
   const message = `Stub ${stub.id} · ${stub.owner.name}: present.`;
   toast(online ? message : `${message} It will be sent when you're back online.`);
