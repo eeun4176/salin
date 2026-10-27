@@ -2,6 +2,8 @@
 
 How Salin adds optional on-device AI on top of the Phase 3 dataset editor and the Phase 4 OCR engine: which models were chosen and why (with the benchmarks that decided it), how suggestions stay grounded and traceable, how models are managed offline, and the status of every Phase 5 task.
 
+> **Current models (October 2026):** handwriting: PaddleOCR PP-OCRv5 mobile (ONNX Runtime Web). Assistant: **Qwen3-0.6B** (Transformers.js) on phones and other devices, and **Qwen3-1.7B** (WebLLM) on laptops and desktops with WebGPU and 8 GB of memory. §1.2 records how the first choice (Qwen3.5-0.8B) was replaced in Round 2. AI modes in Settings are named **Off**, **Handwriting** and **Handwriting and assistant**, plus **Auto**. The summary for the project is in [`TECHNOLOGIES.md`](TECHNOLOGIES.md).
+
 **The rule throughout: AI proposes, validation checks, the user approves.** No AI output is ever written to a dataset or a scan without passing a schema check and an explicit user action. Everything still works without any AI model.
 
 ## 1. Technology decisions
@@ -11,7 +13,7 @@ How Salin adds optional on-device AI on top of the Phase 3 dataset editor and th
 | Tesseract.js | **Kept** | Printed text, word boxes and confidence (Phase 4). |
 | ONNX Runtime Web | **Added** (1.31, shared) | Runs the handwriting model directly, and is the backend under Transformers.js. One engine binary (27 MB, WASM with WebGPU support) serves both models. It is downloaded on demand into the model cache, not precached; its 53 KB loader ships with the app. |
 | Transformers.js | **Added** (4.3) | Runs the assistant language model (tokenizer, chat template, generation) on WebGPU or the CPU. It runs in the AI worker, and only loads when the assistant is used. |
-| WebLLM | **Not added** | It sits behind the same `LocalAiProvider` interface (`core/ai/ai-runtime.ts`), so it can be added for WebGPU-only devices later. One runtime keeps downloads and testing small. |
+| WebLLM | **Added in Round 2** (0.2.85, pinned) | Runs Qwen3-1.7B on laptops and desktops with WebGPU, behind the same `LocalAiProvider` interface (`core/ai/ai-runtime.ts`). Phones never download it. See §1.2, Round 2. |
 | Image preprocessing | Kept | The same crop, deskew, contrast and denoise pipeline feeds handwriting crops. |
 | Templates | **Extended** | They now carry Filipino and English wordings from the CVO forms, a standard-form rule per field, versions, and an editor. |
 | Zod | Kept | It validates every model reply (commands, fields, corrections, mappings, names) and the new backup fields. |
@@ -51,7 +53,7 @@ A reply counts as correct only if it becomes exactly the right validated command
 | LFM2.5-350M (q4) | 294 MB | 4% | 8% | 29% | 0 |
 | **Qwen3.5-0.8B (q4)** | **570 MB (CPU) / 489 MB (GPU)** | **79% → 88%** with the request check | **33% → 42%** (5/12) with the request check | **7/7** | **0** |
 
-**Chosen: Qwen3.5-0.8B** (Apache-2.0), the only candidate that was usable. It is still a small model, so the assistant is **experimental** (AI Advanced only). Every reply is validated against the dataset and previewed before it changes anything, and the Transform tools do everything the assistant can do.
+**Round 1 choice: Qwen3.5-0.8B** (Apache-2.0), the only candidate that was usable. *(Replaced by Qwen3-0.6B and Qwen3-1.7B in Round 2, below.)* It is still a small model, so the assistant is **experimental** (AI Advanced only). Every reply is validated against the dataset and previewed before it changes anything, and the Transform tools do everything the assistant can do.
 
 The held-out score is the honest one. The model's main failure was adding conditions nobody asked for ("only cats please" → also "Sex is Female"). Replies are therefore also checked against the request: a filter condition is kept only if the request names its column or value, including Filipino synonyms such as "aso" → Dog, and common operator spellings ("greater_than_or_equal") are accepted. The second figures re-score the same stored replies with this check (`parseCommandReply(reply, columns, request)`). It also turned one wrong destructive answer ("remove pets older than 10" → delete by date) into a refusal.
 
@@ -133,7 +135,7 @@ Known limits: a form split by a completely unused column reads as two side-by-si
 
 ### 2.1 Modes and device support
 
-*Standard* uses no models. *AI Lite* adds the handwriting reader (35 MB including the engine). *AI Advanced* adds the assistant (≈600 MB; ≈1 GB on WebGPU laptops and desktops with 8 GB of memory).
+*Off* (called Standard in the code) uses no models. *Handwriting* (Lite) adds the handwriting reader (35 MB including the engine). *Handwriting and assistant* (Advanced) adds the assistant (≈600 MB; ≈1 GB on WebGPU laptops and desktops with 8 GB of memory).
 
 *Auto* recommends a mode from the device:
 - WebAssembly, workers and Cache Storage are required.

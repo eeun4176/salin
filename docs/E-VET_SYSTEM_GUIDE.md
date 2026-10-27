@@ -11,7 +11,7 @@ e-Vet is two apps that work together:
 | Main job | Capture paper forms, census sheets and spreadsheets in the field, turn them into clean data, and send values to the office | Review, approve and manage records, run programs, manage Paravets, and report |
 | Data lives | On the phone (IndexedDB) until the user sends it | Central database (Supabase Postgres) |
 | Code | `salin` repo | `city-vet-admin` repo (e-Kapon) |
-| Hosted at | Vercel (`salin` project) | `https://city-vet-admin.vercel.app` |
+| Hosted at | `https://field-evetsjdm.vercel.app` (Vercel) | `https://admin-evetsjdm.vercel.app` (Vercel) |
 
 > Code, storage and database names keep the project names **Salin** (Field) and **e-Kapon** (Admin). Renaming them would lose users' saved data, so only the names people see changed.
 
@@ -111,7 +111,7 @@ Ask questions about a dataset in English, Filipino or Taglish: "ilan ang aso na 
 **Being online does not make AI Studio stronger.** It never uses cloud AI: owner data stays on the device, and the internet is used only to download the model once. On devices without enough memory or WebGPU, AI features say **unsupported on this device**. Scanning, importing and exporting still work.
 
 ### 3.9 Settings and backup
-Theme (light/dark), AI mode (Auto, Lite, Standard, Advanced), model downloads, email for password reset, storage use, and **Backup / Restore** of the phone's data to a file.
+Theme (light/dark), AI mode (Auto, Off, Handwriting, Handwriting and assistant), model downloads, email for password reset, storage use, and **Backup / Restore** of the phone's data to a file.
 
 ---
 
@@ -153,6 +153,7 @@ The list of Paravets and their sign-in accounts.
 The 62 official barangays, by district, each with its **number of active Paravets** and their names. A Paravet counts as soon as their account exists, even before their first sign-in; deactivated Paravets don't count.
 
 ### 4.7 Insights
+- **Analytics** (the first tab): KPI cards (capacity use, attendance, completion and interest-conversion rates, programs, registered and recorded pets, vaccination coverage), each with its formula behind the (i), and column charts below them. It also has program operations with a live view of today's programs, barangay performance, reconciliation checks, and Print/PDF, CSV and Excel exports.
 - **Reports**
   - **Program outcomes**: owner and pet visits, completed procedures, stub vs walk-in visits, and outcomes per process for a year and barangay.
   - **Registry statistics**: totals, year-on-year comparison, monthly charts and a barangay heatmap.
@@ -231,7 +232,10 @@ npm run build
 | File | Topic |
 |---|---|
 | `ADMIN_INTEGRATION.md` | How e-Vet Field talks to e-Vet Admin, sending a census, migrations, password reset |
-| `ARCHITECTURE.md` | e-Vet Field's code structure |
+| `ARCHITECTURE.md` | How both apps are built, connected and deployed |
+| `TECHNOLOGIES.md` | Technologies and AI models: purpose and why they fit |
+| `LIMITATIONS.md` | What the system can't do, or does only under conditions |
+| `DEVELOPMENT_PLAN.md` | Phases, status and what's left before going live |
 | `CENSUS_FORM.md` | The CVO census sheet, OMR and its versions |
 | `PHASE4_OCR.md`, `OCR_BENCHMARKS.md` | Scanning and text reading |
 | `PHASE5_AI.md` | On-device AI: models, benchmarks, decisions |

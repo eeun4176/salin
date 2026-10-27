@@ -1,6 +1,6 @@
 # City Vet admin integration (e-Kapon)
 
-Salin is the paravets' field app for the City Veterinary Office's admin system, **e-Kapon** (`city-vet-admin` repo). Salin keeps everything on the device and sends e-Kapon only what the user chooses to send.
+Salin (shown to users as **e-Vet Field**) is the paravets' field app for the City Veterinary Office's admin system, **e-Kapon** (shown as **e-Vet Admin**, `city-vet-admin` repo). The overall design is in [`ARCHITECTURE.md`](ARCHITECTURE.md). Salin keeps everything on the device and sends e-Kapon only what the user chooses to send.
 
 ```
 Salin PWA ──HTTPS + Bearer token──▶ e-Kapon /api/v1 (Vercel) ──▶ Supabase Postgres (schema ekapon)
@@ -13,7 +13,8 @@ Salin PWA ──HTTPS + Bearer token──▶ e-Kapon /api/v1 (Vercel) ──▶
 - **Documents, scans and photos are never uploaded.** Salin sends only values: program request edits, stub and program-day updates, and census records.
 - **One way in.** Every call goes through `src/core/admin/admin-api.ts` to `${VITE_CITY_VET_API_URL}/api/v1`. It uses a Bearer token, never a cookie, and checks every reply with zod.
 - **Writes go through the outbox** (`src/core/sync/outbox.ts`). A change is saved first and sent later, in order, whenever Salin is online and signed in. Each item's id is also the server's `requestId`, so a resend after a dropped reply is recognised and isn't counted twice. A refusal from the server marks the item "needs attention" and shows the server's message.
-- **Roles.** Paravets use only Salin and are refused by the e-Kapon web app. Staff (SuperAdmin) can also sign in to Salin, for program day.
+- **Roles.** Paravets use only Salin and are refused by the e-Kapon web app. Staff (stored as SuperAdmin, shown as Admin) can also sign in to Salin, for program day.
+- **Phone numbers** are 11 digits starting with 09 and are sent as plain digits; both apps check them the same way.
 
 ## What Salin calls
 
@@ -22,7 +23,7 @@ Salin PWA ──HTTPS + Bearer token──▶ e-Kapon /api/v1 (Vercel) ──▶
 | Sign-in | `POST /auth/login`, `/auth/first-signin`, `/auth/set-password`, `/auth/renew`, `GET /auth/me` | `src/core/auth/local-auth.ts` |
 | Forgotten password | `POST /auth/email` (`send`, `verify`: the paravet's confirmed email), `POST /auth/forgot-password` (`send`, `reset`) | `src/core/auth/local-auth.ts` |
 | Program requests | `GET /program-interest`, `POST /program-interest` (`create-demand`, `add-interest`, `update-interest`, `withdraw-interest`, `submit-request`) | `src/core/programs/program-requests.ts` |
-| Stubs and program day | `GET /stub-workflow` (`mode=print`, `day-pack`, `attendance`), `POST /stub-workflow` (`confirm-print`, `confirm-owner`, `redeem`, `walk-in`) | `src/core/programs/stubs.ts` |
+| Stubs and program day | `GET /stub-workflow` (`mode=print`, `day-pack`, `attendance`), `POST /stub-workflow` (`confirm-print`, `issue`: encode the owner and pets on a blank stub, `redeem`, `walk-in`) | `src/core/programs/stubs.ts` |
 | Census | `POST /census/submissions` | `src/core/census/admin-submission.ts` |
 | City Vet page | `/notifications`, `/issues`, `/search`, `/data-quality`, `/health` | `src/core/admin/city-vet.ts` |
 
@@ -51,6 +52,8 @@ Go to **Census → Send to City Vet**. Only a Paravet can send, and only for the
 | `028_superadmin_only.sql` | One staff role |
 | `029_census_request_id.sql` | `request_id` on census submissions, so a resent census isn't counted twice |
 | `030_password_reset_email.sql` | The paravet's confirmed email, the emailed 6-digit codes, and `sessions_valid_after` (a reset signs out other devices) |
+| `031_email_codes_no_rls.sql` | Turns off the row-level security Supabase adds to new tables, so the API can store email codes |
+| `032_staff_change_username.sql` | Lets an Admin change their own username |
 
 ## Forgotten password
 
