@@ -10,7 +10,7 @@ e-Vet is two apps that work together:
 | What it is | Installable phone app (PWA) that works offline | Web dashboard |
 | Main job | Capture paper forms, census sheets and spreadsheets in the field, turn them into clean data, and send values to the office | Review, approve and manage records, run programs, manage Paravets, and report |
 | Data lives | On the phone (IndexedDB) until the user sends it | Central database (Supabase Postgres) |
-| Code | `salin` repo | `city-vet-admin` repo (e-Kapon) |
+| Code | `e-Vet-Field` repo (Salin) | `e-Vet-Admin` repo (e-Kapon) |
 | Hosted at | `https://field-evetsjdm.vercel.app` (Vercel) | `https://admin-evetsjdm.vercel.app` (Vercel) |
 
 > Code, storage and database names keep the project names **Salin** (Field) and **e-Kapon** (Admin). Renaming them would lose users' saved data, so only the names people see changed.
@@ -220,7 +220,7 @@ npm run build
 - `dev:test` doesn't always reload edited API files; restart it after server changes.
 
 ### Deploy
-- **e-Vet Admin** deploys to Vercel on every push to `main` (`eeun4176/city-vet-admin`).
+- **e-Vet Admin** deploys to Vercel on every push to `main` (`eeun4176/e-Vet-Admin`).
 - Database changes are SQL files in `db/` (numbered migrations) and `hosting/`. The database owner applies them in the Supabase SQL Editor after a backup. `hosting/07-query-timeouts.sql` sets database time limits so one stuck request can't stall the API.
 
 ### Hosting notes (learned the hard way)

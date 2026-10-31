@@ -235,7 +235,7 @@ A scan only counts on the program's own date. A stub already scanned on this pho
 | Using both apps, accounts and roles | [`E-VET_SYSTEM_GUIDE.md`](E-VET_SYSTEM_GUIDE.md) |
 | API calls, census sending, migrations, password reset, CSP | [`ADMIN_INTEGRATION.md`](ADMIN_INTEGRATION.md) |
 | Scanning and OCR | [`PHASE4_OCR.md`](PHASE4_OCR.md), [`OCR_BENCHMARKS.md`](OCR_BENCHMARKS.md) |
-| On-device AI: models and benchmarks | [`PHASE5_AI.md`](PHASE5_AI.md), [`PHASE5_ACCURACY_IMPROVEMENT.md`](PHASE5_ACCURACY_IMPROVEMENT.md) |
+| On-device AI: models and benchmarks | [`PHASE5_AI.md`](PHASE5_AI.md) |
 | The census sheet and OMR | [`CENSUS_FORM.md`](CENSUS_FORM.md) |
 | Colours, type and components | [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md) |
 | Phases and what's left | [`DEVELOPMENT_PLAN.md`](DEVELOPMENT_PLAN.md) |

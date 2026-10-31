@@ -33,3 +33,6 @@ e2e/.models
 
 # Signed-in browser state the e2e setup saves
 e2e/.auth
+
+# Internal working notes, kept locally only
+docs/PHASE5_ACCURACY_IMPROVEMENT.md
