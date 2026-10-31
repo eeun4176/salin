@@ -169,7 +169,7 @@ export function ImportPage() {
   const totalBytes = queue.reduce((sum, f) => sum + f.size, 0);
 
   return (
-    <PageFrame title="Import Files" description="Bring in documents, spreadsheets and images. Nothing is uploaded — files stay on this device.">
+    <PageFrame title="Import files" description="Bring in documents, spreadsheets and images. Nothing is uploaded — files stay on this device.">
       {inputs}
 
       <div

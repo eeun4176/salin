@@ -36,8 +36,8 @@ interface Option {
 
 const OPTIONS: Option[] = [
   { label: "Scan", icon: Camera, key: "s", to: "/scan" },
-  { label: "Import Files", icon: FileUp, key: "i", to: "/import" },
-  { label: "New Dataset", icon: Table2, key: "d", to: "/datasets", state: { newDataset: true } },
+  { label: "Import files", icon: FileUp, key: "i", to: "/import" },
+  { label: "New dataset", icon: Table2, key: "d", to: "/datasets", state: { newDataset: true } },
 ];
 
 export function NewDocumentMenu({ collapsed }: { collapsed: boolean }) {
@@ -116,8 +116,8 @@ export function NewDocumentMenu({ collapsed }: { collapsed: boolean }) {
             aria-haspopup="menu"
             aria-expanded={open}
             aria-controls={menuId}
-            aria-label="New Document"
-            title="New Document"
+            aria-label="New document"
+            title="New document"
             onClick={() => (open ? close() : setOpen(true))}
             onKeyDown={(event) => {
               if (event.key === "ArrowDown" && !open) {
@@ -147,7 +147,7 @@ export function NewDocumentMenu({ collapsed }: { collapsed: boolean }) {
             />
             <span aria-hidden="true" className="relative grid flex-1 text-left whitespace-nowrap" style={{ opacity: collapsed && !open ? 0 : 1 }}>
               <span className="col-start-1 row-start-1" style={{ opacity: open ? 0 : 1, transition: `opacity ${time(300)}ms ease` }}>
-                New Document
+                New document
               </span>
               <span className="col-start-1 row-start-1" style={{ opacity: open ? 1 : 0, transition: `opacity ${time(300)}ms ease` }}>
                 Create New

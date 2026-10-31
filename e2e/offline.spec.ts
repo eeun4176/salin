@@ -31,7 +31,7 @@ test("the cached app opens and keeps working without a network", async ({ page, 
   await page.goto("/settings");
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
   await page.goto("/import");
-  await expect(page.getByRole("heading", { name: "Import Files" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Import files" })).toBeVisible();
 
   await context.setOffline(false);
 });
